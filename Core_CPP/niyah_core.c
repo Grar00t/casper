@@ -105,8 +105,8 @@ static void matvec(float * restrict y,
         float32x4_t a1 = vdupq_n_f32(0.f);
         size_t c = 0;
         for (; c + 7 < C; c += 8) {
-            a0 = vmlaq_f32(a0, vld1q_f32(row+c),   vld1q_f32(x+c));
-            a1 = vmlaq_f32(a1, vld1q_f32(row+c+4), vld1q_f32(x+c+4));
+            a0 = vfmaq_f32(a0, vld1q_f32(row+c),   vld1q_f32(x+c));
+            a1 = vfmaq_f32(a1, vld1q_f32(row+c+4), vld1q_f32(x+c+4));
         }
         float32x4_t acc = vaddq_f32(a0, a1);
         float32x2_t lo2 = vadd_f32(vget_low_f32(acc), vget_high_f32(acc));
@@ -158,8 +158,8 @@ static float dot_f32(const float * restrict a,
     float32x4_t acc1 = vdupq_n_f32(0.f);
     size_t i = 0;
     for (; i + 7 < n; i += 8) {
-        acc0 = vmlaq_f32(acc0, vld1q_f32(a+i),   vld1q_f32(b+i));
-        acc1 = vmlaq_f32(acc1, vld1q_f32(a+i+4), vld1q_f32(b+i+4));
+        acc0 = vfmaq_f32(acc0, vld1q_f32(a+i),   vld1q_f32(b+i));
+        acc1 = vfmaq_f32(acc1, vld1q_f32(a+i+4), vld1q_f32(b+i+4));
     }
     float32x4_t acc = vaddq_f32(acc0, acc1);
     float32x2_t lo2 = vadd_f32(vget_low_f32(acc), vget_high_f32(acc));
@@ -193,6 +193,18 @@ static void rmsnorm(float * restrict out,
         __m128 s4 = _mm_add_ps(lo, hi);
         __m128 s2 = _mm_add_ps(s4, _mm_movehdup_ps(s4));
         ss = _mm_cvtss_f32(_mm_add_ss(s2, _mm_movehl_ps(s2, s2)));
+        for (; ri < n; ri++) ss += x[ri] * x[ri];
+    }
+#elif defined(SIMD_NEON)
+    {
+        float32x4_t vss = vdupq_n_f32(0.f);
+        size_t ri = 0;
+        for (; ri + 3 < n; ri += 4) {
+            float32x4_t vv = vld1q_f32(x + ri);
+            vss = vfmaq_f32(vss, vv, vv);
+        }
+        float32x2_t lo2 = vadd_f32(vget_low_f32(vss), vget_high_f32(vss));
+        ss = vget_lane_f32(vpadd_f32(lo2, lo2), 0);
         for (; ri < n; ri++) ss += x[ri] * x[ri];
     }
 #else
@@ -272,13 +284,16 @@ NiyahModel *niyah_alloc(const NiyahConfig *cfg) {
     size_t nsc = scratch_count(cfg);
     size_t nl  = cfg->n_layers;
 
-    m->_pool_bytes = (nw + nkv + nsc) * sizeof(float)
-                   + nl * sizeof(NiyahLayer);
+    size_t float_bytes = (nw + nkv + nsc) * sizeof(float);
+    /* Pad float region up to NiyahLayer alignment to avoid UB on LP64 */
+    size_t align_pad   = (float_bytes % _Alignof(NiyahLayer)) == 0
+                       ? 0
+                       : _Alignof(NiyahLayer) - (float_bytes % _Alignof(NiyahLayer));
+    m->_pool_bytes = float_bytes + align_pad + nl * sizeof(NiyahLayer);
     m->_pool = xcalloc(1, m->_pool_bytes);
 
     float      *fp = (float *)m->_pool;
-    NiyahLayer *lp = (NiyahLayer *)((char *)m->_pool +
-                     (nw + nkv + nsc) * sizeof(float));
+    NiyahLayer *lp = (NiyahLayer *)((char *)m->_pool + float_bytes + align_pad);
     m->layers = lp;
 
     /* Assign weight pointers */
@@ -568,6 +583,7 @@ float niyah_train_step(NiyahModel *m, NiyahAdam *opt,
 
     size_t nw = weight_count(&m->cfg);
     float *grad = xcalloc(nw, sizeof(float));
+    float *dL   = xmalloc(m->cfg.vocab_size * sizeof(float));
     float loss  = 0.f;
     uint32_t d  = m->cfg.embed_dim;
 
@@ -579,7 +595,7 @@ float niyah_train_step(NiyahModel *m, NiyahAdam *opt,
         float mx = logits[0];
         for (uint32_t i = 1; i < m->cfg.vocab_size; i++)
             if (logits[i] > mx) mx = logits[i];
-        float lse_sum = FLT_MIN;
+        float lse_sum = 0.f;
         for (uint32_t i = 0; i < m->cfg.vocab_size; i++)
             lse_sum += expf(logits[i] - mx);
         float lse = logf(lse_sum) + mx;
@@ -587,7 +603,6 @@ float niyah_train_step(NiyahModel *m, NiyahAdam *opt,
         loss += lse - logits[tgt];
 
         /* dL/dlogits = softmax - one_hot(tgt) */
-        float *dL = grad;
         for (uint32_t i = 0; i < m->cfg.vocab_size; i++)
             dL[i] = expf(logits[i] - lse);
         dL[tgt] -= 1.f;
@@ -625,6 +640,7 @@ float niyah_train_step(NiyahModel *m, NiyahAdam *opt,
         W[i] -= opt->lr * mh / (sqrtf(vh) + opt->eps);
     }
 
+    free(dL);
     free(grad);
     return loss;
 }
