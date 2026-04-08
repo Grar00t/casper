@@ -11,11 +11,12 @@
  * Build:
  *   gcc -O2 -std=c11 -Wall -Wextra -Werror -Wstrict-prototypes -Wcast-align \
  *       niyah_core.c hybrid_reasoner.c constraint_solver.c rule_parser.c \
- *       niyah_hybrid_main.c ../tokenizer.c -o niyah_hybrid -lm
+ *       proof_generator.c niyah_hybrid_main.c ../tokenizer.c -o niyah_hybrid -lm
  */
 
 #include "niyah_core.h"
 #include "rule_parser.h"
+#include "proof_generator.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +32,7 @@ void     tokenizer_free(void);
 int niyah_sym_smoke(void);
 int niyah_csp_smoke(void);
 int niyah_rule_smoke(void);
+int niyah_proof_smoke(void);
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  * §1  Hybrid generation
@@ -75,8 +77,6 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
                             NiyahSampler *sampler,
                             uint8_t proof_out[32])
 {
-    (void)proof_out; /* Task 5 will use this */
-
     tokenizer_init();
 
     /* Encode prompt */
@@ -137,6 +137,11 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
         }
     }
 
+    /* Generate proof hash if requested */
+    if (proof_out && opts && opts->generate_proof && result) {
+        niyah_proof_generate(prompt, result, NULL, proof_out);
+    }
+
     tokenizer_free();
     return result;
 }
@@ -159,6 +164,9 @@ static int run_all_smoke(void) {
 
     /* Rule parser */
     total_fail += niyah_rule_smoke();
+
+    /* Proof generator */
+    total_fail += niyah_proof_smoke();
 
     /* Hybrid integration test */
     {
@@ -340,8 +348,14 @@ int main(int argc, char **argv) {
         } else if (strcmp(argv[i], "--interactive") == 0) {
             do_interactive = true;
         } else if (strcmp(argv[i], "--verify-proof") == 0 && i+1 < argc) {
-            fprintf(stderr, "[NIYAH] Proof verification requires Task 5 (coming soon)\n");
-            return 1;
+            const char *proof_path = argv[++i];
+            /* Read prompt and output from stdin or remaining args */
+            const char *vp = (i+1 < argc) ? argv[++i] : "";
+            const char *vo = (i+1 < argc) ? argv[++i] : "";
+            const char *vr = (i+1 < argc) ? argv[++i] : NULL;
+            bool ok = niyah_proof_verify(proof_path, vp, vo, vr);
+            printf("Proof verification: %s\n", ok ? "VALID" : "INVALID");
+            return ok ? 0 : 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             usage(argv[0]);
             return 0;
