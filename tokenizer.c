@@ -111,6 +111,51 @@ uint32_t tokenizer_encode(const char *text, uint32_t *tokens, uint32_t max_len) 
     return pos;
 }
 
+/*
+ * tokenizer_decode — best-effort reverse of tokenizer_encode.
+ *
+ * Returns malloc'd string (caller frees).
+ * Vocab entries decode exactly. Arabic/Unicode IDs produce [?].
+ * BOS/EOS/PAD are skipped.
+ */
+char *tokenizer_decode(const uint32_t *tokens, uint32_t n) {
+    /* Worst case: each token produces ~64 chars + space */
+    size_t cap = (size_t)n * 66 + 1;
+    char *out = malloc(cap);
+    if (!out) return NULL;
+    size_t pos = 0;
+
+    for (uint32_t i = 0; i < n; i++) {
+        uint32_t id = tokens[i];
+
+        /* Skip special tokens */
+        if (id == 0 || id == 1 || id == 2) continue;
+
+        /* Look up in vocab table */
+        const char *word = NULL;
+        for (uint32_t j = 0; j < vocab_size; j++) {
+            if (vocab[j].id == id) { word = vocab[j].token; break; }
+        }
+
+        if (word) {
+            /* Skip UNK placeholder */
+            if (id == 3) { word = "?"; }
+            size_t wlen = strlen(word);
+            if (pos + wlen + 2 >= cap) break;
+            if (pos > 0) out[pos++] = ' ';
+            memcpy(out + pos, word, wlen);
+            pos += wlen;
+        } else {
+            /* Unknown ID — output placeholder */
+            if (pos > 0) out[pos++] = ' ';
+            int wrote = snprintf(out + pos, cap - pos, "?");
+            if (wrote > 0) pos += (size_t)wrote;
+        }
+    }
+    out[pos] = '\0';
+    return out;
+}
+
 void tokenizer_free(void) { vocab_size = 0; }
 
 /* === TEST === */
