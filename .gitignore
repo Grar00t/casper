@@ -21,3 +21,8 @@ memory/
 my-worker/
 Data_Training/sources/train.txt
 Data_Training/sources/quran_arabic.txt
+niyah_hybrid
+test_reasoner
+test_csp
+test_rules
+test_proof
