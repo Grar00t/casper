@@ -157,6 +157,32 @@ size_t      niyah_param_count(const NiyahModel *m);
 /* Smoke test — returns failed-assertion count (0 = all pass) */
 int niyah_smoke(void);
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * Hybrid neuro-symbolic API
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Forward declaration — full types in rule_parser.h */
+typedef struct NiyahRuleKBTag NiyahRuleKBOpaque;
+
+/* Hybrid generation options */
+typedef struct {
+    void        *rules;         /* NiyahRuleKB* or NULL for pure neural */
+    uint32_t     max_retries;   /* re-sample attempts on violation (default 3) */
+    bool         generate_proof;/* compute proof hash */
+} NiyahHybridOpts;
+
+/*
+ * Generate text with optional symbolic verification.
+ *
+ * Returns malloc'd string (caller frees).
+ * If proof_out is non-NULL, 32-byte SHA-256 hash is written there.
+ * If no rules are provided, runs pure neural generation.
+ */
+char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
+                            const NiyahHybridOpts *opts,
+                            NiyahSampler *sampler,
+                            uint8_t proof_out[32]);
+
 #ifdef __cplusplus
 }
 #endif
