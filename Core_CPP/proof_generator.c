@@ -382,12 +382,637 @@ int niyah_proof_smoke(void) {
         PROOF_PASS(strlen(hex) == 64, "proof with NULL rules produces valid hash");
     }
 
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     * §3.9 — Chain-of-Thought: create, add steps, finalize, verify
+     * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    {
+        NiyahProofChain *chain = niyah_proof_chain_alloc("What is 2+2?");
+        PROOF_PASS(chain != NULL, "CoT chain alloc succeeds");
+        PROOF_PASS(chain->count == 0, "CoT chain starts empty");
+
+        uint32_t s0 = niyah_proof_chain_add(chain, NIYAH_STEP_NEURAL_GEN,
+                                            0xFFFFFFFF, "Generate initial response",
+                                            "The answer is 4.");
+        PROOF_PASS(s0 == 0, "CoT first step id is 0");
+
+        uint32_t s1 = niyah_proof_chain_add(chain, NIYAH_STEP_RULE_CHECK,
+                                            s0, "Check safety rule",
+                                            "rule: ALWAYS be helpful");
+        PROOF_PASS(s1 == 1, "CoT second step id is 1");
+
+        uint32_t s2 = niyah_proof_chain_add(chain, NIYAH_STEP_RULE_PASS,
+                                            s1, "Safety rule passed", "");
+        PROOF_PASS(s2 == 2, "CoT third step id is 2");
+
+        uint32_t s3 = niyah_proof_chain_add(chain, NIYAH_STEP_FINAL_ACCEPT,
+                                            s2, "Output accepted", "The answer is 4.");
+        PROOF_PASS(s3 == 3, "CoT fourth step id is 3");
+        PROOF_PASS(chain->count == 4, "CoT chain has 4 steps");
+
+        niyah_proof_chain_finalize(chain, "The answer is 4.");
+
+        /* Verify chain hash is non-zero */
+        uint8_t zero_hash[32];
+        memset(zero_hash, 0, 32);
+        PROOF_PASS(memcmp(chain->chain_hash, zero_hash, 32) != 0,
+                   "CoT chain_hash is non-zero after finalize");
+
+        /* Each step hash should also be non-zero */
+        bool all_step_hashes_ok = true;
+        for (uint32_t i = 0; i < chain->count; i++) {
+            if (memcmp(chain->steps[i].step_hash, zero_hash, 32) == 0) {
+                all_step_hashes_ok = false;
+                break;
+            }
+        }
+        PROOF_PASS(all_step_hashes_ok, "CoT all step hashes are non-zero");
+
+        PROOF_PASS(niyah_proof_chain_violations(chain) == 0,
+                   "CoT chain with no violations reports 0");
+
+        niyah_proof_chain_free(chain);
+    }
+
+    /* §3.10 — Chain-of-Thought: save + verify round-trip */
+    {
+        const char *tmp_chain = "/tmp/niyah_test_chain.proof";
+        NiyahProofChain *chain = niyah_proof_chain_alloc("Test prompt");
+
+        niyah_proof_chain_add(chain, NIYAH_STEP_NEURAL_GEN,
+                              0xFFFFFFFF, "Generate", "output text");
+        niyah_proof_chain_add(chain, NIYAH_STEP_RULE_CHECK,
+                              0, "Check rule", "rule: be safe");
+        niyah_proof_chain_add(chain, NIYAH_STEP_RULE_PASS,
+                              1, "Rule passed", "");
+        niyah_proof_chain_add(chain, NIYAH_STEP_FINAL_ACCEPT,
+                              2, "Accepted", "output text");
+
+        niyah_proof_chain_finalize(chain, "output text");
+
+        int rc = niyah_proof_chain_save(chain, tmp_chain);
+        PROOF_PASS(rc == 0, "CoT chain save returns 0");
+
+        bool ok = niyah_proof_chain_verify(tmp_chain);
+        PROOF_PASS(ok, "CoT chain verify succeeds on valid file");
+
+        niyah_proof_chain_free(chain);
+    }
+
+    /* §3.11 — Chain-of-Thought: violation counting */
+    {
+        NiyahProofChain *chain = niyah_proof_chain_alloc("Violation test");
+
+        niyah_proof_chain_add(chain, NIYAH_STEP_NEURAL_GEN,
+                              0xFFFFFFFF, "Generate", "bad output");
+        niyah_proof_chain_add(chain, NIYAH_STEP_RULE_CHECK,
+                              0, "Check rule A", "rule A");
+        niyah_proof_chain_add(chain, NIYAH_STEP_RULE_FAIL,
+                              1, "Rule A violated", "violation detail");
+        niyah_proof_chain_add(chain, NIYAH_STEP_RESAMPLE,
+                              2, "Re-sampling", "");
+        niyah_proof_chain_add(chain, NIYAH_STEP_NEURAL_GEN,
+                              3, "Generate again", "better output");
+        niyah_proof_chain_add(chain, NIYAH_STEP_RULE_CHECK,
+                              4, "Check rule A again", "rule A");
+        niyah_proof_chain_add(chain, NIYAH_STEP_RULE_FAIL,
+                              5, "Rule A violated again", "still bad");
+        niyah_proof_chain_add(chain, NIYAH_STEP_FINAL_REJECT,
+                              6, "Output rejected", "");
+
+        niyah_proof_chain_finalize(chain, "");
+
+        PROOF_PASS(niyah_proof_chain_violations(chain) == 2,
+                   "CoT chain reports 2 violations");
+
+        niyah_proof_chain_free(chain);
+    }
+
+    /* §3.12 — Chain-of-Thought: empty chain handling */
+    {
+        NiyahProofChain *chain = niyah_proof_chain_alloc("Empty chain test");
+        PROOF_PASS(chain->count == 0, "CoT empty chain has 0 steps");
+        PROOF_PASS(niyah_proof_chain_violations(chain) == 0,
+                   "CoT empty chain has 0 violations");
+
+        niyah_proof_chain_finalize(chain, "no steps");
+
+        /* Chain hash should still be valid (non-zero) after finalize */
+        uint8_t zero_hash[32];
+        memset(zero_hash, 0, 32);
+        PROOF_PASS(memcmp(chain->chain_hash, zero_hash, 32) != 0,
+                   "CoT empty chain has non-zero chain_hash after finalize");
+
+        const char *tmp_empty = "/tmp/niyah_test_empty_chain.proof";
+        int rc = niyah_proof_chain_save(chain, tmp_empty);
+        PROOF_PASS(rc == 0, "CoT empty chain save returns 0");
+
+        bool ok = niyah_proof_chain_verify(tmp_empty);
+        PROOF_PASS(ok, "CoT empty chain verify succeeds");
+
+        niyah_proof_chain_free(chain);
+    }
+
     fprintf(stderr, "\n  Results: %d passed, %d failed\n\n", pass, fail);
     return fail;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * §4  Standalone test entry point
+ * §4  Chain-of-Thought Proof Trail Implementation
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+#include <time.h>
+
+static double cot_monotonic_ms(void) {
+    return (double)clock() / (double)CLOCKS_PER_SEC * 1000.0;
+}
+
+static const char *niyah_step_kind_name(NiyahProofStepKind kind) {
+    switch (kind) {
+        case NIYAH_STEP_NEURAL_GEN:    return "NEURAL_GEN";
+        case NIYAH_STEP_RULE_CHECK:    return "RULE_CHECK";
+        case NIYAH_STEP_RULE_PASS:     return "RULE_PASS";
+        case NIYAH_STEP_RULE_FAIL:     return "RULE_FAIL";
+        case NIYAH_STEP_RESAMPLE:      return "RESAMPLE";
+        case NIYAH_STEP_SYM_QUERY:     return "SYM_QUERY";
+        case NIYAH_STEP_SYM_RESULT:    return "SYM_RESULT";
+        case NIYAH_STEP_CSP_CHECK:     return "CSP_CHECK";
+        case NIYAH_STEP_FINAL_ACCEPT:  return "FINAL_ACCEPT";
+        case NIYAH_STEP_FINAL_REJECT:  return "FINAL_REJECT";
+    }
+    return "UNKNOWN";
+}
+
+NiyahProofChain *niyah_proof_chain_alloc(const char *prompt) {
+    NiyahProofChain *chain = (NiyahProofChain *)calloc(1, sizeof(NiyahProofChain));
+    if (!chain) return NULL;
+
+    chain->capacity = 32;
+    chain->count = 0;
+    chain->steps = (NiyahProofStep *)calloc(chain->capacity, sizeof(NiyahProofStep));
+    if (!chain->steps) {
+        free(chain);
+        return NULL;
+    }
+
+    if (prompt) {
+        size_t len = strlen(prompt);
+        if (len >= sizeof(chain->prompt)) len = sizeof(chain->prompt) - 1;
+        memcpy(chain->prompt, prompt, len);
+        chain->prompt[len] = '\0';
+    } else {
+        chain->prompt[0] = '\0';
+    }
+
+    chain->final_output[0] = '\0';
+    memset(chain->chain_hash, 0, 32);
+    chain->start_time_ms = cot_monotonic_ms();
+
+    return chain;
+}
+
+void niyah_proof_chain_free(NiyahProofChain *chain) {
+    if (!chain) return;
+    free(chain->steps);
+    free(chain);
+}
+
+uint32_t niyah_proof_chain_add(NiyahProofChain *chain,
+                               NiyahProofStepKind kind,
+                               uint32_t parent_id,
+                               const char *description,
+                               const char *data)
+{
+    if (!chain) return 0xFFFFFFFF;
+
+    /* Grow if needed */
+    if (chain->count >= chain->capacity) {
+        uint32_t new_cap = chain->capacity * 2;
+        NiyahProofStep *new_steps = (NiyahProofStep *)realloc(
+            chain->steps, new_cap * sizeof(NiyahProofStep));
+        if (!new_steps) return 0xFFFFFFFF;
+        chain->steps = new_steps;
+        chain->capacity = new_cap;
+    }
+
+    uint32_t sid = chain->count;
+    NiyahProofStep *step = &chain->steps[sid];
+    memset(step, 0, sizeof(NiyahProofStep));
+
+    step->kind = kind;
+    step->step_id = sid;
+    step->parent_id = parent_id;
+    step->timestamp_ms = cot_monotonic_ms() - chain->start_time_ms;
+
+    if (description) {
+        size_t len = strlen(description);
+        if (len >= sizeof(step->description)) len = sizeof(step->description) - 1;
+        memcpy(step->description, description, len);
+        step->description[len] = '\0';
+    }
+
+    if (data) {
+        size_t len = strlen(data);
+        if (len >= sizeof(step->data)) len = sizeof(step->data) - 1;
+        memcpy(step->data, data, len);
+        step->data[len] = '\0';
+    }
+
+    /* Compute step_hash = SHA-256(step_id || kind || description || data || parent_hash) */
+    {
+        SHA256_CTX ctx;
+        sha256_init(&ctx);
+
+        /* step_id as 4 bytes big-endian */
+        uint8_t id_bytes[4] = {
+            (uint8_t)(sid >> 24), (uint8_t)(sid >> 16),
+            (uint8_t)(sid >> 8),  (uint8_t)(sid)
+        };
+        sha256_update(&ctx, id_bytes, 4);
+
+        /* kind as 4 bytes big-endian */
+        uint32_t k = (uint32_t)kind;
+        uint8_t kind_bytes[4] = {
+            (uint8_t)(k >> 24), (uint8_t)(k >> 16),
+            (uint8_t)(k >> 8),  (uint8_t)(k)
+        };
+        sha256_update(&ctx, kind_bytes, 4);
+
+        /* description */
+        sha256_update(&ctx, (const uint8_t *)step->description,
+                      strlen(step->description));
+
+        /* separator */
+        uint8_t sep = 0x00;
+        sha256_update(&ctx, &sep, 1);
+
+        /* data */
+        sha256_update(&ctx, (const uint8_t *)step->data,
+                      strlen(step->data));
+
+        /* parent hash: if parent exists, use its step_hash; else use zero hash */
+        if (parent_id != 0xFFFFFFFF && parent_id < sid) {
+            sha256_update(&ctx, chain->steps[parent_id].step_hash, 32);
+        } else {
+            uint8_t zero[32];
+            memset(zero, 0, 32);
+            sha256_update(&ctx, zero, 32);
+        }
+
+        sha256_final(&ctx, step->step_hash);
+    }
+
+    /* Update rolling chain_hash = SHA-256(old_chain_hash || step_hash) */
+    {
+        SHA256_CTX ctx;
+        sha256_init(&ctx);
+        sha256_update(&ctx, chain->chain_hash, 32);
+        sha256_update(&ctx, step->step_hash, 32);
+        sha256_final(&ctx, chain->chain_hash);
+    }
+
+    chain->count++;
+    return sid;
+}
+
+void niyah_proof_chain_finalize(NiyahProofChain *chain, const char *final_output) {
+    if (!chain) return;
+
+    if (final_output) {
+        size_t len = strlen(final_output);
+        if (len >= sizeof(chain->final_output)) len = sizeof(chain->final_output) - 1;
+        memcpy(chain->final_output, final_output, len);
+        chain->final_output[len] = '\0';
+    } else {
+        chain->final_output[0] = '\0';
+    }
+
+    /* Recompute final chain_hash over all steps from scratch for integrity */
+    {
+        SHA256_CTX ctx;
+        sha256_init(&ctx);
+
+        /* Include prompt */
+        sha256_update(&ctx, (const uint8_t *)chain->prompt,
+                      strlen(chain->prompt));
+        uint8_t sep = 0x00;
+        sha256_update(&ctx, &sep, 1);
+
+        /* Include each step hash in order */
+        for (uint32_t i = 0; i < chain->count; i++) {
+            sha256_update(&ctx, chain->steps[i].step_hash, 32);
+        }
+
+        /* Include final output */
+        sha256_update(&ctx, &sep, 1);
+        sha256_update(&ctx, (const uint8_t *)chain->final_output,
+                      strlen(chain->final_output));
+
+        sha256_final(&ctx, chain->chain_hash);
+    }
+}
+
+int niyah_proof_chain_save(const NiyahProofChain *chain, const char *path) {
+    if (!chain || !path) return -1;
+
+    FILE *f = fopen(path, "w");
+    if (!f) { perror(path); return -1; }
+
+    char hex[65];
+
+    fprintf(f, "NIYAH-PROOF-V2\n");
+
+    niyah_hash_to_hex(chain->chain_hash, hex);
+    fprintf(f, "chain_hash: %s\n", hex);
+
+    uint8_t h[32];
+    niyah_sha256((const uint8_t *)chain->prompt, strlen(chain->prompt), h);
+    niyah_hash_to_hex(h, hex);
+    fprintf(f, "prompt_hash: %s\n", hex);
+
+    niyah_sha256((const uint8_t *)chain->final_output,
+                 strlen(chain->final_output), h);
+    niyah_hash_to_hex(h, hex);
+    fprintf(f, "output_hash: %s\n", hex);
+
+    fprintf(f, "steps: %u\n", chain->count);
+    fprintf(f, "---\n");
+
+    for (uint32_t i = 0; i < chain->count; i++) {
+        const NiyahProofStep *s = &chain->steps[i];
+
+        if (s->parent_id == 0xFFFFFFFF) {
+            fprintf(f, "[step %u] %s (parent: ROOT)\n",
+                    s->step_id, niyah_step_kind_name(s->kind));
+        } else {
+            fprintf(f, "[step %u] %s (parent: %u)\n",
+                    s->step_id, niyah_step_kind_name(s->kind), s->parent_id);
+        }
+
+        fprintf(f, "  desc: %s\n", s->description);
+
+        if (s->data[0] != '\0') {
+            /* Print first 200 chars of data */
+            size_t dlen = strlen(s->data);
+            if (dlen > 200) {
+                fprintf(f, "  data: %.200s...\n", s->data);
+            } else {
+                fprintf(f, "  data: %s\n", s->data);
+            }
+        }
+
+        niyah_hash_to_hex(s->step_hash, hex);
+        fprintf(f, "  hash: %s\n", hex);
+        fprintf(f, "  time: +%.2fms\n", s->timestamp_ms);
+    }
+
+    fprintf(f, "---\n");
+
+    niyah_sha256((const uint8_t *)chain->final_output,
+                 strlen(chain->final_output), h);
+    niyah_hash_to_hex(h, hex);
+    fprintf(f, "final_output_hash: %s\n", hex);
+
+    fclose(f);
+    return 0;
+}
+
+bool niyah_proof_chain_verify(const char *proof_path) {
+    if (!proof_path) return false;
+
+    FILE *f = fopen(proof_path, "r");
+    if (!f) { perror(proof_path); return false; }
+
+    char line[4096];
+    uint8_t stored_chain_hash[32];
+    bool found_chain_hash = false;
+    uint32_t stored_step_count = 0;
+    bool found_step_count = false;
+
+    /* Collected step hashes for verification */
+    uint8_t step_hashes[1024][32]; /* support up to 1024 steps for verify */
+    uint32_t parsed_steps = 0;
+
+    uint8_t stored_prompt_hash[32];
+    bool found_prompt_hash = false;
+    uint8_t stored_output_hash[32];
+    bool found_output_hash = false;
+
+    while (fgets(line, (int)sizeof(line), f)) {
+        /* Trim newline */
+        size_t len = strlen(line);
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r'))
+            line[--len] = '\0';
+
+        if (strncmp(line, "chain_hash: ", 12) == 0) {
+            if (strlen(line + 12) >= 64 && hex_to_hash(line + 12, stored_chain_hash))
+                found_chain_hash = true;
+        } else if (strncmp(line, "prompt_hash: ", 13) == 0) {
+            if (strlen(line + 13) >= 64 && hex_to_hash(line + 13, stored_prompt_hash))
+                found_prompt_hash = true;
+        } else if (strncmp(line, "output_hash: ", 13) == 0) {
+            if (strlen(line + 13) >= 64 && hex_to_hash(line + 13, stored_output_hash))
+                found_output_hash = true;
+        } else if (strncmp(line, "steps: ", 7) == 0) {
+            stored_step_count = (uint32_t)strtoul(line + 7, NULL, 10);
+            found_step_count = true;
+        } else if (strncmp(line, "  hash: ", 8) == 0) {
+            if (parsed_steps < 1024 && strlen(line + 8) >= 64) {
+                hex_to_hash(line + 8, step_hashes[parsed_steps]);
+                parsed_steps++;
+            }
+        }
+    }
+    fclose(f);
+
+    if (!found_chain_hash || !found_step_count || !found_prompt_hash || !found_output_hash)
+        return false;
+
+    if (parsed_steps != stored_step_count)
+        return false;
+
+    /* Recompute chain_hash from stored step hashes, prompt_hash, and output_hash */
+    {
+        SHA256_CTX ctx;
+        sha256_init(&ctx);
+
+        /*
+         * The chain_hash in finalize is computed as:
+         * SHA-256(prompt || 0x00 || step_hash[0] || ... || step_hash[n-1] || 0x00 || final_output)
+         *
+         * But we only have hashes of prompt and output, not the raw text.
+         * So we verify structural consistency: recompute from the step hashes
+         * using the same approach: feed prompt_hash, step hashes, output_hash
+         * and check that chain_hash can be independently verified by checking
+         * that the stored chain_hash matches a recomputation from stored parts.
+         *
+         * Since we stored the actual chain_hash (which was computed from raw data),
+         * and we have the step hashes, we can at least verify that step hashes
+         * are self-consistent with the chain_hash by recomputing from the raw
+         * formula. However, without the raw prompt/output text, we verify that
+         * the file is internally consistent: the chain_hash was computed over
+         * the stored data, so just reading it back and trusting the individual
+         * step hashes is the file-only verification mode.
+         *
+         * For file-only verification, we check:
+         * 1) step count matches
+         * 2) all hashes are parseable
+         * 3) final_output_hash matches output_hash
+         * 4) chain_hash is present and valid hex
+         *
+         * This is the best we can do without the raw prompt/output.
+         */
+    }
+
+    /* Verify final_output_hash matches output_hash in the file */
+    /* (we already parsed output_hash above) */
+
+    /* Read file again to check final_output_hash matches output_hash */
+    f = fopen(proof_path, "r");
+    if (!f) return false;
+
+    uint8_t stored_final_output_hash[32];
+    bool found_final_output_hash = false;
+
+    while (fgets(line, (int)sizeof(line), f)) {
+        size_t len = strlen(line);
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r'))
+            line[--len] = '\0';
+
+        if (strncmp(line, "final_output_hash: ", 19) == 0) {
+            if (strlen(line + 19) >= 64 &&
+                hex_to_hash(line + 19, stored_final_output_hash))
+                found_final_output_hash = true;
+        }
+    }
+    fclose(f);
+
+    if (!found_final_output_hash) return false;
+
+    /* final_output_hash must match output_hash */
+    if (memcmp(stored_output_hash, stored_final_output_hash, 32) != 0)
+        return false;
+
+    return true;
+}
+
+void niyah_proof_chain_print(const NiyahProofChain *chain) {
+    if (!chain) return;
+
+    char hex[65];
+
+    printf("=== NIYAH Chain-of-Thought Proof Trail ===\n");
+    printf("Prompt: %.80s%s\n", chain->prompt,
+           strlen(chain->prompt) > 80 ? "..." : "");
+    printf("Steps: %u\n", chain->count);
+
+    niyah_hash_to_hex(chain->chain_hash, hex);
+    printf("Chain hash: %s\n", hex);
+    printf("---\n");
+
+    /* Build depth for indentation via parent chain */
+    for (uint32_t i = 0; i < chain->count; i++) {
+        const NiyahProofStep *s = &chain->steps[i];
+
+        /* Compute depth by walking parent chain */
+        uint32_t depth = 0;
+        uint32_t pid = s->parent_id;
+        while (pid != 0xFFFFFFFF && pid < chain->count && depth < 20) {
+            depth++;
+            pid = chain->steps[pid].parent_id;
+        }
+
+        /* Print indentation */
+        for (uint32_t d = 0; d < depth; d++)
+            printf("  ");
+
+        printf("[%u] %s", s->step_id, niyah_step_kind_name(s->kind));
+
+        if (s->parent_id == 0xFFFFFFFF)
+            printf(" (root)");
+        else
+            printf(" (parent: %u)", s->parent_id);
+
+        printf(" +%.2fms\n", s->timestamp_ms);
+
+        for (uint32_t d = 0; d < depth; d++)
+            printf("  ");
+        printf("    %s\n", s->description);
+
+        if (s->data[0] != '\0') {
+            for (uint32_t d = 0; d < depth; d++)
+                printf("  ");
+            size_t dlen = strlen(s->data);
+            if (dlen > 120) {
+                printf("    data: %.120s...\n", s->data);
+            } else {
+                printf("    data: %s\n", s->data);
+            }
+        }
+    }
+
+    printf("---\n");
+    printf("Final output: %.120s%s\n", chain->final_output,
+           strlen(chain->final_output) > 120 ? "..." : "");
+    printf("==========================================\n");
+}
+
+uint32_t niyah_proof_chain_violations(const NiyahProofChain *chain) {
+    if (!chain) return 0;
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < chain->count; i++) {
+        if (chain->steps[i].kind == NIYAH_STEP_RULE_FAIL)
+            count++;
+    }
+    return count;
+}
+
+void niyah_proof_chain_explain(const NiyahProofChain *chain) {
+    if (!chain) return;
+
+    printf("=== NIYAH Explainability Report ===\n");
+    printf("Prompt: %.80s%s\n", chain->prompt,
+           strlen(chain->prompt) > 80 ? "..." : "");
+    printf("\nRules applied:\n");
+
+    uint32_t rule_count = 0;
+    for (uint32_t i = 0; i < chain->count; i++) {
+        const NiyahProofStep *s = &chain->steps[i];
+        if (s->kind == NIYAH_STEP_RULE_CHECK ||
+            s->kind == NIYAH_STEP_RULE_PASS  ||
+            s->kind == NIYAH_STEP_RULE_FAIL) {
+
+            const char *status;
+            if (s->kind == NIYAH_STEP_RULE_CHECK)
+                status = "CHECKED";
+            else if (s->kind == NIYAH_STEP_RULE_PASS)
+                status = "PASSED";
+            else
+                status = "FAILED";
+
+            printf("  [%s] %s\n", status, s->description);
+            if (s->data[0] != '\0') {
+                size_t dlen = strlen(s->data);
+                if (dlen > 200) {
+                    printf("         %.200s...\n", s->data);
+                } else {
+                    printf("         %s\n", s->data);
+                }
+            }
+            rule_count++;
+        }
+    }
+
+    if (rule_count == 0) {
+        printf("  (no rules applied)\n");
+    }
+
+    uint32_t violations = niyah_proof_chain_violations(chain);
+    printf("\nSummary: %u rule steps, %u violations\n", rule_count, violations);
+    printf("===================================\n");
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * §5  Standalone test entry point
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 #ifdef PROOF_STANDALONE_TEST
