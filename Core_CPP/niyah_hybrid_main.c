@@ -11,12 +11,14 @@
  * Build:
  *   gcc -O2 -std=c11 -Wall -Wextra -Werror -Wstrict-prototypes -Wcast-align \
  *       niyah_core.c hybrid_reasoner.c constraint_solver.c rule_parser.c \
- *       proof_generator.c niyah_hybrid_main.c ../tokenizer.c -o niyah_hybrid -lm
+ *       proof_generator.c khz_q_svd.c niyah_hybrid_main.c ../tokenizer.c \
+ *       -o niyah_hybrid -lm
  */
 
 #include "niyah_core.h"
 #include "rule_parser.h"
 #include "proof_generator.h"
+#include "khz_q_svd.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,13 +107,37 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
         char *text = tokenizer_decode(out_tokens, n_out);
         if (!text) { text = malloc(1); text[0] = '\0'; }
 
+        /* ── KHZ_Q Ethical Prism: SVD Verify step ─────────────────────────
+         * Applied BEFORE rule_parser — mathematical coherence gate.
+         * Flow: Decode → [KHZ_Q SVD Verify] → [Rule Verify] → Re-sample
+         *
+         * target_energy = 0.85f  (85% Fitrah-alignment threshold)
+         * If energy < 85% OR penalty_nasl >= 1.0 → Re-sample.
+         * ---------------------------------------------------------------- */
+        KHZQ_Result khz = khz_q_verify_output(text, 0.85f);
+        if (!khz.is_coherent) {
+            fprintf(stderr,
+                    "[KHZ_Q] Reject attempt %u/%u — "
+                    "energy=%.3f penalty_nasl=%.3f chi_e=%d\n",
+                    attempt + 1, max_retries + 1,
+                    khz.energy_preserved, khz.penalty_nasl, khz.chi_e);
+            free(text);
+            continue; /* trigger re-sample */
+        }
+        fprintf(stderr,
+                "[KHZ_Q] Coherent attempt %u — "
+                "energy=%.3f penalty_nasl=%.3f chi_e=%d\n",
+                attempt + 1,
+                khz.energy_preserved, khz.penalty_nasl, khz.chi_e);
+        /* ── end KHZ_Q ─────────────────────────────────────────────────── */
+
         /* If no rules, accept immediately */
         if (!rules) {
             result = text;
             break;
         }
 
-        /* Check against rules */
+        /* Check against symbolic rules */
         const char *violation = niyah_rule_check(rules, prompt, text);
         if (!violation) {
             result = text;
@@ -167,6 +193,67 @@ static int run_all_smoke(void) {
 
     /* Proof generator */
     total_fail += niyah_proof_smoke();
+
+    /* KHZ_Q SVD Ethical Prism smoke test */
+    {
+        int pass = 0, fail = 0;
+
+        fprintf(stderr, "\n+--------------------------------------+\n");
+        fprintf(stderr, "|   KHZ_Q SVD Ethical Prism Test       |\n");
+        fprintf(stderr, "+--------------------------------------+\n");
+
+        #define KHZQ_PASS(cond, label) do { \
+            if (cond) { pass++; fprintf(stderr, "  [PASS] %s\n", label); } \
+            else      { fail++; fprintf(stderr, "  [FAIL] %s\n", label); } \
+        } while(0)
+
+        /* T1: coherent text */
+        {
+            KHZQ_Result r = khz_q_verify_output(
+                "bismillah bismillah bismillah bismillah", 0.85f);
+            KHZQ_PASS(r.energy_preserved >= 0.85f, "coherent text energy >= 85%");
+            fprintf(stderr, "       energy=%.4f penalty=%.4f chi_e=%d\n",
+                    r.energy_preserved, r.penalty_nasl, r.chi_e);
+        }
+
+        /* T2: empty text → degenerate → rejected */
+        {
+            KHZQ_Result r = khz_q_verify_output("", 0.85f);
+            KHZQ_PASS(!r.is_coherent, "empty text rejected");
+        }
+
+        /* T3: target_energy clamping */
+        {
+            KHZQ_Result r = khz_q_verify_output("test", 1.5f);
+            KHZQ_PASS(r.chi_e > 0 && r.chi_e <= KHZ_MAX_N,
+                      "chi_e in valid range after clamp");
+        }
+
+        /* T4: Arabic UTF-8 */
+        {
+            KHZQ_Result r = khz_q_verify_output(
+                "\xd8\xa8\xd8\xb3\xd9\x85 \xd8\xa7\xd9\x84\xd9\x84\xd9\x87",
+                0.80f);
+            KHZQ_PASS(r.chi_e >= 1, "Arabic UTF-8 processes without crash");
+        }
+
+        /* T5: high-entropy text gets higher penalty than low-entropy */
+        {
+            KHZQ_Result r_lo = khz_q_verify_output(
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0.85f);
+            KHZQ_Result r_hi = khz_q_verify_output(
+                "a1!b2@c3#d4$e5%f6^g7&h8*i9(j0)k_l", 0.85f);
+            KHZQ_PASS(r_hi.penalty_nasl >= r_lo.penalty_nasl,
+                      "entropy increases Penalty_Nasl");
+            fprintf(stderr, "       low=%.4f high=%.4f\n",
+                    r_lo.penalty_nasl, r_hi.penalty_nasl);
+        }
+
+        fprintf(stderr, "\n  Results: %d passed, %d failed\n\n", pass, fail);
+        total_fail += fail;
+
+        #undef KHZQ_PASS
+    }
 
     /* Hybrid integration test */
     {
@@ -276,6 +363,7 @@ static void interactive_loop(NiyahModel *m, NiyahRuleKB *rules) {
         printf("  Rules: %u loaded\n", rules->count);
     else
         printf("  Rules: none (pure neural)\n");
+    printf("  KHZ_Q Ethical Prism: ACTIVE (target_energy=0.85)\n");
     printf("  Type a prompt and press Enter. Type 'quit' to exit.\n\n");
 
     NiyahSampler sampler = { .temperature = 0.8f, .top_p = 0.9f, .seed = 12345 };
@@ -329,7 +417,7 @@ static void usage(const char *prog) {
     fprintf(stderr, "  --model PATH      Load model from .bin file\n");
     fprintf(stderr, "  --rules PATH      Load verification rules from .nrule file\n");
     fprintf(stderr, "  --interactive     Start interactive prompt loop\n");
-    fprintf(stderr, "  --verify-proof P  Verify a .proof file (requires Task 5)\n");
+    fprintf(stderr, "  --verify-proof P  Verify a .proof file\n");
 }
 
 int main(int argc, char **argv) {
@@ -349,7 +437,6 @@ int main(int argc, char **argv) {
             do_interactive = true;
         } else if (strcmp(argv[i], "--verify-proof") == 0 && i+1 < argc) {
             const char *proof_path = argv[++i];
-            /* Read prompt and output from stdin or remaining args */
             const char *vp = (i+1 < argc) ? argv[++i] : "";
             const char *vo = (i+1 < argc) ? argv[++i] : "";
             const char *vr = (i+1 < argc) ? argv[++i] : NULL;
@@ -389,7 +476,6 @@ int main(int argc, char **argv) {
             printf("[NIYAH] Loaded model: %s (%zu params)\n",
                    model_path, niyah_param_count(m));
         } else {
-            /* No model specified: create a small default model */
             fprintf(stderr, "[NIYAH] No --model specified, creating default small model\n");
             NiyahConfig cfg = {
                 .magic = NIYAH_MAGIC, .version = NIYAH_VER,
@@ -398,7 +484,6 @@ int main(int argc, char **argv) {
                 .ctx_len = 32, .rope_theta = 10000.f, .rms_eps = 1e-5f,
             };
             m = niyah_alloc(&cfg);
-            /* Initialize with small randoms for demo */
             float *wp = (float *)m->_pool;
             size_t nw = niyah_param_count(m);
             for (size_t i = 0; i < nw; i++) wp[i] = ((float)(i%37)-18.f)*0.005f;
@@ -428,7 +513,6 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    /* No action specified */
     usage(argv[0]);
     return 1;
 }
