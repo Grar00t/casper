@@ -375,3 +375,20 @@ bool niyah_proof_verify(const char *proof_path, const char *prompt,
 ## License
 
 This project is maintained by [Suliman Alshammari (Grar00t)](https://github.com/grar00t).
+
+---
+
+## Sister Projects
+
+Casper Engine is the **reasoning brain** of the gratech sovereign stack.
+Its shield-arm is **[KSpike](https://github.com/Grar00t/kspike)** — a dual-mode,
+judge-gated kernel defense & active-response framework. KSpike embeds the
+`KHZ_Q` Khawarizmi-Fitrah balancer (distilled from 115 protocol revisions)
+as the ethical kernel of its Judge layer, and will delegate contextual
+adjudication to Casper Engine over FFI in v0.2.
+
+- 🧠 [Casper Engine](https://github.com/Grar00t/Casper_Engine) — hybrid neuro-symbolic reasoning (C11, zero-deps).
+- 🛡️ [KSpike](https://github.com/Grar00t/kspike) — Casper-governed kernel defense (Rust).
+- 🧬 [haven-niyah-engine](https://github.com/Grar00t/haven-niyah-engine) — Arabic-first three-lobe LLM.
+- 🌐 [k-forge](https://github.com/Grar00t/k-forge) — P2P, crypto-signed VCS.
+- 💻 [khawrizm-os](https://github.com/Grar00t/khawrizm-os) — Sovereign ARM64 Linux.
