@@ -108,29 +108,54 @@ A from-scratch C11 inference and training engine that fuses a Transformer neural
 
 ## Quick Start
 
-### Linux / macOS (GCC or Clang)
+### Linux / macOS (recommended — `make`)
 
 ```bash
 # Clone
-git clone https://github.com/grar00t/Casper_Engine.git
+git clone https://github.com/Grar00t/Casper_Engine.git
 cd Casper_Engine
 
+# Build everything (niyah_hybrid + niyah_train + Core_CPP/niyah + Core_CPP/trainer)
+# Auto-detects x86_64/AVX2 vs aarch64/NEON
+make
+
+# Run the full smoke suite (101 tests)
+make test
+
+# Sanitizer build (AddressSanitizer + UndefinedBehaviorSanitizer)
+make debug
+
+# Install niyah_hybrid + niyah_train to /usr/local/bin
+sudo make install
+
+# Tear down everything
+make clean
+```
+
+Run `make help` to list every target.
+
+### Linux / macOS (low-level — direct `gcc`)
+
+If you don't want `make`:
+
+```bash
 # Build core binaries (auto-detects arch + SIMD)
 bash scripts/build_gcc.sh
 
-# Run smoke tests (neural core)
-RUN_SMOKE=1 bash scripts/build_gcc.sh
-
-# Build hybrid binary (neural + symbolic)
+# Or build the hybrid binary by hand
 gcc -O2 -std=c11 -Wall -Wextra -Werror \
     Core_CPP/niyah_core.c Core_CPP/hybrid_reasoner.c \
     Core_CPP/constraint_solver.c Core_CPP/rule_parser.c \
-    Core_CPP/proof_generator.c Core_CPP/niyah_hybrid_main.c \
+    Core_CPP/proof_generator.c Core_CPP/khz_q_svd.c \
+    Core_CPP/niyah_hybrid_main.c \
     tokenizer.c -o niyah_hybrid -lm
 
-# Run all 96 tests (neural + symbolic + constraints + rules + proofs)
+# Run all 101 tests (neural + symbolic + constraints + rules + proofs + KHZ_Q + hybrid)
 ./niyah_hybrid --smoke
 ```
+
+> Note: `Core_CPP/khz_q_svd.c` is **required** — it provides the KHZ_Q SVD Ethical Prism
+> referenced from `hybrid_reasoner.c`. Omitting it will cause an undefined-reference link error.
 
 ### Windows (MSVC / PowerShell)
 
@@ -146,11 +171,10 @@ cd C:\Users\You\Casper_Engine
 ### Training
 
 ```bash
-# Standalone trainer
-gcc -O2 -std=c11 Core_CPP/niyah_core.c Core_CPP/niyah_train.c \
-    tokenizer.c -o niyah_train -lm
+# Build the standalone trainer
+make train     # produces ./niyah_train
 
-# Train on corpus (3 epochs, lr=0.001)
+# Train on a corpus (3 epochs, lr=0.001)
 ./niyah_train Data_Training/sovereign_knowledge.txt 3 0.001
 
 # Save model

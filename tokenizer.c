@@ -11,6 +11,7 @@ extern "C" {
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include "tokenizer.h"
 
 static int is_arabic(uint32_t c) {
     return (c >= 0x0600 && c <= 0x06FF) ||
