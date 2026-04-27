@@ -135,6 +135,25 @@ build_c \
     "$ROOT/Core_CPP/niyah_core.c" \
     "$ROOT/Core_CPP/niyah_main.c"
 
+# Hybrid binary — full neuro-symbolic engine (neural + symbolic + KHZ_Q + proof + rules)
+build_c \
+    "$ROOT/niyah_hybrid" \
+    "$ROOT/Core_CPP/niyah_core.c" \
+    "$ROOT/Core_CPP/hybrid_reasoner.c" \
+    "$ROOT/Core_CPP/constraint_solver.c" \
+    "$ROOT/Core_CPP/rule_parser.c" \
+    "$ROOT/Core_CPP/proof_generator.c" \
+    "$ROOT/Core_CPP/khz_q_svd.c" \
+    "$ROOT/Core_CPP/niyah_hybrid_main.c" \
+    "$ROOT/tokenizer.c"
+
+# Standalone trainer (C only)
+build_c \
+    "$ROOT/niyah_train" \
+    "$ROOT/Core_CPP/niyah_core.c" \
+    "$ROOT/Core_CPP/niyah_train.c" \
+    "$ROOT/tokenizer.c"
+
 build_cxx \
     "$ROOT/Core_CPP/trainer" \
     "$ROOT/Core_CPP/trainer.cpp"
@@ -186,8 +205,13 @@ fi
 # ── optional smoke-test run ───────────────────────────────────────────────────
 if [[ "${RUN_SMOKE:-0}" == "1" ]]; then
     echo ""
-    echo "[build_gcc] Running smoke test..."
+    echo "[build_gcc] Running neural smoke test..."
     cd "$ROOT/Core_CPP"
     ./niyah
-    echo "[build_gcc] Smoke test PASSED"
+    echo "[build_gcc] Neural smoke test PASSED"
+    echo ""
+    echo "[build_gcc] Running hybrid integration suite (96 tests)..."
+    cd "$ROOT"
+    ./niyah_hybrid --smoke
+    echo "[build_gcc] Hybrid suite complete"
 fi
