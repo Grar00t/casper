@@ -26,3 +26,6 @@ test_reasoner
 test_csp
 test_rules
 test_proof
+deploy.sh
+upgrade_and_deploy.sh
+.hf_secret
