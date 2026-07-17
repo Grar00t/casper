@@ -47,3 +47,4 @@ Install one of:
 Then open a new PowerShell and rerun:
   .\scripts\build_trainer.ps1
 "@
+

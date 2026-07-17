@@ -1,6 +1,7 @@
+[CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("build","corpus","train","smoke","bench","save","run","all")]
+    [ValidateSet("build", "corpus", "train", "smoke", "bench", "save", "run", "all")]
     [string]$Action = "all",
 
     [Parameter(Position = 1)]
@@ -13,7 +14,7 @@ param(
     [double]$Lr = 0.001,
     [double]$MinLr = 0.0001,
 
-    [string]$Prompt = "بِسْمِ اللَّهِ",
+    [string]$Prompt = "bismillah",
     [int]$Tokens = 64,
     [string]$Model = "niyah_tiny.bin",
     [string]$Size = "tiny",
@@ -25,60 +26,94 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
+$RepoRoot = (Get-Location).Path
 
 function Invoke-Build {
     Write-Host "[niyah] build..."
-    powershell -ExecutionPolicy Bypass -File ".\scripts\build_msvc.ps1" -Config Release
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\build_msvc.ps1") -Config Release
+}
+
+function Ensure-Build {
+    if (-not (Test-Path (Join-Path $RepoRoot "Core_CPP\niyah.exe"))) {
+        Invoke-Build
+    }
 }
 
 function Invoke-Corpus {
     Write-Host "[niyah] corpus..."
-    powershell -ExecutionPolicy Bypass -File ".\scripts\build_corpus.ps1"
+    $corpusScript = Join-Path $RepoRoot "scripts\build_corpus.ps1"
+    if (Test-Path $corpusScript) {
+        & powershell -ExecutionPolicy Bypass -File $corpusScript
+    } else {
+        Write-Host "[niyah] corpus script not found; skipping."
+    }
 }
 
 function Invoke-Train {
     Write-Host "[niyah] train..."
-    if (-not (Test-Path ".\niyah_train.exe")) {
-        Invoke-Build
-    }
-    & ".\niyah_train.exe" $DataPath $Epochs $Lr $MinLr
+    Ensure-Build
+    $trainer = Join-Path $RepoRoot "niyah_train.exe"
+    & $trainer $DataPath $Epochs $Lr $MinLr
 }
 
 function Invoke-Smoke {
     Write-Host "[niyah] smoke..."
-    & ".\Core_CPP\niyah.exe" --mode smoke
+    Ensure-Build
+    $smoke = Join-Path $RepoRoot "Core_CPP\niyah.exe"
+    & $smoke
 }
 
 function Invoke-Bench {
     Write-Host "[niyah] bench..."
-    & ".\scripts\niyah.exe" --mode bench --steps $Steps --size $Size
+    Ensure-Build
+    $bench = Join-Path $RepoRoot "Core_CPP\bench_niyah.exe"
+    if (-not (Test-Path $bench)) {
+        Write-Host "[niyah] building benchmark binary..."
+        & powershell -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\build_msvc.ps1") -Config Release
+    }
+    & $bench
 }
 
 function Invoke-Save {
     Write-Host "[niyah] save..."
-    & ".\scripts\niyah.exe" --mode save --model $Model --size $Size
+    Invoke-Train
+    $saved = Join-Path $RepoRoot "niyah_trained.bin"
+    if (Test-Path $saved) {
+        Write-Host "[niyah] saved model to $saved"
+    } else {
+        Write-Host "[niyah] model output was not produced; check the trainer output."
+    }
 }
 
 function Invoke-Run {
     Write-Host "[niyah] run..."
-    & ".\scripts\niyah.exe" --mode run --model $Model --prompt $Prompt --tokens $Tokens --temp $Temp --topp $TopP --seed $Seed
+    Ensure-Build
+    $hybrid = Join-Path $RepoRoot "Core_CPP\niyah_hybrid.exe"
+    if (-not (Test-Path $hybrid)) {
+        Write-Host "[niyah] building hybrid binary..."
+        & powershell -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\build_msvc.ps1") -Config Release
+    }
+
+    $inputText = @($Prompt, "quit") -join [Environment]::NewLine
+    $inputText | & $hybrid --model $Model --interactive
 }
 
 switch ($Action) {
-    "build"  { Invoke-Build }
+    "build" { Invoke-Build }
     "corpus" { Invoke-Corpus }
-    "train"  { Invoke-Train }
-    "smoke"  { Invoke-Smoke }
-    "bench"  { Invoke-Bench }
-    "save"   { Invoke-Save }
-    "run"    { Invoke-Run }
+    "train" { Invoke-Train }
+    "smoke" { Invoke-Smoke }
+    "bench" { Invoke-Bench }
+    "save" { Invoke-Save }
+    "run" { Invoke-Run }
     "all" {
         Invoke-Build
-        if (Test-Path ".\Data_Training\sources") {
+        if (Test-Path (Join-Path $RepoRoot "Data_Training\sources")) {
             try { Invoke-Corpus } catch { Write-Host "[niyah] corpus skipped: $($_.Exception.Message)" }
         }
         Invoke-Train
         Invoke-Smoke
     }
 }
+
 

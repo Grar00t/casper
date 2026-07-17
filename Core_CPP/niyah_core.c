@@ -29,6 +29,27 @@
 #include <time.h>
 #include <stdint.h>
 
+#if defined(_MSC_VER)
+#include <windows.h>
+static double niyah_monotonic_ms(void) {
+    static LARGE_INTEGER freq = {0};
+    LARGE_INTEGER now;
+    if (freq.QuadPart == 0) {
+        QueryPerformanceFrequency(&freq);
+    }
+    QueryPerformanceCounter(&now);
+    return (double)now.QuadPart * 1000.0 / (double)freq.QuadPart;
+}
+#else
+static double niyah_monotonic_ms(void) {
+    struct timespec t;
+    if (clock_gettime(CLOCK_MONOTONIC, &t) != 0) {
+        return (double)clock() * 1000.0 / (double)CLOCKS_PER_SEC;
+    }
+    return (double)t.tv_sec * 1000.0 + (double)t.tv_nsec / 1000000.0;
+}
+#endif
+
 /* ── SIMD headers ─────────────────────────────────────────────────── */
 #if defined(__AVX2__) && defined(__FMA__)
 #  include <immintrin.h>
@@ -650,7 +671,8 @@ float niyah_train_step(NiyahModel *m, NiyahAdam *opt,
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 #define T_PASS(cond, label) do { \
-    if (cond) { pass++; fprintf(stderr,"  [PASS] %s\n", label); } \
+    int _cond = (cond); \
+    if (_cond) { pass++; fprintf(stderr,"  [PASS] %s\n", label); } \
     else      { fail++; fprintf(stderr,"  [FAIL] %s\n", label); } \
 } while(0)
 
@@ -709,12 +731,11 @@ int niyah_smoke(void) {
     T_PASS(finite_ok, "forward 8 tokens: all logits finite");
 
     /* §9.5 — Benchmark 200 passes */
-    struct timespec t0, t1;
-    clock_gettime(CLOCK_MONOTONIC, &t0);
+    double t0 = niyah_monotonic_ms();
     for (int i = 0; i < 200; i++)
         niyah_forward(m, (uint32_t)(i % cfg.vocab_size), 0);
-    clock_gettime(CLOCK_MONOTONIC, &t1);
-    double ms = (t1.tv_sec - t0.tv_sec)*1e3 + (t1.tv_nsec - t0.tv_nsec)*1e-6;
+    double t1 = niyah_monotonic_ms();
+    double ms = t1 - t0;
     double tok_s = 200.0 / (ms * 1e-3);
     fprintf(stderr, "  [BENCH] 200 forward  %.2f ms  →  %.0f tok/s\n", ms, tok_s);
     T_PASS(ms > 0.0, "bench time > 0");
@@ -791,11 +812,11 @@ int niyah_smoke(void) {
             }
         for (uint32_t j = 0; j < mc.embed_dim; j++) mm->rms_final[j] = 1.f;
 
-        clock_gettime(CLOCK_MONOTONIC, &t0);
+        double t0b = niyah_monotonic_ms();
         for (int i = 0; i < 50; i++)
             niyah_forward(mm, (uint32_t)(i % mc.vocab_size), 0);
-        clock_gettime(CLOCK_MONOTONIC, &t1);
-        double ms2 = (t1.tv_sec-t0.tv_sec)*1e3 + (t1.tv_nsec-t0.tv_nsec)*1e-6;
+        double t1b = niyah_monotonic_ms();
+        double ms2 = t1b - t0b;
         fprintf(stderr,"  [BENCH] medium(embed=256,L=4) 50 fwd  %.2f ms  →  %.0f tok/s\n",
                 ms2, 50.0/(ms2*1e-3));
         T_PASS(ms2 > 0.0, "medium bench time > 0");

@@ -12,3 +12,4 @@ if (-not (Test-Path $exe)) {
 
 Write-Host "[Casper] Running trainer..."
 & ".\$exe" $data
+

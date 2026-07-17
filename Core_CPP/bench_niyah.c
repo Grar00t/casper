@@ -21,11 +21,22 @@
 #include <math.h>
 #include <stdint.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 /* ── Timer ────────────────────────────────────────────────────── */
 static double now_ms(void) {
+#ifdef _WIN32
+    LARGE_INTEGER freq, count;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&count);
+    return (double)count.QuadPart * 1000.0 / (double)freq.QuadPart;
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1e3 + (double)ts.tv_nsec * 1e-6;
+#endif
 }
 
 /* ── Scalar matvec reference (compiled without SIMD flags) ──────── */
