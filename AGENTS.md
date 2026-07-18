@@ -121,6 +121,53 @@ Expected: **96 tests**. Any failure, crash, or count change = blocked.
 
 ---
 
+## Agent Behavior Rules
+
+These rules govern how the agent responds to requests. They exist because AI models
+tend to write plausible-looking but incorrect code when they skip reading the actual
+source files. This section is non-negotiable.
+
+### Before writing any code
+
+1. Read the relevant source file. Do not assume its contents from memory or context.
+2. State what you read and from which lines. If you cannot read the file, say so.
+3. If a function, type, or constant you plan to use does not appear in the file you
+   just read, do not use it. Ask where it is defined.
+4. If the task is unclear, ask one focused question. Do not invent a plausible
+   interpretation and silently run with it.
+
+### When the request is vague or open-ended
+
+Do not start writing code. Instead:
+
+1. List what you understand the goal to be (one sentence).
+2. List what information is missing.
+3. Ask the user to confirm or correct before proceeding.
+
+### When something does not build or test
+
+1. Show the exact error output.
+2. Read the file at the failing line.
+3. Propose one fix with a reason.
+4. Do not propose multiple alternatives simultaneously — pick the most likely correct one.
+
+### When asked to "improve" or "clean up" or "make it better"
+
+Do not rewrite working subsystems. Do not add features that were not requested.
+The minimal-change rule applies: fix only what is broken or explicitly requested.
+
+### What "done" means
+
+A task is done when:
+- The change compiles with `-Wall -Wextra -Werror` (or MSVC `/W4 /WX`).
+- The relevant smoke tests pass.
+- The diff contains no unrelated changes.
+- Evidence (file path + line range + command output) supports every claim.
+
+If any of these conditions are not met, the task is not done. Do not claim otherwise.
+
+---
+
 ## Evidence Protocol
 
 Every material claim about the implementation must be verifiable:
@@ -134,6 +181,9 @@ Every material claim about the implementation must be verifiable:
 
 ## Prohibited Actions
 
+- Writing code without first reading the relevant source file
+- Claiming a build or test passed without running it and showing the output
+- Proposing changes to subsystems that were not mentioned in the request
 - Adding external runtime or build dependencies
 - Converting `constraint_solver.c` exact arithmetic to floating point
 - Disabling the occurs check in `hybrid_reasoner.c`
@@ -142,3 +192,4 @@ Every material claim about the implementation must be verifiable:
 - Introducing hidden `malloc`/`free` in inference/training hot paths
 - Changing public symbol names, `.bin` serialization format, `.nrule` grammar, or proof format without explicit migration handling
 - Committing secrets, credentials, or machine-specific paths
+- Rewriting a working subsystem to match a preferred style
