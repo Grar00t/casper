@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Casper.exe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#040706;
+    --neon:#2CF2DA;
+    --neon-dim:#18B49F;
+    --neon-soft:rgba(44,242,218,.12);
+    --neon-line:rgba(44,242,218,.32);
+    --copper:#E0A354;
+    --copper-soft:rgba(224,163,84,.14);
+    --danger:#FF6E62;
+    --danger-soft:rgba(255,110,98,.13);
+    --danger-line:rgba(255,110,98,.4);
+    --ink:#F1FBF9;
+    --ink-dim:#8FA6A2;
+    --ink-faint:#4E5C59;
+    --glass-bg:rgba(9,15,16,.44);
+    --glass-border:rgba(255,255,255,.06);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    color:var(--ink);font-family:'Tajawal',sans-serif;
+    display:flex;flex-direction:column;overflow:hidden;font-size:15.5px;
+    background:var(--void);position:relative;
+  }
+  /* ambient neon sweep — the signature */
+  .ambient{position:fixed;inset:-20% -20%;z-index:0;pointer-events:none;overflow:hidden;}
+  .ambient::before{
+    content:'';position:absolute;width:160%;height:340px;left:-30%;top:8%;
+    background:linear-gradient(100deg, transparent 30%, rgba(44,242,218,.10) 48%, rgba(44,242,218,.20) 50%, rgba(44,242,218,.10) 52%, transparent 70%);
+    filter:blur(30px);transform:rotate(-9deg);
+    animation:drift 22s ease-in-out infinite alternate;
+  }
+  .ambient::after{
+    content:'';position:absolute;width:120%;height:220px;right:-20%;bottom:4%;
+    background:linear-gradient(100deg, transparent 30%, rgba(44,242,218,.06) 50%, transparent 70%);
+    filter:blur(40px);transform:rotate(-9deg);
+    animation:drift 26s ease-in-out infinite alternate-reverse;
+  }
+  @keyframes drift{0%{transform:rotate(-9deg) translateY(-10px);}100%{transform:rotate(-9deg) translateY(30px);}}
+  @media (prefers-reduced-motion: reduce){.ambient::before,.ambient::after{animation:none;}}
+
+  .mono{font-family:'JetBrains Mono',monospace;direction:ltr;unicode-bidi:isolate;}
+  ::selection{background:var(--neon-soft);color:var(--ink);}
+  *:focus-visible{outline:2px solid var(--neon);outline-offset:2px;border-radius:4px;}
+
+  /* ===== NATIVE TITLEBAR ===== */
+  .titlebar{
+    height:34px;display:flex;align-items:center;gap:10px;padding:0 12px;
+    direction:ltr;flex-shrink:0;position:relative;z-index:5;
+    background:rgba(5,9,9,.6);border-bottom:1px solid var(--glass-border);
+  }
+  .tl-dots{display:flex;gap:6px;}
+  .tl-dots span{width:9px;height:9px;border-radius:50%;background:#2B3634;}
+  .tl-path{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-faint);}
+  .tl-path b{color:var(--ink-dim);font-weight:500;}
+  .tl-badge{
+    margin-inline-start:auto;display:flex;align-items:center;gap:6px;
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--neon);
+  }
+  .tl-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--neon);box-shadow:0 0 8px var(--neon);}
+
+  /* ===== TOP BAR (workspace tabs) ===== */
+  .topbar{
+    height:50px;display:flex;align-items:center;padding:0 18px;gap:18px;
+    direction:ltr;flex-shrink:0;position:relative;z-index:5;
+    background:rgba(6,11,11,.4);backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--glass-border);
+  }
+  .tabs{display:flex;gap:4px;flex:1;overflow-x:auto;}
+  .tab{
+    display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:8px;
+    font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-faint);
+    cursor:pointer;white-space:nowrap;border:1px solid transparent;
+  }
+  .tab.active{background:var(--neon-soft);color:var(--ink);border-color:var(--neon-line);}
+  .tab:not(.active):hover{color:var(--ink-dim);}
+  .tab-add{color:var(--ink-faint);padding:7px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;}
+
+  /* ===== LAYOUT ===== */
+  .layout{flex:1;display:grid;grid-template-columns:220px 1fr 300px;overflow:hidden;position:relative;z-index:1;}
+  .col{overflow-y:auto;}
+  .col::-webkit-scrollbar{width:7px;}
+  .col::-webkit-scrollbar-thumb{background:var(--glass-border);border-radius:4px;}
+  .col-header{
+    position:sticky;top:0;z-index:2;padding:20px 20px 12px;
+    font-size:13px;color:var(--ink-dim);font-weight:700;background:transparent;
+  }
+
+  /* ===== SOURCES ===== */
+  .sources{direction:ltr;border-inline-end:1px solid var(--glass-border);}
+  .src-group{padding:6px 14px;}
+  .src-group-label{font-size:10px;color:var(--ink-faint);font-family:'JetBrains Mono',monospace;padding:10px 6px 6px;letter-spacing:.5px;}
+  .src-item{display:flex;align-items:center;gap:9px;padding:8px 8px;border-radius:8px;cursor:pointer;font-size:12.5px;color:var(--ink-dim);}
+  .src-item:hover{background:rgba(255,255,255,.03);color:var(--ink);}
+  .src-item .ic{width:15px;text-align:center;opacity:.7;font-size:12px;}
+  .src-item .name{flex:1;font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .src-item .count{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-faint);}
+  .src-item.selected{background:var(--neon-soft);color:var(--neon);}
+  .src-item.selected .count{color:var(--neon);}
+
+  /* ===== WORKBENCH ===== */
+  .workbench{display:flex;flex-direction:column;}
+  .stream{flex:1;overflow-y:auto;padding:26px 30px 14px;display:flex;flex-direction:column;gap:22px;}
+
+  .msg-user{
+    align-self:flex-end;max-width:66%;border-radius:16px 16px 4px 16px;
+    padding:14px 18px;font-size:15px;line-height:1.95;
+    background:rgba(255,255,255,.035);
+  }
+
+  .trace{max-width:86%;}
+  .trace-head{
+    display:flex;align-items:center;gap:9px;padding:4px 2px 8px;cursor:pointer;
+    font-size:12.5px;color:var(--neon);direction:rtl;
+  }
+  .trace-head .chev{transition:transform .15s ease;color:var(--ink-faint);font-size:11px;}
+  .trace.collapsed .chev{transform:rotate(-90deg);}
+  .trace-head .trace-sub{color:var(--ink-faint);font-family:'JetBrains Mono',monospace;font-size:10.5px;margin-inline-start:auto;}
+  .trace-body{direction:ltr;padding-inline-start:2px;}
+  .trace.collapsed .trace-body{display:none;}
+  .trace-steps{position:relative;padding-inline-start:22px;display:flex;flex-direction:column;gap:9px;}
+  .trace-steps::before{content:'';position:absolute;left:5px;top:2px;bottom:2px;width:1px;background:var(--glass-border);}
+  .trace-runner{
+    position:absolute;left:4.5px;width:2px;height:50px;
+    background:linear-gradient(to bottom, transparent, var(--neon), transparent);
+    box-shadow:0 0 12px 1px var(--neon);animation:beam-run-small 2.8s linear infinite;pointer-events:none;
+  }
+  @keyframes beam-run-small{0%{top:-50px;}100%{top:100%;}}
+  .tstep{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-dim);line-height:1.65;position:relative;}
+  .tstep::before{content:'';position:absolute;left:-21px;top:5px;width:6px;height:6px;border-radius:50%;background:var(--void);border:1.5px solid var(--neon-dim);}
+  .tstep.warn{color:var(--danger);}
+  .tstep.warn::before{border-color:var(--danger);}
+  .tstep .tn{color:var(--ink-faint);margin-inline-end:6px;}
+
+  .msg-casper{max-width:86%;display:flex;flex-direction:column;gap:12px;}
+  .msg-casper .p{line-height:2.05;font-size:15px;padding-inline-start:2px;}
+  .chiprow{display:flex;gap:7px;flex-wrap:wrap;direction:ltr;}
+  .chip{
+    display:inline-flex;align-items:center;gap:5px;background:transparent;
+    border:1px solid var(--neon-line);color:var(--neon);
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:4px 9px;border-radius:20px;cursor:pointer;
+  }
+  .chip:hover,.chip.pinged{background:var(--neon-soft);}
+  .chip.warn{border-color:var(--danger-line);color:var(--danger);}
+  .chip.warn:hover{background:var(--danger-soft);}
+
+  .flags{display:flex;gap:16px;padding:2px 2px 0;font-size:12px;}
+  .flag{display:flex;align-items:center;gap:6px;}
+  .flag.ok{color:var(--neon);}
+  .flag.warn{color:var(--danger);}
+
+  .composer{border-top:1px solid var(--glass-border);padding:16px 24px 22px;display:flex;flex-direction:column;gap:10px;}
+  .mode-row{display:flex;gap:6px;}
+  .mode-btn{
+    font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 12px;border-radius:7px;
+    border:1px solid var(--glass-border);color:var(--ink-faint);cursor:pointer;background:transparent;
+  }
+  .mode-btn.active{border-color:var(--neon-line);color:var(--neon);background:var(--neon-soft);}
+  .input-row{display:flex;gap:10px;align-items:center;}
+  .input-row input{
+    flex:1;background:rgba(255,255,255,.035);border:1px solid var(--glass-border);
+    color:var(--ink);padding:13px 16px;border-radius:11px;font-family:'Tajawal',sans-serif;font-size:14.5px;
+  }
+  .input-row input::placeholder{color:var(--ink-faint);}
+  .run-btn{
+    background:var(--neon);color:#04211D;border:none;padding:13px 22px;border-radius:11px;
+    font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:14px;
+    box-shadow:0 0 22px -4px var(--neon);
+  }
+  .run-btn:hover{filter:brightness(1.06);}
+
+  /* ===== PROOF LEDGER ===== */
+  .ledger{direction:ltr;display:flex;flex-direction:column;border-inline-start:1px solid var(--glass-border);}
+  .stat-strip{display:flex;padding:0 20px 18px;gap:0;}
+  .stat{flex:1;padding-inline-end:14px;}
+  .stat + .stat{border-inline-start:1px solid var(--glass-border);padding-inline-start:14px;}
+  .stat .v{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--neon);}
+  .stat.danger .v{color:var(--danger);}
+  .stat .l{font-size:9.5px;color:var(--ink-faint);margin-top:2px;letter-spacing:.4px;font-family:'JetBrains Mono',monospace;}
+
+  .ledger-list{flex:1;overflow-y:auto;padding:4px 0;position:relative;}
+  .beam-runner{
+    position:absolute;left:19.5px;width:2px;height:80px;
+    background:linear-gradient(to bottom, transparent, var(--neon), transparent);
+    box-shadow:0 0 16px 2px var(--neon);animation:beam-run 3.6s linear infinite;pointer-events:none;z-index:1;
+  }
+  @keyframes beam-run{0%{top:-80px;}100%{top:100%;}}
+  @media (prefers-reduced-motion: reduce){.beam-runner,.trace-runner{animation:none;opacity:.4;}}
+
+  .lentry{position:relative;padding:13px 20px 13px 32px;cursor:pointer;}
+  .lentry::before{content:'';position:absolute;left:20px;top:0;bottom:0;width:1px;background:var(--glass-border);}
+  .lentry:first-child::before{top:50%;}
+  .lentry:last-child::before{bottom:50%;}
+  .lentry::after{
+    content:attr(data-n);position:absolute;left:14px;top:15px;width:14px;height:14px;border-radius:50%;
+    background:var(--void);border:1.5px solid var(--neon-dim);color:var(--neon);
+    font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;z-index:2;
+  }
+  .lentry.verified::after{border-color:var(--copper);color:var(--copper);}
+  .lentry.danger::after{border-color:var(--danger);color:var(--danger);}
+  .lentry.highlight{background:var(--neon-soft);}
+  .lentry .rule{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink);font-weight:600;}
+  .lentry .desc{font-size:11px;color:var(--ink-dim);margin-top:4px;line-height:1.55;}
+  .lentry .meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+  .lentry .hash{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-faint);}
+  .lentry .delta{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;color:var(--neon);}
+  .lentry .delta.neg{color:var(--danger);}
+  .lentry .delta.gold{color:var(--copper);}
+
+  .ledger-footer{
+    padding:14px 20px;border-top:1px solid var(--glass-border);
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-faint);
+    display:flex;justify-content:space-between;
+  }
+  .ledger-footer b{color:var(--copper);}
+
+  @media (max-width:980px){
+    .layout{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;}
+    .sources{max-height:130px;}
+    .ledger{max-height:200px;}
+  }
+</style>
+</head>
+<body>
+
+  <div class="ambient"></div>
+
+  <div class="titlebar">
+    <div class="tl-dots"><span></span><span></span><span></span></div>
+    <div class="tl-path"><b>Casper.exe</b> · C:\Users\Admin\casper_engine\Core_CPP</div>
+    <div class="tl-badge"><span class="dot"></span>محلي · يعمل بدون اتصال</div>
+  </div>
+
+  <div class="topbar">
+    <div class="tabs">
+      <div class="tab">◎ الويب</div>
+      <div class="tab active">⌥ github.com/grar00t/casper_engine</div>
+      <div class="tab">📖 MS Learn — SIMD intrinsics</div>
+      <div class="tab-add">+</div>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- SOURCES -->
+    <div class="col sources">
+      <div class="col-header">المصادر</div>
+      <div class="src-group">
+        <div class="src-group-label">GITHUB</div>
+        <div class="src-item selected"><span class="ic">⌥</span><span class="name">casper_engine</span><span class="count">144</span></div>
+        <div class="src-item"><span class="ic">⌥</span><span class="name">khawrizm-one</span><span class="count">62</span></div>
+        <div class="src-item"><span class="ic">⌥</span><span class="name">niyah</span><span class="count">31</span></div>
+      </div>
+      <div class="src-group">
+        <div class="src-group-label">محلي</div>
+        <div class="src-item"><span class="ic">🗂</span><span class="name">Core_CPP/docs</span><span class="count">18</span></div>
+        <div class="src-item"><span class="ic">🗂</span><span class="name">.nrule</span><span class="count">27</span></div>
+      </div>
+      <div class="src-group">
+        <div class="src-group-label">WEB</div>
+        <div class="src-item"><span class="ic">⌕</span><span class="name">SearXNG</span><span class="count">12</span></div>
+        <div class="src-item"><span class="ic">📖</span><span class="name">MS Learn</span><span class="count">4</span></div>
+      </div>
+    </div>
+
+    <!-- WORKBENCH -->
+    <div class="col workbench">
+      <div class="stream">
+
+        <div class="msg-user">
+          حلل مسار AVX2 في casper_engine وقارنه بمسار AVX-512 المقترح، وأعطني القرار.
+        </div>
+
+        <div class="trace" data-toggle>
+          <div class="trace-head">
+            <span class="chev">▾</span>
+            <span>أثر التفكير</span>
+            <span class="trace-sub">5 steps · 41ms</span>
+          </div>
+          <div class="trace-body">
+            <div class="trace-steps">
+              <span class="trace-runner"></span>
+              <div class="tstep"><span class="tn">01</span>parse query → 2 constraints extracted</div>
+              <div class="tstep"><span class="tn">02</span>match source pool → 382 candidates, 14 passed filter</div>
+              <div class="tstep"><span class="tn">03</span>unify premises (Robinson) → R14 flagged: target_hw_compat unknown</div>
+              <div class="tstep warn"><span class="tn">04</span>constraint unresolved → recommendation withheld, not rejected</div>
+              <div class="tstep"><span class="tn">05</span>compose response → 2 citations attached, confidence 86%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="msg-casper">
+          <div class="p">
+            المسار الحالي في <span class="mono">Core_CPP</span> يعتمد AVX2+FMA لعمليات الـ attention، وهذا خيار متعمّد وليس نقص — يوسّع التوافق على معالجات أقدم بدون خسارة كبيرة في throughput لأحجام السياق الحالية.
+          </div>
+          <div class="chiprow">
+            <div class="chip" data-target="l1"><span>1</span> attention.cpp</div>
+            <div class="chip" data-target="l2"><span>2</span> benchmark log</div>
+          </div>
+
+          <div class="p">
+            الانتقال لـ AVX-512 يرفع الأداء نظريًا، لكن القاعدة الرمزية <span class="mono">.nrule</span> رفضت التوصية المباشرة لأن شرط التوافق مع الأجهزة المستهدفة غير محقق — القرار معلّق، مو مرفوض ومو مقبول.
+          </div>
+          <div class="chiprow">
+            <div class="chip warn" data-target="l3"><span>3</span> rule R14 — blocked</div>
+          </div>
+
+          <div class="flags">
+            <div class="flag ok">✓ مصدرين متطابقين</div>
+            <div class="flag warn">⚠ تعارض واحد غير محسوم</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="composer">
+        <div class="mode-row">
+          <button class="mode-btn active">بحث</button>
+          <button class="mode-btn">بناء</button>
+          <button class="mode-btn">تحقق فقط</button>
+        </div>
+        <div class="input-row">
+          <input type="text" placeholder="اسأل، أو ألصق رابط مستودع للفهرسة…">
+          <button class="run-btn">تشغيل</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROOF LEDGER -->
+    <div class="col ledger">
+      <div class="col-header">سجل الإثبات</div>
+      <div class="stat-strip">
+        <div class="stat"><div class="v">86%</div><div class="l">ثقة</div></div>
+        <div class="stat danger"><div class="v">1</div><div class="l">معلّق</div></div>
+        <div class="stat"><div class="v">14</div><div class="l">قاعدة</div></div>
+        <div class="stat"><div class="v">382</div><div class="l">مصدر</div></div>
+      </div>
+
+      <div class="ledger-list">
+        <span class="beam-runner"></span>
+        <div class="lentry" data-n="1" id="l1">
+          <div class="rule">SOURCE · attention.cpp:112</div>
+          <div class="desc">AVX2+FMA intrinsics confirmed in current build path.</div>
+          <div class="meta"><span class="hash">sha256:a1f9c2…</span><span class="delta">+4%</span></div>
+        </div>
+        <div class="lentry" data-n="2" id="l2">
+          <div class="rule">SOURCE · bench/avx2_vs_avx512.log</div>
+          <div class="desc">Throughput delta measured, matches claim within 3%.</div>
+          <div class="meta"><span class="hash">sha256:7c02e4…</span><span class="delta">+8%</span></div>
+        </div>
+        <div class="lentry danger" data-n="3" id="l3">
+          <div class="rule">RULE R14 · backward_chaining</div>
+          <div class="desc">.nrule constraint: target_hw_compat = unknown → recommendation withheld.</div>
+          <div class="meta"><span class="hash">sha256:e441bd…</span><span class="delta neg">blocked</span></div>
+        </div>
+        <div class="lentry verified" data-n="4">
+          <div class="rule">UNIFICATION · Robinson</div>
+          <div class="desc">No contradiction between benchmark claim and rule state.</div>
+          <div class="meta"><span class="hash">sha256:9b30af…</span><span class="delta gold">verified</span></div>
+        </div>
+      </div>
+
+      <div class="ledger-footer">
+        <span>chain length: 4</span>
+        <span><b>VERIFIED</b> · root sha256:2fd8…</span>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+document.querySelectorAll('.chip').forEach(chip=>{
+  chip.addEventListener('click',()=>{
+    const id=chip.getAttribute('data-target');
+    const target=document.getElementById(id);
+    if(!target)return;
+    document.querySelectorAll('.lentry.highlight').forEach(e=>e.classList.remove('highlight'));
+    target.classList.add('highlight');
+    target.scrollIntoView({behavior:'smooth',block:'center'});
+    chip.classList.add('pinged');
+    setTimeout(()=>chip.classList.remove('pinged'),600);
+  });
+});
+document.querySelectorAll('[data-toggle]').forEach(el=>{
+  el.querySelector('.trace-head').addEventListener('click',()=>el.classList.toggle('collapsed'));
+});
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+  });
+});
+document.querySelectorAll('.mode-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
