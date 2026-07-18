@@ -1,325 +1,506 @@
-<!DOCTYPE html><html lang='ar' dir='rtl'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>NIYAH</title><link href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Tajawal:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap' rel='stylesheet'><style>
-:root{--bg:#050d0c;--panel:#0a1412;--border:rgba(44,242,218,.12);--neon:#2CF2DA;--neon-dim:#18B49F;--neon-soft:rgba(44,242,218,.1);--text:#E8F5F3;--text-dim:#7A9E9A;--text-faint:#3D5552;--copper:#E0A354;--danger:#FF6E62;--success:#4ade80;--mono:'JetBrains Mono',monospace}
-[data-theme=light]{--bg:#F0F4F3;--panel:#FFFFFF;--border:rgba(30,90,80,.12);--neon:#0D8C7E;--neon-dim:#0A6E62;--neon-soft:rgba(13,140,126,.1);--text:#0D2220;--text-dim:#3D6560;--text-faint:#8AADA9;--copper:#B87820;--danger:#D63B2F;--success:#16a34a}
+
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NIYAH</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"><style>
+/* ═══════════════ DARK THEME (default) ═══════════════ */
+:root {
+  --bg: #0F1117;
+  --surface: #1A1D27;
+  --surface2: #232635;
+  --border: rgba(255,255,255,.08);
+  --border-strong: rgba(255,255,255,.15);
+  --neon: #7C3AED;
+  --neon2: #A78BFA;
+  --accent: #06B6D4;
+  --accent2: #67E8F9;
+  --green: #10B981;
+  --amber: #F59E0B;
+  --red: #EF4444;
+  --text: #F8FAFC;
+  --text2: #94A3B8;
+  --text3: #475569;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', 'Tajawal', sans-serif;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 4px 24px rgba(0,0,0,.4);
+}
+/* ═══════════════ LIGHT THEME ═══════════════ */
+[data-theme="light"] {
+  --bg: #F1F5F9;
+  --surface: #FFFFFF;
+  --surface2: #F8FAFC;
+  --border: rgba(0,0,0,.08);
+  --border-strong: rgba(0,0,0,.18);
+  --neon: #7C3AED;
+  --neon2: #6D28D9;
+  --accent: #0891B2;
+  --accent2: #0E7490;
+  --green: #059669;
+  --amber: #D97706;
+  --red: #DC2626;
+  --text: #0F172A;
+  --text2: #475569;
+  --text3: #94A3B8;
+  --shadow: 0 4px 24px rgba(0,0,0,.10);
+}
+/* ═══════════════ RESET ═══════════════ */
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;font-family:'Tajawal','Inter',sans-serif;background:var(--bg);color:var(--text);font-size:15px}
+html,body{height:100%;overflow:hidden;font-family:var(--sans);background:var(--bg);color:var(--text);font-size:15px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px}
+::selection{background:rgba(124,58,237,.25);color:var(--text)}
 .mono{font-family:var(--mono)}
-::selection{background:var(--neon-soft);color:var(--text)}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.titlebar{height:32px;display:flex;align-items:center;padding:0 12px;gap:8px;background:rgba(0,0,0,.3);border-bottom:1px solid var(--border);flex-shrink:0;direction:ltr;-webkit-app-region:drag}
-.tl-dots{display:flex;gap:5px;-webkit-app-region:no-drag}.tl-dot{width:11px;height:11px;border-radius:50%;cursor:pointer;transition:opacity .15s}.tl-dot:hover{opacity:.8}
-.tl-dot-close{background:#FF5F57}.tl-dot-min{background:#FEBC2E}.tl-dot-max{background:#28C840}
-.tl-title{flex:1;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text-faint);pointer-events:none}
-.tl-badge{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--neon)}
-.tl-dot-live{width:6px;height:6px;border-radius:50%;background:var(--neon);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.statusbar{height:22px;display:flex;align-items:center;padding:0 14px;gap:12px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text-faint);flex-shrink:0;direction:ltr}
-.sb-dot{width:5px;height:5px;border-radius:50%}.sb-dot.ok{background:var(--success)}.sb-dot.warn{background:var(--copper)}.sb-dot.err{background:var(--danger)}
-.sb-right{margin-left:auto;display:flex;gap:10px;align-items:center}
-.sb-theme-btn,.sb-lang-btn{background:transparent;border:1px solid var(--border);color:var(--text-faint);padding:1px 7px;border-radius:3px;cursor:pointer;font-family:var(--mono);font-size:9px;transition:all .15s}
-.sb-theme-btn:hover,.sb-lang-btn:hover{border-color:var(--neon);color:var(--neon)}
-.app{flex:1;display:grid;grid-template-columns:190px 1fr 270px;overflow:hidden}
-.sidebar{border-inline-end:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
-.sidebar-section{padding:10px 12px;border-bottom:1px solid var(--border)}
-.sidebar-label{font-family:var(--mono);font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
-.niyah-card{background:var(--neon-soft);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
-.niyah-card-name{font-family:var(--mono);font-size:12px;color:var(--neon);font-weight:500}
-.niyah-card-desc{font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5}
-.niyah-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
-.niyah-tag{font-family:var(--mono);font-size:9px;padding:2px 5px;border-radius:3px;background:rgba(255,255,255,.05);color:var(--text-faint)}
-.stat-row{display:flex;justify-content:space-between;font-size:11px;padding:2px 0}
-.stat-label{color:var(--text-faint)}.stat-val{color:var(--text-dim);font-family:var(--mono)}
-.stat-val.live{color:var(--neon)}
-.suggestion{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text-dim);transition:all .12s}
-.suggestion:hover{background:var(--neon-soft);color:var(--neon)}
-.suggestion-arrow{color:var(--text-faint);font-size:11px;flex-shrink:0}
-.main{display:flex;flex-direction:column;overflow:hidden}
-.stream{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px}
-.welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;text-align:center;padding:30px}
-.welcome-logo{font-family:var(--mono);font-size:42px;font-weight:500;color:var(--neon);letter-spacing:3px}
-.welcome-tagline{font-size:13px;color:var(--text-dim);max-width:380px;line-height:1.7}
-.welcome-honest{font-family:var(--mono);font-size:11px;color:var(--text-faint);max-width:420px;text-align:left;direction:ltr;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:10px;line-height:1.8}
-.welcome-pills{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;max-width:440px}
-.pill{font-size:12px;padding:7px 13px;border-radius:20px;cursor:pointer;border:1px solid var(--border);color:var(--text-dim);transition:all .15s;direction:rtl}
-.pill:hover{border-color:var(--neon);color:var(--neon);background:var(--neon-soft)}
-.msg-user{align-self:flex-end;max-width:70%;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:14px 14px 4px 14px;padding:11px 15px;font-size:14px;line-height:1.85}
-.msg-niyah{display:flex;flex-direction:column;gap:10px;max-width:90%}
+/* ═══════════════ LAYOUT ═══════════════ */
+.app-shell{height:100vh;display:flex;flex-direction:column}
+.titlebar{
+  height:40px;display:flex;align-items:center;padding:0 16px;gap:10px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;-webkit-app-region:drag;direction:ltr
+}
+.traffic-lights{display:flex;gap:6px;-webkit-app-region:no-drag}
+.tl{width:12px;height:12px;border-radius:50%;cursor:pointer;transition:filter .15s}
+.tl:hover{filter:brightness(1.3)}
+.tl-close{background:#FF5F57}
+.tl-min{background:#FEBC2E}
+.tl-max{background:#28C840}
+.title-text{flex:1;text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--text2);pointer-events:none;letter-spacing:.5px}
+.title-badge{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,.4)}50%{opacity:.7;box-shadow:0 0 0 5px rgba(16,185,129,0)}}
+/* ═══════════════ NAV BAR ═══════════════ */
+.navbar{
+  display:flex;align-items:center;padding:0 16px;height:44px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  gap:4px;flex-shrink:0
+}
+.nav-tab{
+  display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--radius-sm);
+  font-size:12.5px;font-family:var(--mono);color:var(--text2);cursor:pointer;
+  transition:all .15s;border:none;background:transparent
+}
+.nav-tab:hover{background:var(--surface2);color:var(--text)}
+.nav-tab.active{background:var(--neon);color:#fff;font-weight:500}
+.nav-spacer{flex:1}
+.nav-action{
+  display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:var(--radius-sm);
+  font-size:11px;font-family:var(--mono);color:var(--text2);cursor:pointer;
+  border:1px solid var(--border);background:transparent;transition:all .15s
+}
+.nav-action:hover{border-color:var(--border-strong);color:var(--text)}
+/* ═══════════════ STATUS BAR ═══════════════ */
+.statusbar{
+  display:flex;align-items:center;padding:0 16px;height:26px;gap:14px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  font-family:var(--mono);font-size:10.5px;color:var(--text3);flex-shrink:0;direction:ltr
+}
+.sb-item{display:flex;align-items:center;gap:5px}
+.sb-dot{width:6px;height:6px;border-radius:50%}
+.sb-dot.ok{background:var(--green)}
+.sb-dot.warn{background:var(--amber)}
+.sb-dot.off{background:var(--red)}
+.sb-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+/* ═══════════════ MAIN CONTENT ═══════════════ */
+.content{flex:1;display:grid;grid-template-columns:220px 1fr 280px;overflow:hidden;min-height:0}
+/* ═══════════════ SIDEBAR ═══════════════ */
+.sidebar{
+  background:var(--surface);border-inline-end:1px solid var(--border);
+  overflow-y:auto;display:flex;flex-direction:column;gap:0
+}
+.sidebar-block{padding:14px 14px 10px;border-bottom:1px solid var(--border)}
+.sidebar-label{font-family:var(--mono);font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px}
+/* Engine card */
+.engine-card{
+  background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(6,182,212,.08));
+  border:1px solid rgba(124,58,237,.25);border-radius:var(--radius);padding:12px
+}
+.engine-name{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--neon2);margin-bottom:4px}
+.engine-desc{font-size:11.5px;color:var(--text2);line-height:1.55}
+.engine-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.engine-tag{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(124,58,237,.12);color:var(--neon2);border:1px solid rgba(124,58,237,.2)}
+/* Stats */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-card{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px}
+.stat-val{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--accent);line-height:1}
+.stat-label{font-size:10px;color:var(--text3);margin-top:3px}
+/* Suggestions */
+.suggestion{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);
+  cursor:pointer;font-size:12px;color:var(--text2);transition:all .15s
+}
+.suggestion:hover{background:var(--surface2);color:var(--text)}
+.suggestion-icon{font-size:10px;color:var(--text3)}
+/* ═══════════════ WORKBENCH ═══════════════ */
+.workbench{display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+.stream{
+  flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px;
+  background:var(--bg)
+}
+/* Welcome */
+.welcome{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:28px;text-align:center;padding:40px;min-height:300px
+}
+.welcome-logo{
+  font-family:var(--mono);font-size:52px;font-weight:700;letter-spacing:4px;
+  background:linear-gradient(135deg,var(--neon),var(--accent));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text
+}
+.welcome-sub{font-size:14px;color:var(--text2);max-width:380px;line-height:1.7}
+.welcome-how{
+  font-family:var(--mono);font-size:11px;color:var(--text2);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 18px;text-align:left;direction:ltr;line-height:1.85;max-width:480px
+}
+.welcome-pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:500px}
+.pill{
+  font-size:12.5px;padding:8px 16px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--border);color:var(--text2);background:var(--surface);
+  transition:all .18s
+}
+.pill:hover{border-color:var(--neon);color:var(--neon);background:rgba(124,58,237,.08)}
+/* Messages */
+.msg-user{
+  align-self:flex-end;max-width:72%;background:var(--neon);color:#fff;
+  border-radius:18px 18px 4px 18px;padding:13px 18px;font-size:14px;line-height:1.85;
+  box-shadow:0 2px 12px rgba(124,58,237,.3)
+}
+.msg-niyah{display:flex;flex-direction:column;gap:12px;max-width:92%}
+.answer-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 20px;box-shadow:var(--shadow)
+}
 .answer-text{font-size:14px;line-height:2.0;color:var(--text)}
-.answer-text sup{color:var(--neon);font-family:var(--mono);font-size:9px}
-.conf-bar-wrap{display:flex;align-items:center;gap:8px;direction:ltr}
-.conf-bar{width:100px;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.answer-text sup{color:var(--neon2);font-family:var(--mono);font-size:9px}
+/* Confidence bar */
+.conf-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;direction:ltr}
+.conf-bar{width:80px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
 .conf-fill{height:100%;border-radius:2px;transition:width .5s}
-.conf-fill.hi{background:var(--success)}.conf-fill.mid{background:var(--copper)}.conf-fill.lo{background:var(--danger)}
-.conf-label{font-family:var(--mono);font-size:10px;color:var(--text-faint)}
-.mem-badge{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(224,163,84,.1);color:var(--copper);border:1px solid rgba(224,163,84,.2)}
-.cit-row{display:flex;flex-wrap:wrap;gap:5px;direction:ltr}
-.cit{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:12px;border:1px solid var(--border);color:var(--text-dim);text-decoration:none;transition:all .12s}
-.cit:hover{border-color:var(--neon);color:var(--neon);background:var(--neon-soft)}
-.show-more{font-family:var(--mono);font-size:10px;color:var(--neon-dim);background:none;border:none;cursor:pointer;padding:3px 0;display:block}
-.show-more:hover{color:var(--neon)}
-.identity-answer{border-left:2px solid var(--neon);padding-left:12px;direction:rtl;font-size:13.5px;line-height:1.9;color:var(--text)}
-.trace-wrap{background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-width:90%}
-.trace-header{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--neon-dim);-webkit-user-select:none;user-select:none}
-.trace-header:hover{color:var(--neon)}
-.trace-body{display:none;padding:8px 12px;border-top:1px solid var(--border)}
-.trace-wrap.open .trace-body{display:block}
-.trace-step{display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);direction:ltr}
-.trace-step-name{color:var(--neon);min-width:100px;font-weight:500}
-.trace-step-ms{color:var(--text-faint);min-width:45px}
-.trace-step-detail{color:var(--text-dim);flex:1}
-.trace-step-data{color:var(--text-faint);font-size:9.5px;margin-top:1px;padding-left:145px}
-.typing-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--neon-dim);animation:td .8s ease-in-out infinite}
-.typing-dot:nth-child(2){animation-delay:.2s}.typing-dot:nth-child(3){animation-delay:.4s}
-@keyframes td{0%,100%{opacity:.2;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
-.err-msg{color:var(--danger);font-size:13px;padding:8px;background:rgba(255,110,98,.07);border:1px solid rgba(255,110,98,.2);border-radius:6px}
-.composer{border-top:1px solid var(--border);padding:10px 16px 14px;display:flex;flex-direction:column;gap:8px;background:rgba(0,0,0,.15)}
-.composer-top{display:flex;align-items:center;justify-content:space-between}
-.mode-btns{display:flex;gap:4px}
-.mode-btn{font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);color:var(--text-faint);cursor:pointer;background:transparent;transition:all .12s}
-.mode-btn.active{border-color:var(--neon);color:var(--neon);background:var(--neon-soft)}
-.mode-btn:hover:not(.active){color:var(--text-dim)}
-.agent-badge{font-family:var(--mono);font-size:9.5px;display:flex;align-items:center;gap:4px;color:var(--text-faint)}
-.input-row{display:flex;gap:8px;align-items:center}
-.query-input{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:10px;font-family:'Tajawal','Inter',sans-serif;font-size:14px;transition:border-color .15s}
+.conf-fill.hi{background:var(--green)}
+.conf-fill.mid{background:var(--amber)}
+.conf-fill.lo{background:var(--red)}
+.conf-pct{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text2)}
+.mem-tag{font-family:var(--mono);font-size:9.5px;padding:2px 8px;border-radius:4px;background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25)}
+/* Citations */
+.cit-row{display:flex;flex-wrap:wrap;gap:6px;direction:ltr;margin-top:4px}
+.cit{
+  display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10.5px;
+  padding:4px 11px;border-radius:20px;border:1px solid var(--border);color:var(--text2);
+  text-decoration:none;background:var(--surface2);transition:all .15s
+}
+.cit:hover{border-color:var(--neon);color:var(--neon);background:rgba(124,58,237,.08)}
+/* Show more */
+.show-more{
+  font-family:var(--mono);font-size:10.5px;color:var(--neon2);background:none;
+  border:none;cursor:pointer;padding:4px 0;margin-top:2px;display:block
+}
+/* Trace block */
+.trace-block{
+  background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;margin-top:4px
+}
+.trace-toggle{
+  display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;
+  font-family:var(--mono);font-size:11px;color:var(--text2);-webkit-user-select:none;user-select:none;
+  transition:background .15s
+}
+.trace-toggle:hover{background:var(--surface)}
+.trace-toggle .chevron{color:var(--text3);transition:transform .15s;font-size:10px}
+.trace-block.open .chevron{transform:rotate(90deg)}
+.trace-body{display:none;padding:8px 14px 12px;border-top:1px solid var(--border)}
+.trace-block.open .trace-body{display:block}
+.trace-step{display:grid;grid-template-columns:120px 48px 1fr;gap:6px;padding:4px 0;font-family:var(--mono);font-size:11px;color:var(--text2);direction:ltr;border-bottom:1px solid var(--border);align-items:start}
+.trace-step:last-child{border-bottom:none}
+.trace-step-name{color:var(--accent);font-weight:500}
+.trace-step-ms{color:var(--text3)}
+.trace-step-sub{font-size:9.5px;color:var(--text3);padding-left:120px;margin-top:1px;direction:ltr}
+/* Identity */
+.identity-answer{
+  background:var(--surface);border:1px solid rgba(124,58,237,.2);border-radius:var(--radius);
+  padding:18px 20px;font-size:13.5px;line-height:1.9;color:var(--text);white-space:pre-line
+}
+/* Composer */
+.composer{
+  padding:14px 20px 18px;background:var(--surface);border-top:1px solid var(--border);
+  display:flex;flex-direction:column;gap:10px
+}
+.composer-row1{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mode-group{display:flex;gap:4px}
+.mode-btn{
+  font-family:var(--mono);font-size:11px;padding:5px 13px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s
+}
+.mode-btn.active{background:rgba(124,58,237,.12);border-color:var(--neon);color:var(--neon);font-weight:500}
+.mode-btn:hover:not(.active){background:var(--surface2);color:var(--text)}
+.agent-status{font-family:var(--mono);font-size:10.5px;display:flex;align-items:center;gap:5px;color:var(--text3)}
+.composer-row2{display:flex;gap:10px;align-items:center}
+.query-input{
+  flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);
+  padding:11px 16px;font-family:var(--sans);font-size:14px;color:var(--text);
+  transition:border-color .15s
+}
 .query-input:focus{outline:none;border-color:var(--neon)}
-.query-input::placeholder{color:var(--text-faint)}
-.send-btn{background:var(--neon);color:#03201C;border:none;padding:10px 18px;border-radius:10px;font-weight:600;cursor:pointer;font-family:'Tajawal','Inter',sans-serif;font-size:13px;white-space:nowrap;transition:all .15s;box-shadow:0 0 18px -4px var(--neon)}
-.send-btn:hover{filter:brightness(1.1)}.send-btn:disabled{opacity:.45;box-shadow:none;cursor:not-allowed}
-.extra-row{display:flex;align-items:center;gap:6px}
-.extra-btn{font-family:var(--mono);font-size:10px;padding:4px 9px;border-radius:5px;border:1px solid var(--border);color:var(--text-faint);cursor:pointer;background:transparent;transition:all .12s}
-.extra-btn:hover{border-color:var(--neon);color:var(--neon)}
-.file-tag{font-family:var(--mono);font-size:9.5px;color:var(--neon);background:var(--neon-soft);border:1px solid var(--border);padding:2px 8px;border-radius:4px;display:none}
-.ledger{border-inline-start:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-.ledger-header{padding:10px 14px 6px;font-family:var(--mono);font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
-.ledger-stats{display:flex;padding:8px 14px;gap:0;border-bottom:1px solid var(--border)}
-.ledger-stat{flex:1;text-align:center}
-.ledger-stat-v{font-family:var(--mono);font-size:16px;font-weight:500;color:var(--neon)}
-.ledger-stat-l{font-family:var(--mono);font-size:8.5px;color:var(--text-faint);margin-top:1px}
-.ledger-list{flex:1;overflow-y:auto;padding:4px 0}
-.ledger-empty{padding:20px 14px;font-family:var(--mono);font-size:10px;color:var(--text-faint);line-height:1.8;direction:ltr}
-.lentry{padding:9px 14px;border-bottom:1px solid var(--border);cursor:default;direction:ltr}
-.lentry:hover{background:rgba(255,255,255,.02)}
-.lentry-kind{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--neon);margin-bottom:3px}
-.lentry-desc{font-size:11px;color:var(--text-dim);line-height:1.5;word-break:break-word}
-.lentry-meta{display:flex;justify-content:space-between;margin-top:4px}
-.lentry-hash{font-family:var(--mono);font-size:9px;color:var(--text-faint)}
-.lentry-delta{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--success)}
-.lentry-delta.none{color:var(--text-faint)}
-.lentry-url{font-family:var(--mono);font-size:9px;color:var(--text-faint);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lentry-url:hover{color:var(--neon)}
-.ledger-footer{padding:8px 14px;border-top:1px solid var(--border);font-family:var(--mono);font-size:9px;color:var(--text-faint);display:flex;justify-content:space-between;direction:ltr}
+.query-input::placeholder{color:var(--text3)}
+.send-btn{
+  background:var(--neon);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius);
+  font-weight:600;cursor:pointer;font-size:13.5px;white-space:nowrap;font-family:var(--sans);
+  box-shadow:0 2px 12px rgba(124,58,237,.35);transition:all .15s
+}
+.send-btn:hover{filter:brightness(1.1);box-shadow:0 4px 18px rgba(124,58,237,.5)}
+.send-btn:disabled{opacity:.45;box-shadow:none;cursor:not-allowed}
+.composer-row3{display:flex;gap:6px;align-items:center}
+.extra-btn{
+  font-family:var(--mono);font-size:10.5px;padding:4px 10px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s
+}
+.extra-btn:hover{border-color:var(--border-strong);color:var(--text)}
+.file-tag{font-family:var(--mono);font-size:10px;color:var(--green);background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);padding:3px 9px;border-radius:5px}
+/* ═══════════════ LEDGER ═══════════════ */
+.ledger{background:var(--surface);border-inline-start:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.ledger-header{padding:12px 16px 8px;font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border)}
+.ledger-kpis{display:flex;border-bottom:1px solid var(--border)}
+.kpi{flex:1;padding:12px 10px;text-align:center;border-right:1px solid var(--border)}
+.kpi:last-child{border-right:none}
+.kpi-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent)}
+.kpi-label{font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:2px;text-transform:uppercase}
+.ledger-list{flex:1;overflow-y:auto}
+.lentry{padding:10px 14px;border-bottom:1px solid var(--border);direction:ltr;transition:background .12s}
+.lentry:hover{background:var(--surface2)}
+.lentry-kind{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--neon2);margin-bottom:3px}
+.lentry-desc{font-size:11px;color:var(--text2);line-height:1.5}
+.lentry-sub{font-family:var(--mono);font-size:9.5px;color:var(--text3);margin-top:2px;word-break:break-all}
+.lentry-meta{display:flex;justify-content:space-between;margin-top:5px}
+.lentry-ms{font-family:var(--mono);font-size:9.5px;color:var(--text3)}
+.lentry-check{color:var(--green);font-size:11px}
+.ledger-empty{padding:24px 16px;font-family:var(--mono);font-size:11px;color:var(--text3);line-height:1.8;text-align:center}
+.ledger-footer{padding:8px 14px;border-top:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text3);display:flex;justify-content:space-between}
+/* ═══════════════ TERMINAL ═══════════════ */
+.term-panel{
+  display:none;position:fixed;bottom:0;left:0;right:0;height:42%;
+  background:#0D0D0D;border-top:2px solid var(--neon);z-index:200;
+  flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.5)
+}
+.term-header{
+  display:flex;align-items:center;padding:6px 14px;gap:10px;
+  background:rgba(0,0,0,.6);font-family:var(--mono);font-size:11px
+}
+.term-title{color:var(--neon2)}
+.term-status{color:var(--text3)}
+.term-close{margin-left:auto;background:transparent;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0 4px;line-height:1}
+/* Typing indicator */
+.typing{display:flex;align-items:center;gap:6px;padding:4px 0;font-family:var(--mono);font-size:11px;color:var(--text3)}
+.tdot{width:5px;height:5px;border-radius:50%;background:var(--neon2);animation:td .8s infinite}
+.tdot:nth-child(2){animation-delay:.2s}
+.tdot:nth-child(3){animation-delay:.4s}
+@keyframes td{0%,100%{opacity:.2;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
 .hidden{display:none!important}
 </style>
-</head>
-<body>
+</head><body>
+<div class="app-shell">
 
+<!-- TITLEBAR -->
 <div class="titlebar">
-  <div class="tl-dots">
-    <div class="tl-dot tl-dot-close" onclick="if(window.casper)window.casper.Close()" title="Close"></div>
-    <div class="tl-dot tl-dot-min" onclick="if(window.casper)window.casper.Minimise()" title="Minimise"></div>
-    <div class="tl-dot tl-dot-max" onclick="if(window.casper)window.casper.ToggleMaximise()" title="Maximise"></div>
+  <div class="traffic-lights">
+    <div class="tl tl-close" onclick="window.casper?.Close()"></div>
+    <div class="tl tl-min" onclick="window.casper?.Minimise()"></div>
+    <div class="tl tl-max" onclick="window.casper?.ToggleMaximise()"></div>
   </div>
-  <div class="tl-title mono">NIYAH · Casper Engine · v3.1</div>
-  <div class="tl-badge"><span class="tl-dot-live"></span><span id="conn-label">Connecting…</span></div>
+  <div class="title-text mono">NIYAH · Casper Engine · v3.2</div>
+  <div class="title-badge"><span class="live-dot" id="live-dot"></span><span id="conn-label" style="color:var(--text3)">—</span></div>
 </div>
 
+<!-- NAVBAR -->
+<div class="navbar">
+  <button class="nav-tab active" id="tab-search" onclick="setTab('search',this)">🔍 Search</button>
+  <button class="nav-tab" id="tab-terminal" onclick="openTerminal()">⬛ Terminal</button>
+  <div class="nav-spacer"></div>
+  <button class="nav-action" id="ctrl-theme" onclick="toggleTheme()">☀ Light</button>
+  <button class="nav-action" id="ctrl-lang" onclick="toggleLang()">EN</button>
+  <button class="nav-action" onclick="clearStream()">↺ Clear</button>
+</div>
+
+<!-- STATUS BAR -->
 <div class="statusbar">
-  <div style="display:flex;align-items:center;gap:4px"><span class="sb-dot" id="vm-dot"></span><span id="vm-label">VM</span></div>
+  <div class="sb-item"><span class="sb-dot" id="vm-dot"></span><span id="vm-label">VM</span></div>
   <span id="backend-label">DDG HTML</span>
-  <span id="mem-label">Mem: —</span>
-  <div class="sb-right">
-    <span id="q-count" class="mono">0 queries</span>
-    <button class="sb-theme-btn" onclick="toggleTheme()">☀ Light</button>
-    <button class="sb-lang-btn" onclick="toggleLang()">EN</button>
-  </div>
+  <span id="mem-stat" class="mono">Mem: —</span>
+  <div class="sb-right"><span id="q-count" class="mono">0 queries</span></div>
 </div>
 
-<div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-<div class="app">
+<!-- CONTENT -->
+<div class="content">
 
   <!-- SIDEBAR -->
   <div class="sidebar">
-    <div class="sidebar-section">
-      <div class="niyah-card">
-        <div class="niyah-card-name">◈ NIYAH Engine</div>
-        <div class="niyah-card-desc" id="nc-desc">محرك بحث واستخلاص. لا يُنشئ نصاً — يجلب من الويب.</div>
-        <div class="niyah-tags"><span class="niyah-tag">TF-IDF</span><span class="niyah-tag">DDG HTML</span><span class="niyah-tag">SQLite</span><span class="niyah-tag">SHA-256</span></div>
+    <div class="sidebar-block">
+      <div class="engine-card">
+        <div class="engine-name">◈ NIYAH</div>
+        <div class="engine-desc" id="nc-desc">Search & extraction. Fetches real web pages — generates nothing.</div>
+        <div class="engine-tags">
+          <span class="engine-tag">TF-IDF</span>
+          <span class="engine-tag">DDG HTML</span>
+          <span class="engine-tag">SQLite</span>
+          <span class="engine-tag">SHA-256</span>
+        </div>
       </div>
     </div>
-    <div class="sidebar-section">
-      <div class="sidebar-label" id="lbl-stats">Session Stats</div>
-      <div class="stat-row"><span class="stat-label" id="lbl-queries">Queries</span><span class="stat-val live" id="st-queries">0</span></div>
-      <div class="stat-row"><span class="stat-label" id="lbl-avgconf">Avg Confidence</span><span class="stat-val" id="st-conf">—</span></div>
-      <div class="stat-row"><span class="stat-label" id="lbl-avgtime">Avg Time</span><span class="stat-val" id="st-time">—</span></div>
-      <div class="stat-row"><span class="stat-label" id="lbl-cached">From Cache</span><span class="stat-val" id="st-cache">0</span></div>
+    <div class="sidebar-block">
+      <div class="sidebar-label" id="lbl-stats">Session</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-val" id="st-queries">0</div><div class="stat-label" id="lbl-queries">Queries</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-conf">—</div><div class="stat-label" id="lbl-conf">Avg Conf</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-time">—</div><div class="stat-label" id="lbl-time">Avg Time</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-cache">0</div><div class="stat-label" id="lbl-cache">Cached</div></div>
+      </div>
     </div>
-    <div class="sidebar-section" style="flex:1">
+    <div class="sidebar-block" style="flex:1">
       <div class="sidebar-label" id="lbl-suggest">Suggestions</div>
       <div id="suggestions"></div>
     </div>
   </div>
 
-  <!-- MAIN WORKBENCH -->
-  <div class="main">
+  <!-- WORKBENCH -->
+  <div class="workbench">
     <div class="stream" id="stream">
       <div class="welcome" id="welcome">
         <div class="welcome-logo">NIYAH</div>
-        <div class="welcome-tagline" id="w-tagline">Sovereign search — no model weights, no hallucination.</div>
-        <div class="welcome-honest" id="w-how">
-DDG HTML scrape → strip tags → TF-IDF cosine rank → top sentences → [n] citations → SHA-256 sign<br>
-Not LLaMA. Not GPT. Not DeepSeek.<br>
-Arabic · English · Chinese — any language DDG indexes.
-        </div>
+        <div class="welcome-sub" id="w-sub">Sovereign search. No model weights. No hallucination.</div>
+        <div class="welcome-how" id="w-how">DDG scrape → strip HTML → TF-IDF cosine rank → top sentences → [n] citations</div>
         <div class="welcome-pills" id="welcome-pills"></div>
       </div>
     </div>
     <div class="composer">
-      <div class="composer-top">
-        <div class="mode-btns">
+      <div class="composer-row1">
+        <div class="mode-group">
           <button class="mode-btn active" id="btn-search" onclick="setMode('search')">Search</button>
           <button class="mode-btn" id="btn-cache" onclick="setMode('cache')">Cached</button>
           <button class="mode-btn" id="btn-fresh" onclick="setMode('fresh')">Fresh ↺</button>
         </div>
-        <div class="agent-badge"><span class="sb-dot" id="agent-dot"></span><span id="agent-label">…</span></div>
+        <div class="agent-status"><span class="sb-dot" id="agent-dot"></span><span id="agent-label" class="mono" style="font-size:10.5px">—</span></div>
       </div>
-      <div class="input-row">
+      <div class="composer-row2">
         <input class="query-input" id="qi" type="text" placeholder="Ask anything…" autocomplete="off">
         <button class="send-btn" id="send-btn" onclick="sendQuery()">Send ↵</button>
       </div>
-      <div class="extra-row">
+      <div class="composer-row3">
         <button class="extra-btn" onclick="document.getElementById('file-input').click()">📎 File</button>
         <button class="extra-btn" onclick="clearStream()">↺ Clear</button>
-        <span class="file-tag" id="file-tag"></span>
-        <input type="file" id="file-input" accept=".txt,.md,.pdf,.png,.jpg,.jpeg" class="hidden">
+        <span class="file-tag hidden" id="file-tag"></span>
+        <input type="file" id="file-input" accept=".txt,.md,.pdf,.png,.jpg" class="hidden">
       </div>
     </div>
   </div>
 
-  <!-- PROOF LEDGER -->
+  <!-- LEDGER -->
   <div class="ledger">
-    <div class="ledger-header" id="lbl-ledger">Proof Ledger</div>
-    <div class="ledger-stats">
-      <div class="ledger-stat"><div class="ledger-stat-v" id="ld-conf">—</div><div class="ledger-stat-l">confidence</div></div>
-      <div class="ledger-stat"><div class="ledger-stat-v" id="ld-cit">0</div><div class="ledger-stat-l">citations</div></div>
-      <div class="ledger-stat"><div class="ledger-stat-v" id="ld-ms">—</div><div class="ledger-stat-l">ms</div></div>
+    <div class="ledger-header">Proof Ledger</div>
+    <div class="ledger-kpis">
+      <div class="kpi"><div class="kpi-val" id="ld-conf">—</div><div class="kpi-label">conf</div></div>
+      <div class="kpi"><div class="kpi-val" id="ld-cit">0</div><div class="kpi-label">cit</div></div>
+      <div class="kpi"><div class="kpi-val" id="ld-ms">—</div><div class="kpi-label">ms</div></div>
     </div>
     <div class="ledger-list" id="ledger-list">
-      <div class="ledger-empty" id="ledger-empty">Run a query to see the real pipeline steps here.</div>
+      <div class="ledger-empty">Run a query to see<br>the real pipeline here.</div>
     </div>
-    <div class="ledger-footer"><span id="ld-chain">chain: —</span><span id="ld-hash" class="mono">—</span></div>
+    <div class="ledger-footer"><span id="ld-chain">—</span><span id="ld-hash" class="mono">—</span></div>
   </div>
 
-</div>
-</div>
+</div><!-- /content -->
 
-<!-- ── REAL TERMINAL (hidden until user opens it) ── -->
-<div id="terminal-panel" style="display:none;position:fixed;bottom:0;left:0;right:0;height:40%;background:#0a0a0a;border-top:2px solid var(--neon);z-index:100;flex-direction:column">
-  <div style="display:flex;align-items:center;padding:4px 12px;background:rgba(0,0,0,.5);font-family:var(--mono);font-size:11px;color:var(--neon)">
-    <span>⬛ Terminal — PowerShell</span>
-    <span style="margin-left:8px;color:var(--text-faint)" id="pty-status">connecting…</span>
-    <button onclick="closeTerminal()" style="margin-left:auto;background:transparent;border:none;color:var(--danger);cursor:pointer;font-size:14px">✕</button>
+<!-- TERMINAL PANEL -->
+<div class="term-panel" id="term-panel">
+  <div class="term-header">
+    <span class="term-title">⬛ Terminal — PowerShell</span>
+    <span class="term-status" id="pty-status">connecting…</span>
+    <button class="term-close" onclick="closeTerminal()">✕</button>
   </div>
-  <div id="xterm-container" style="flex:1;overflow:hidden"></div>
+  <div id="xterm-container" style="flex:1;overflow:hidden;padding:4px"></div>
 </div>
-
-<!-- xterm.js from CDN -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
 
+</div><!-- /app-shell -->
 <script>
 'use strict';
-/* ═══════════════════════════════════════════════════════════
-   NIYAH Casper UI v3.1
-   Honest: shows real pipeline steps, real timings, real data.
-   No fake "intent analysis", no fake "thinking steps".
-   ═══════════════════════════════════════════════════════════ */
+const AGENT=(window._agentUrl)||'http://20.91.208.59';
 
-const AGENT = (window._agentUrl) || 'http://20.91.208.59';
-
-/* ── Global helpers ── */
-function h(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function qs(id){ return document.getElementById(id); }
-function ael(id,ev,fn){ const el=qs(id); if(el) el.addEventListener(ev,fn); }
+function h(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function qs(id){return document.getElementById(id)}
 
 /* ── Theme ── */
-let _theme = localStorage.getItem('theme')||'dark';
+let _theme=localStorage.getItem('theme')||'dark';
 function applyTheme(){
-  document.documentElement.setAttribute('data-theme', _theme==='light'?'light':'');
-  qs('send-btn')&&(qs('send-btn').style.color=_theme==='light'?'#fff':null);
+  document.documentElement.setAttribute('data-theme',_theme==='light'?'light':'');
+  const btn=qs('ctrl-theme');
+  if(btn)btn.textContent=_theme==='dark'?'☀ Light':'🌙 Dark';
 }
-function toggleTheme(){
-  _theme = _theme==='dark'?'light':'dark';
-  localStorage.setItem('theme',_theme);
-  applyTheme();
-  const btn=document.querySelector('.sb-theme-btn');
-  if(btn) btn.textContent=_theme==='dark'?'☀ Light':'🌙 Dark';
-}
+function toggleTheme(){_theme=_theme==='dark'?'light':'dark';localStorage.setItem('theme',_theme);applyTheme()}
 applyTheme();
 
 /* ── Language ── */
-let _lang = localStorage.getItem('ui-lang')||'ar';
-const L = {
-  ar:{
-    send:'أرسل ↵',placeholder:'اسأل أي شيء…',search:'بحث',cache:'محفوظ',fresh:'جديد ↺',
-    stats:'إحصاءات الجلسة',queries:'الاستعلامات',avgconf:'متوسط الثقة',avgtime:'متوسط الوقت',cached:'من الذاكرة',
-    suggest:'أسئلة مقترحة',ledger:'سجل الإثبات',connecting:'جارٍ الاتصال…',connected:'متصل',
-    offline:'غير متاح',clear:'مسح ↺',file:'📎 ملف',
-    tagline:'بحث سيادي — بدون أوزان نماذج، بدون هلوسة.',
-    how:'استخراج DDG HTML → تجريد الوسوم → ترتيب TF-IDF → أفضل الجمل → استشهادات [n] → SHA-256\nليس LLaMA. ليس GPT. ليس DeepSeek.\nعربي · إنجليزي · صيني — أي لغة يفهرسها DDG.',
-    identity:'NIYAH محرك بحث واستخلاص — ليس نموذجاً لغوياً.\n\nما يفعله فعلياً:\n① يرسل سؤالك لـ DuckDuckGo HTML (بدون API)\n② يجلب الصفحات الأعلى صلة بـ HTTP GET\n③ يجرّد HTML ويقسّم النص لجمل\n④ يحسب cosine similarity (TF-IDF) بين السؤال وكل جملة\n⑤ يختار الجمل الأعلى صلة ويرفق أرقام المصادر [n]\n⑥ يوقّع الناتج بـ SHA-256\n\nلا هلوسة. لا أوزان مدرّبة. النص يأتي من الويب حرفياً.',
-    pills:['كيف يعمل الذكاء الاصطناعي؟','ما هو Python؟','ما الفرق بين React و Vue؟','من أنت؟','كيف أتعلم البرمجة؟','ما هو التعلم الآلي؟'],
-    ncDesc:'محرك بحث واستخلاص. لا يُنشئ نصاً — يجلب من الويب.',
-  },
-  en:{
-    send:'Send ↵',placeholder:'Ask anything…',search:'Search',cache:'Cached',fresh:'Fresh ↺',
-    stats:'Session Stats',queries:'Queries',avgconf:'Avg Confidence',avgtime:'Avg Time',cached:'From Cache',
-    suggest:'Suggestions',ledger:'Proof Ledger',connecting:'Connecting…',connected:'Connected',
-    offline:'Offline',clear:'Clear ↺',file:'📎 File',
-    tagline:'Sovereign search — no model weights, no hallucination.',
-    how:'DDG HTML scrape → strip tags → TF-IDF cosine rank → top sentences → [n] citations → SHA-256 sign\nNot LLaMA. Not GPT. Not DeepSeek.\nArabic · English · Chinese — any language DDG indexes.',
-    identity:'NIYAH is a search+extraction engine — NOT a language model.\n\nWhat it actually does:\n① Sends your query to DuckDuckGo HTML (no API key)\n② Fetches top-ranked pages via HTTP GET\n③ Strips HTML tags, splits text into sentences\n④ Computes TF-IDF cosine similarity between query and each sentence\n⑤ Picks highest-scoring sentences, attaches source numbers [n]\n⑥ Signs output with SHA-256\n\nNo hallucination. No trained weights. Text comes verbatim from the web.',
-    pills:['How does AI work?','What is Python?','React vs Vue difference?','Who are you?','How to learn programming?','What is machine learning?'],
-    ncDesc:'Search & extraction engine. Generates nothing — fetches from the web.',
-  },
+let _lang=localStorage.getItem('ui-lang')||'ar';
+const L={
+  ar:{placeholder:'اسأل أي شيء…',send:'أرسل ↵',search:'بحث',cache:'محفوظ',fresh:'جديد ↺',
+      stats:'الجلسة',queries:'الاستعلامات',conf:'متوسط الثقة',time:'متوسط الوقت',cache2:'محفوظ',
+      suggest:'مقترحات',ncDesc:'بحث واستخلاص. يجلب من الويب — لا يُنشئ.',
+      wsub:'بحث سيادي. لا أوزان. لا هلوسة.',
+      who:'من أنت؟',
+      pills:['كيف يعمل الذكاء الاصطناعي؟','ما هو Python؟','ما الفرق بين React و Vue؟','من أنت؟','كيف أتعلم البرمجة؟'],
+      identity:`NIYAH محرك بحث واستخلاص. أداة — ليس شخصاً.
+
+ما يفعله فعلياً:
+① يرسل سؤالك لـ DuckDuckGo HTML
+② يجلب أعلى الصفحات صلة بـ HTTP GET
+③ يجرّد HTML ويقسّم لجمل
+④ يحسب TF-IDF cosine similarity
+⑤ يختار الجمل الأعلى صلة → يرفق [n]
+⑥ يوقّع بـ SHA-256
+
+لا هلوسة. لا أوزان. النص من الويب حرفياً.`},
+  en:{placeholder:'Ask anything…',send:'Send ↵',search:'Search',cache:'Cached',fresh:'Fresh ↺',
+      stats:'Session',queries:'Queries',conf:'Avg Conf',time:'Avg Time',cache2:'Cached',
+      suggest:'Suggestions',ncDesc:'Search & extraction. Fetches real web pages — generates nothing.',
+      wsub:'Sovereign search. No model weights. No hallucination.',
+      who:'Who are you?',
+      pills:['How does AI work?','What is Python?','React vs Vue?','Who are you?','How to learn programming?'],
+      identity:`NIYAH is a search & extraction engine. A tool — not a person.
+
+What it actually does:
+① Sends your query to DuckDuckGo HTML
+② Fetches top-ranked pages via HTTP GET
+③ Strips HTML, splits into sentences
+④ Computes TF-IDF cosine similarity
+⑤ Picks highest-scoring sentences → attaches [n]
+⑥ Signs with SHA-256
+
+No hallucination. No trained weights. Text from the real web.`},
 };
-
-function t(key){ return (L[_lang]||L.en)[key]||key; }
-
+function t(k){return(L[_lang]||L.en)[k]||k}
 function applyLang(){
-  const dir = _lang==='ar'?'rtl':'ltr';
+  const dir=_lang==='ar'?'rtl':'ltr';
   document.documentElement.setAttribute('lang',_lang);
   document.documentElement.setAttribute('dir',dir);
-  const qi=qs('qi'); if(qi) qi.placeholder=t('placeholder');
-  const sb=qs('send-btn'); if(sb) sb.textContent=t('send');
-  qs('btn-search')&&(qs('btn-search').textContent=t('search'));
-  qs('btn-cache')&&(qs('btn-cache').textContent=t('cache'));
-  qs('btn-fresh')&&(qs('btn-fresh').textContent=t('fresh'));
+  const qi=qs('qi');if(qi)qi.placeholder=t('placeholder');
+  const sb=qs('send-btn');if(sb)sb.textContent=t('send');
+  ['btn-search','btn-cache','btn-fresh'].forEach((id,i)=>{const b=qs(id);if(b)b.textContent=[t('search'),t('cache'),t('fresh')][i];});
   qs('lbl-stats')&&(qs('lbl-stats').textContent=t('stats'));
   qs('lbl-queries')&&(qs('lbl-queries').textContent=t('queries'));
-  qs('lbl-avgconf')&&(qs('lbl-avgconf').textContent=t('avgconf'));
-  qs('lbl-avgtime')&&(qs('lbl-avgtime').textContent=t('avgtime'));
-  qs('lbl-cached')&&(qs('lbl-cached').textContent=t('cached'));
+  qs('lbl-conf')&&(qs('lbl-conf').textContent=t('conf'));
+  qs('lbl-time')&&(qs('lbl-time').textContent=t('time'));
+  qs('lbl-cache')&&(qs('lbl-cache').textContent=t('cache2'));
   qs('lbl-suggest')&&(qs('lbl-suggest').textContent=t('suggest'));
-  qs('lbl-ledger')&&(qs('lbl-ledger').textContent=t('ledger'));
   qs('nc-desc')&&(qs('nc-desc').textContent=t('ncDesc'));
-  qs('w-tagline')&&(qs('w-tagline').textContent=t('tagline'));
-  qs('w-how')&&(qs('w-how').textContent=t('how'));
+  qs('w-sub')&&(qs('w-sub').textContent=t('wsub'));
+  qs('ctrl-lang')&&(qs('ctrl-lang').textContent=_lang==='ar'?'EN':'ع');
   buildPills();
 }
-function toggleLang(){
-  _lang=_lang==='ar'?'en':'ar';
-  localStorage.setItem('ui-lang',_lang);
-  const btn=document.querySelector('.sb-lang-btn');
-  if(btn) btn.textContent=_lang==='ar'?'EN':'ع';
-  applyLang();
-}
+function toggleLang(){_lang=_lang==='ar'?'en':'ar';localStorage.setItem('ui-lang',_lang);applyLang()}
+
 /* ── Session stats ── */
 let _stats={q:0,conf:0,ms:0,mem:0};
-function updateStats(conf,ms,fromMem){
-  _stats.q++;_stats.conf+=conf||0;_stats.ms+=ms||0;if(fromMem)_stats.mem++;
+function updateStats(c,ms,mem){
+  _stats.q++;_stats.conf+=c||0;_stats.ms+=ms||0;if(mem)_stats.mem++;
   qs('st-queries').textContent=_stats.q;
   qs('q-count').textContent=_stats.q+' queries';
   qs('st-conf').textContent=_stats.q?Math.round(_stats.conf/_stats.q*100)+'%':'—';
-  qs('st-time').textContent=_stats.q?((_stats.ms/_stats.q)/1000).toFixed(1)+'s':'—';
+  qs('st-time').textContent=_stats.q?(_stats.ms/_stats.q/1000).toFixed(1)+'s':'—';
   qs('st-cache').textContent=_stats.mem;
 }
 
@@ -327,99 +508,68 @@ function updateStats(conf,ms,fromMem){
 let _mode='search';
 function setMode(m){
   _mode=m;
-  ['search','cache','fresh'].forEach(id=>qs('btn-'+id)?.classList.remove('active'));
+  ['search','cache','fresh'].forEach(id=>{qs('btn-'+id)?.classList.remove('active')});
   qs('btn-'+m)?.classList.add('active');
 }
 
-/* ── Identity patterns (honest answers, no DDG search) ── */
-const ID_PAT=[
-  /من\s*أنت|من\s*انت|عرّف\s*نفسك|عرف\s*نفسك|ايش\s*نياه|ما\s*نياه|ما\s*هو\s*نياه/i,
-  /who\s*are\s*you|what\s*(are|is)\s*you|tell\s*me\s*about\s*you(rself)?/i,
-  /^(niyah|نياه)\s*\??$/i,
-];
-function isIdentityQ(q){ return ID_PAT.some(p=>p.test(q.trim())); }
+/* ── Tab ── */
+function setTab(name,el){
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+/* ── Identity patterns ── */
+const ID_PAT=[/من\s*أنت|من\s*انت|عرّف\s*نفسك/i,/who\s*are\s*you|what\s*are\s*you/i,/^(niyah|نياه)\s*\??$/i];
+function isIdentityQ(q){return ID_PAT.some(p=>p.test(q.trim()))}
 
 /* ── API ── */
-async function niyahAsk(q,forceFresh){
-  const r=await fetch(AGENT+'/api/v1/niyah/ask',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({query:q,forceFresh:!!forceFresh}),
-    signal:AbortSignal.timeout(50000),
-  });
-  if(!r.ok) throw new Error('HTTP '+r.status);
+async function niyahAsk(q,fresh){
+  const r=await fetch(AGENT+'/api/v1/niyah/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,forceFresh:!!fresh}),signal:AbortSignal.timeout(50000)});
+  if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
+async function phiAsk(msg){
+  try{
+    const r=await fetch(AGENT+'/api/v1/phi/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,maxTokens:300}),signal:AbortSignal.timeout(120000)});
+    if(r.ok)return await r.json();
+  }catch{}
+  return null;
+}
 async function healthCheck(){
-  try{ const r=await fetch(AGENT+'/health',{signal:AbortSignal.timeout(4000)}); return r.ok; }
-  catch{ return false; }
+  try{const r=await fetch(AGENT+'/health',{signal:AbortSignal.timeout(4000)});return r.ok}catch{return false}
+}
+async function phiHealth(){
+  try{const r=await fetch(AGENT+'/api/v1/phi/health',{signal:AbortSignal.timeout(3000)});if(r.ok){const d=await r.json();return d.available}return false}catch{return false}
 }
 
-/* ── Status bar init ── */
+/* ── Status init ── */
 async function initStatus(){
-  qs('conn-label').textContent=t('connecting');
   const alive=await healthCheck();
-  qs('vm-dot').className='sb-dot '+(alive?'ok':'err');
-  qs('vm-label').textContent=alive?'VM':'VM '+t('offline');
+  qs('live-dot').style.background=alive?'var(--green)':'var(--red)';
+  qs('conn-label').textContent=alive?'Connected':'Offline';
+  qs('conn-label').style.color=alive?'var(--green)':'var(--red)';
+  qs('vm-dot').className='sb-dot '+(alive?'ok':'off');
+  qs('vm-label').textContent=alive?'VM':'VM offline';
   qs('agent-dot').className='sb-dot '+(alive?'ok':'warn');
-  qs('agent-label').textContent=alive?t('connected'):t('offline');
-  qs('conn-label').textContent=alive?t('connected'):t('offline');
+  qs('agent-label').textContent=alive?'NIYAH online':'offline';
   if(alive){
     try{
       const s=await fetch(AGENT+'/api/v1/niyah/stats',{signal:AbortSignal.timeout(3000)});
-      if(s.ok){ const d=await s.json();
-        qs('mem-label').textContent='Mem: '+(d.total_memories||0);
-        qs('backend-label').textContent=d.search_backend||'DDG HTML';
-      }
+      if(s.ok){const d=await s.json();qs('mem-stat').textContent='Mem: '+(d.total_memories||0)}
     }catch{}
+    const phi=await phiHealth();
+    if(phi){
+      qs('agent-label').textContent='NIYAH + Phi online';
+    }
   }
 }
 initStatus();
 
-/* ── Clear stream ── */
-function clearStream(){
-  const stream=qs('stream');
-  stream.innerHTML='';
-  const w=document.createElement('div');
-  w.className='welcome'; w.id='welcome';
-  w.innerHTML='<div class="welcome-logo">NIYAH</div><div class="welcome-tagline" id="w-tagline"></div><div class="welcome-honest" id="w-how"></div><div class="welcome-pills" id="welcome-pills"></div>';
-  stream.appendChild(w);
-  applyLang();
-  _stats={q:0,conf:0,ms:0,mem:0};
-  updateStats(0,0,false);_stats={q:0,conf:0,ms:0,mem:0};
-  qs('st-queries').textContent='0'; qs('st-conf').textContent='—'; qs('st-time').textContent='—'; qs('st-cache').textContent='0'; qs('q-count').textContent='0 queries';
-  resetLedger();
-}
-
-/* ── Build pills ── */
-function buildPills(){
-  const c=qs('welcome-pills'); if(!c) return;
-  c.innerHTML='';
-  const sc=qs('suggestions'); if(sc) sc.innerHTML='';
-  (t('pills')||[]).forEach(q=>{
-    const pill=document.createElement('div');
-    pill.className='pill'; pill.textContent=q;
-    pill.onclick=()=>{ qs('qi').value=q; sendQuery(); };
-    c.appendChild(pill);
-    if(sc){
-      const s=document.createElement('div');
-      s.className='suggestion';
-      s.innerHTML='<span class="suggestion-arrow">→</span><span>'+h(q)+'</span>';
-      s.onclick=()=>{ qs('qi').value=q; sendQuery(); };
-      sc.appendChild(s);
-    }
-  });
-}
-
-/* ── Append message ── */
-function appendEl(el){ const w=qs('welcome'); if(w) w.remove(); const s=qs('stream'); s.appendChild(el); s.scrollTop=99999; return el; }
-function appendDiv(cls,html){ const d=document.createElement('div'); d.className=cls; d.innerHTML=html; return appendEl(d); }
-
-/* ── Ledger updates ── */
+/* ── Ledger ── */
 function resetLedger(){
-  qs('ld-conf').textContent='—'; qs('ld-cit').textContent='0'; qs('ld-ms').textContent='—';
-  qs('ld-chain').textContent='chain: —'; qs('ld-hash').textContent='—';
-  qs('ledger-list').innerHTML='<div class="ledger-empty" id="ledger-empty">'+
-    (t('ledger')||'Proof Ledger')+'</div>';
+  ['ld-conf','ld-cit','ld-ms'].forEach(id=>{const el=qs(id);if(el)el.textContent='—'});
+  qs('ld-chain').textContent='—';qs('ld-hash').textContent='—';
+  qs('ledger-list').innerHTML='<div class="ledger-empty">Run a query to see<br>the real pipeline here.</div>';
 }
 resetLedger();
 
@@ -428,269 +578,214 @@ function updateLedger(result){
   qs('ld-conf').textContent=conf+'%';
   qs('ld-cit').textContent=(result.citations||[]).length;
   qs('ld-ms').textContent=(result.tookMs||0)+'ms';
-  qs('ld-hash').textContent=result.chain_hash?result.chain_hash.substring(0,14)+'…':'no proof';
   qs('ld-chain').textContent='cit: '+(result.citations||[]).length;
-
+  qs('ld-hash').textContent=result.chain_hash?result.chain_hash.substring(0,12)+'…':'no proof';
   const list=qs('ledger-list');
   list.innerHTML='';
-
-  /* Real pipeline trace steps */
-  (result.trace||[]).forEach(step=>{
-    const el=document.createElement('div');
-    el.className='lentry';
-    el.innerHTML='<div class="lentry-kind">'+h(step.step)+'</div>'+
-      '<div class="lentry-desc">'+h(step.detail||'')+'</div>'+
-      (step.data?'<div class="lentry-hash mono" style="margin-top:3px">'+h(step.data)+'</div>':'')+
-      '<div class="lentry-meta"><span class="lentry-hash">'+step.ms+'ms</span>'+
-      '<span class="lentry-delta">✓</span></div>';
-    list.appendChild(el);
+  (result.trace||[]).forEach(s=>{
+    list.innerHTML+=`<div class="lentry">
+      <div class="lentry-kind">${h(s.step)}</div>
+      <div class="lentry-desc">${h(s.detail||'')}</div>
+      ${s.data?`<div class="lentry-sub">${h(s.data)}</div>`:''}
+      <div class="lentry-meta"><span class="lentry-ms">${s.ms}ms</span><span class="lentry-check">✓</span></div>
+    </div>`;
   });
-
-  /* Citations */
   (result.citations||[]).forEach((c,i)=>{
-    const el=document.createElement('div');
-    el.className='lentry';
-    el.innerHTML='<div class="lentry-kind">CITATION ['+c.n+']</div>'+
-      '<div class="lentry-desc">'+h((c.title||'').substring(0,60))+'</div>'+
-      '<a class="lentry-url" href="'+h(c.url||'')+'" target="_blank">'+h((c.url||'').substring(0,50))+'</a>'+
-      '<div class="lentry-meta"><span class="lentry-hash">source</span><span class="lentry-delta">✓</span></div>';
-    list.appendChild(el);
+    list.innerHTML+=`<div class="lentry">
+      <div class="lentry-kind">CITATION [${c.n}]</div>
+      <div class="lentry-desc">${h((c.title||'').substring(0,60))}</div>
+      <div class="lentry-sub"><a href="${h(c.url||'')}" target="_blank" style="color:inherit;text-decoration:none">${h((c.url||'').substring(0,50))}</a></div>
+      <div class="lentry-meta"><span class="lentry-ms">source</span><span class="lentry-check">✓</span></div>
+    </div>`;
   });
-
-  /* Proof */
-  if(result.chain_hash){
-    const el=document.createElement('div');
-    el.className='lentry';
-    el.innerHTML='<div class="lentry-kind">'+(result.proof_verified?'✓ SHA-256 VERIFIED':'~ SHA-256 SIGNED')+'</div>'+
-      '<div class="lentry-desc">KHZ energy: '+(result.khz_energy?Math.round(result.khz_energy*100)+'%':'n/a')+'</div>'+
-      '<div class="lentry-hash mono" style="margin-top:3px">'+h(result.chain_hash.substring(0,20))+'…</div>'+
-      '<div class="lentry-meta"><span class="lentry-hash">C11 gate</span><span class="lentry-delta '+(result.proof_verified?'':'none')+'">'+(result.proof_verified?'verified':'signed')+'</span></div>';
-    list.appendChild(el);
-  }
 }
+
+/* ── Clear ── */
+function clearStream(){
+  const s=qs('stream');s.innerHTML='';
+  const w=document.createElement('div');w.className='welcome';w.id='welcome';
+  w.innerHTML=`<div class="welcome-logo">NIYAH</div><div class="welcome-sub" id="w-sub"></div><div class="welcome-how" id="w-how"></div><div class="welcome-pills" id="welcome-pills"></div>`;
+  s.appendChild(w);
+  applyLang();
+  _stats={q:0,conf:0,ms:0,mem:0};
+  ['st-queries','st-conf','st-time','st-cache','q-count'].forEach(id=>{const el=qs(id);if(el)el.textContent=id==='q-count'?'0 queries':'0'});
+  resetLedger();
+}
+
+/* ── Pills ── */
+function buildPills(){
+  const c=qs('welcome-pills');if(!c)return;c.innerHTML='';
+  const sg=qs('suggestions');if(sg)sg.innerHTML='';
+  (t('pills')||[]).forEach(q=>{
+    const pill=document.createElement('div');pill.className='pill';pill.textContent=q;
+    pill.onclick=()=>{qs('qi').value=q;sendQuery()};
+    c.appendChild(pill);
+    if(sg){const s=document.createElement('div');s.className='suggestion';
+      s.innerHTML=`<span class="suggestion-icon">→</span><span>${h(q)}</span>`;
+      s.onclick=()=>{qs('qi').value=q;sendQuery()};sg.appendChild(s);}
+  });
+}
+
+/* ── Append ── */
+function appendEl(el){const w=qs('welcome');if(w)w.remove();const s=qs('stream');s.appendChild(el);s.scrollTop=99999;return el}
+function appendDiv(cls,html){const d=document.createElement('div');d.className=cls;d.innerHTML=html;return appendEl(d)}
 /* ── Format answer ── */
-function formatAnswer(text, maxSentences){
-  if(!text) return ['',''];
-  const lines = text.split('\n').filter(l=>l.trim().length>5);
-  const vis = lines.slice(0,maxSentences).map(l=>
-    h(l).replace(/\[(\d+)\]/g,'<sup> [$1]</sup>')
-  ).join('<br>');
-  const hidden = lines.slice(maxSentences);
-  let moreHtml='';
-  if(hidden.length>0){
+function formatAnswer(text,max){
+  if(!text)return['',''];
+  const lines=text.split('\n').filter(l=>l.trim().length>8);
+  const vis=lines.slice(0,max).map(l=>h(l).replace(/\[(\d+)\]/g,'<sup> [$1]</sup>')).join('<br>');
+  const hid=lines.slice(max);
+  let more='';
+  if(hid.length>0){
     const mid='m'+Date.now();
-    moreHtml='<div id="'+mid+'" class="hidden">'+
-      hidden.map(l=>h(l).replace(/\[(\d+)\]/g,'<sup> [$1]</sup>')).join('<br>')+
-      '</div><button class="show-more" onclick="(function(b){var d=document.getElementById(\''+mid+'\');var open=d.classList.toggle(\'hidden\');b.textContent=open?\'▸ Show '+hidden.length+' more\':\'▾ Hide\'})(this)">▸ Show '+hidden.length+' more</button>';
+    more=`<div id="${mid}" class="hidden"><br>${hid.map(l=>h(l).replace(/\[(\d+)\]/g,'<sup> [$1]</sup>')).join('<br>')}</div><button class="show-more" onclick="(function(b){var d=document.getElementById('${mid}');d.classList.toggle('hidden');b.textContent=d.classList.contains('hidden')?'▸ Show ${hid.length} more':'▾ Hide'})(this)">▸ Show ${hid.length} more</button>`;
   }
-  return [vis, moreHtml];
-}
-
-/* ── Build confidence bar ── */
-function confBar(conf){
-  const cls=conf>=70?'hi':conf>=45?'mid':'lo';
-  return '<div class="conf-bar-wrap">'+
-    '<div class="conf-bar"><div class="conf-fill '+cls+'" style="width:'+conf+'%"></div></div>'+
-    '<span class="conf-label">'+conf+'% confidence</span>'+
-  '</div>';
-}
-
-/* ── Build citation chips ── */
-function citChips(citations){
-  if(!citations||!citations.length) return '';
-  return '<div class="cit-row">'+
-    citations.map(c=>'<a class="cit" href="'+h(c.url||'')+'" target="_blank">['+c.n+'] '+h((c.title||c.url||'').substring(0,38))+'</a>').join('')+
-  '</div>';
+  return[vis,more];
 }
 
 /* ── Main send query ── */
 async function sendQuery(){
   const qi=qs('qi');
   let q=(qi.value||'').trim();
-  if(!q) return;
+  if(!q)return;
+  let dq=q;
+  if(window._fileText){q=q+'\n\n[File: '+window._fileName+']\n'+window._fileText.substring(0,2000);window._fileText='';window._fileName='';qs('file-tag').classList.add('hidden');dq+=' 📎';}
+  qi.value='';
+  const btn=qs('send-btn');btn.disabled=true;btn.textContent='…';
 
-  /* Prepend attached file text */
-  let displayQ=q;
-  if(window._fileText){
-    q=q+'\n\n[Attached file: '+window._fileName+']\n'+window._fileText.substring(0,2000);
-    window._fileText=''; window._fileName='';
-    qs('file-tag').style.display='none';
-    displayQ+=' 📎';
+  appendDiv('msg-user',h(dq));
+
+  /* Identity shortcut */
+  if(isIdentityQ(q)){
+    setTimeout(()=>{
+      const d=document.createElement('div');d.className='msg-niyah';
+      d.innerHTML=`<div class="identity-answer">${h(t('identity'))}</div>`;
+      appendEl(d);btn.disabled=false;btn.textContent=t('send');
+    },200);return;
   }
 
-  qi.value='';
-  const btn=qs('send-btn');
-  btn.disabled=true; btn.textContent='…';
-
-  appendDiv('msg-user', h(displayQ));
-
   /* Typing indicator */
-  const loading=appendDiv('trace-wrap','<div class="trace-header"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span> <span style="margin-left:6px;font-size:11px">NIYAH searching…</span></div>');
+  const loading=appendDiv('msg-niyah',`<div class="typing"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span><span class="mono" style="color:var(--text3);margin-left:8px">NIYAH searching…</span></div>`);
 
   try{
-    /* Identity shortcut */
-    if(isIdentityQ(q)){
-      loading.remove();
-      const ans=appendDiv('msg-niyah','');
-      ans.innerHTML='<div class="identity-answer" style="white-space:pre-line">'+h(t('identity'))+'</div>';
-      btn.disabled=false; btn.textContent=t('send'); return;
-    }
-
     const alive=await healthCheck();
-    if(!alive){
-      loading.remove();
-      appendDiv('err-msg','Agent offline. Check VM: '+AGENT);
-      btn.disabled=false; btn.textContent=t('send'); return;
-    }
+    let result=null;
 
-    const result=await niyahAsk(q, _mode==='fresh');
+    if(alive){result=await niyahAsk(q,_mode==='fresh')}
+
     loading.remove();
 
-    if(!result||!result.answer){
-      appendDiv('err-msg','No answer returned.');
-      btn.disabled=false; btn.textContent=t('send'); return;
+    if(result&&result.answer){
+      const conf=Math.round((result.confidence||0)*100);
+      const [vis,more]=formatAnswer(result.answer,4);
+      const cits=result.citations||[];
+      const ms=result.tookMs||0;
+      const confClass=conf>=70?'hi':conf>=45?'mid':'lo';
+      const fromMem=result.fromMemory;
+
+      /* Confidence row */
+      const confRow=`<div class="conf-row">
+        <div class="conf-bar"><div class="conf-fill ${confClass}" style="width:${conf}%"></div></div>
+        <span class="conf-pct">${conf}% confidence</span>
+        ${fromMem?'<span class="mem-tag">⚡ cached</span>':''}
+        ${ms?`<span class="mono" style="font-size:10px;color:var(--text3)">${(ms/1000).toFixed(1)}s</span>`:''}
+      </div>`;
+
+      /* Citations */
+      let citHtml='';
+      if(cits.length){
+        citHtml='<div class="cit-row">'+cits.map(c=>`<a class="cit" href="${h(c.url||'')}" target="_blank">[${c.n}] ${h((c.title||c.url||'').substring(0,40))}</a>`).join('')+'</div>';
+      }
+
+      /* Trace block */
+      const traceId='tr'+Date.now();
+      const traceSteps=(result.trace||[]).map(s=>`
+        <div class="trace-step">
+          <span class="trace-step-name">${h(s.step)}</span>
+          <span class="trace-step-ms">${s.ms}ms</span>
+          <span>${h(s.detail||'')}</span>
+        </div>
+        ${s.data?`<div class="trace-step-sub">${h(s.data)}</div>`:''}
+      `).join('');
+
+      const traceHtml=traceSteps?`<div class="trace-block" id="${traceId}">
+        <div class="trace-toggle" onclick="document.getElementById('${traceId}').classList.toggle('open')">
+          <span class="chevron">▶</span>
+          <span class="mono" style="font-size:10.5px;color:var(--text2)">Pipeline · ${ms}ms · ${(result.trace||[]).length} steps</span>
+        </div>
+        <div class="trace-body">${traceSteps}</div>
+      </div>`:'';
+
+      const el=document.createElement('div');el.className='msg-niyah';
+      el.innerHTML=`<div class="answer-card">${confRow}<div class="answer-text">${vis}${more}</div>${citHtml}</div>${traceHtml}`;
+      appendEl(el);
+      updateStats(result.confidence||0,ms,fromMem);
+      updateLedger(result);
+
+    } else if(alive){
+      /* Try Phi if NIYAH returned nothing */
+      const phi=await phiHealth();
+      if(phi){
+        loading&&loading.remove&&loading.remove();
+        const loading2=appendDiv('msg-niyah','<div class="typing"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span><span class="mono" style="color:var(--text3);margin-left:8px">Phi thinking…</span></div>');
+        const phiR=await phiAsk(q);
+        loading2.remove();
+        if(phiR&&phiR.answer){
+          const el=document.createElement('div');el.className='msg-niyah';
+          el.innerHTML=`<div class="answer-card"><div class="conf-row"><span class="mono" style="font-size:11px;color:var(--text2)">Phi-3.5 mini · ${(phiR.tookMs/1000).toFixed(1)}s</span></div><div class="answer-text">${h(phiR.answer)}</div></div>`;
+          appendEl(el);return;
+        }
+      }
+      appendDiv('msg-niyah','<div class="answer-card" style="color:var(--text2)">No results found. Try rephrasing.</div>');
+
+    } else {
+      appendDiv('msg-niyah','<div class="answer-card" style="color:var(--red)">Agent offline: '+h(AGENT)+'</div>');
     }
-
-    const conf=Math.round((result.confidence||0)*100);
-    const [vis,more]=formatAnswer(result.answer,4);
-    const fromMem=result.fromMemory;
-    const ms=result.tookMs||0;
-
-    /* Trace block */
-    const hasTrace=(result.trace||[]).length>0;
-    const traceSteps=(result.trace||[]).map((s,i)=>
-      '<div class="trace-step">'+
-        '<span class="trace-step-name">'+h(s.step)+'</span>'+
-        '<span class="trace-step-ms">'+s.ms+'ms</span>'+
-        '<span class="trace-step-detail">'+h(s.detail||'')+'</span>'+
-      '</div>'+
-      (s.data?'<div class="trace-step-data">'+h(s.data)+'</div>':'')+''
-    ).join('');
-
-    const traceId='tr'+Date.now();
-    const traceHtml=hasTrace?
-      '<div class="trace-wrap" id="'+traceId+'">'+
-        '<div class="trace-header" onclick="document.getElementById(\''+traceId+'\').classList.toggle(\'open\')">'+
-          '▸ Pipeline · '+ms+'ms'+(fromMem?' · ⚡ cached':'')+
-        '</div>'+
-        '<div class="trace-body">'+traceSteps+'</div>'+
-      '</div>':'';
-
-    const msgEl=appendDiv('msg-niyah','');
-    msgEl.innerHTML=
-      confBar(conf)+
-      (fromMem?'<span class="mem-badge">⚡ from memory</span>':'')+
-      '<div class="answer-text">'+vis+more+'</div>'+
-      citChips(result.citations)+
-      traceHtml+
-      (result.chain_hash?'<div style="margin-top:4px;font-family:var(--mono);font-size:9px;color:var(--text-faint)">'+(result.proof_verified?'✓':'~')+' SHA-256 '+result.chain_hash.substring(0,16)+'…</div>':'');
-
-    updateStats(result.confidence||0, ms, fromMem);
-    updateLedger(result);
-
   }catch(err){
     loading.remove();
-    appendDiv('err-msg','Error: '+h(err.message));
+    appendDiv('msg-niyah','<div class="answer-card" style="color:var(--red)">Error: '+h(err.message)+'</div>');
   }finally{
-    btn.disabled=false; btn.textContent=t('send');
+    btn.disabled=false;btn.textContent=t('send');
     qs('stream').scrollTop=99999;
   }
 }
 
 /* ── File attach ── */
 qs('file-input').addEventListener('change',async()=>{
-  const f=qs('file-input').files[0]; if(!f) return;
+  const f=qs('file-input').files[0];if(!f)return;
   window._fileName=f.name;
-  try{
-    window._fileText=await f.text();
-    const tag=qs('file-tag');
-    tag.style.display='inline'; tag.textContent='📎 '+f.name.substring(0,20);
-  }catch{ window._fileText=''; }
+  try{window._fileText=await f.text();const tag=qs('file-tag');tag.classList.remove('hidden');tag.textContent='📎 '+f.name.substring(0,20);}
+  catch{window._fileText='';}
 });
 
 /* ── Keyboard ── */
-qs('qi').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey) sendQuery(); });
+qs('qi').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey)sendQuery()});
+
+/* ── Welcome pills ── */
+qs('welcome-pills')?.addEventListener('click',e=>{
+  const p=e.target.closest('.pill');if(p){qs('qi').value=p.textContent;sendQuery();}
+});
+
+/* ── Terminal ── */
+let _term=null,_termOpen=false;
+function openTerminal(){
+  const panel=qs('term-panel');panel.style.display='flex';_termOpen=true;
+  if(_term){_term.focus();return;}
+  const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js';
+  s.onload=()=>{
+    _term=new window.Terminal({cols:120,rows:28,fontFamily:'"JetBrains Mono",monospace',fontSize:13,
+      theme:{background:'#0D0D0D',foreground:'#E2E8F0',cursor:'#7C3AED'},cursorBlink:true,convertEol:true});
+    _term.open(qs('xterm-container'));
+    window.__ptyData=(b64)=>{try{_term.write(new TextDecoder('utf-8').decode(Uint8Array.from(atob(b64),c=>c.charCodeAt(0))))}catch{}};
+    _term.onData(data=>{window.casper?.TerminalInput?.(data)});
+    if(window.casper?.TerminalStart){window.casper.TerminalStart(120,28);const st=qs('pty-status');if(st)st.textContent='connected';}
+    else{_term.write('\r\n\x1b[33mOpen Casper.exe for real terminal.\x1b[0m\r\n');}
+    _term.focus();
+  };document.head.appendChild(s);
+}
+function closeTerminal(){qs('term-panel').style.display='none';_termOpen=false;}
+document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='`'){_termOpen?closeTerminal():openTerminal();}});
 
 /* ── Init ── */
 applyLang();
-const langBtn=document.querySelector('.sb-lang-btn');
-if(langBtn) langBtn.textContent=_lang==='ar'?'EN':'ع';
-const themeBtn=document.querySelector('.sb-theme-btn');
-if(themeBtn) themeBtn.textContent=_theme==='dark'?'☀ Light':'🌙 Dark';
-
-/* ══════════════════════════════════════════════════════════
-   REAL TERMINAL — xterm.js + ConPTY via window.casper bridge
-   Ctrl+` to toggle · runs actual PowerShell via C# ConPTY API
-   ══════════════════════════════════════════════════════════ */
-let _term = null;
-let _termOpen = false;
-
-function openTerminal() {
-  const panel = document.getElementById('terminal-panel');
-  if (!panel) return;
-  panel.style.display = 'flex';
-  _termOpen = true;
-  if (_term) { _term.focus(); return; }
-
-  const s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js';
-  s.onload = () => {
-    const {Terminal} = window;
-    _term = new Terminal({
-      cols:120, rows:30,
-      fontFamily:'"JetBrains Mono",monospace',
-      fontSize:13,
-      theme:{background:'#0a0a0a',foreground:'#e8f5f3',cursor:'#2CF2DA'},
-      convertEol:true, cursorBlink:true,
-    });
-    _term.open(document.getElementById('xterm-container'));
-
-    /* C# sends base64 PTY output → decode → write to xterm */
-    window.__ptyData = (b64) => {
-      try {
-        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-        _term.write(new TextDecoder('utf-8').decode(bytes));
-      } catch {}
-    };
-
-    /* xterm input → C# → real shell */
-    _term.onData(data => { window.casper?.TerminalInput?.(data); });
-
-    /* Start PTY session */
-    if (window.casper?.TerminalStart) {
-      window.casper.TerminalStart(120, 30);
-      const st = document.getElementById('pty-status');
-      if(st) st.textContent = 'connected';
-    } else {
-      _term.write('\r\n\x1b[33mOpen Casper.exe for real terminal.\x1b[0m\r\n');
-    }
-    _term.focus();
-  };
-  document.head.appendChild(s);
-}
-
-function closeTerminal() {
-  const panel = document.getElementById('terminal-panel');
-  if(panel) panel.style.display = 'none';
-  _termOpen = false;
-}
-
-/* Ctrl+` toggle */
-document.addEventListener('keydown', e => {
-  if (e.ctrlKey && e.key === '`') { _termOpen ? closeTerminal() : openTerminal(); }
-});
-
-/* Add Terminal button to status bar */
-(function(){
-  const sb = document.querySelector('.sb-right');
-  if(!sb) return;
-  const btn = document.createElement('button');
-  btn.className = 'sb-theme-btn';
-  btn.textContent = '⬛ Terminal';
-  btn.title = 'Ctrl+` to toggle';
-  btn.onclick = openTerminal;
-  sb.insertBefore(btn, sb.firstChild);
-})();
-</script>
-</body>
-</html>
+</script></body></html>
