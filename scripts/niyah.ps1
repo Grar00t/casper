@@ -1,4 +1,3 @@
-[CmdletBinding()]
 param(
     [Parameter(Position = 0)]
     [ValidateSet("build", "corpus", "train", "smoke", "bench", "save", "run", "all")]
@@ -34,8 +33,6 @@ function Invoke-Build {
 }
 
 function Require-Binaries {
-    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-    param()
     if (-not (Test-Path (Join-Path $RepoRoot "Core_CPP\niyah_hybrid.exe"))) {
         Invoke-Build
     }
