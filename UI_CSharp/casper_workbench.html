@@ -59,75 +59,142 @@
     background:rgba(5,9,9,.6);border-bottom:1px solid var(--glass-border);
   }
   .tl-dots{display:flex;gap:6px;}
-  .tl-dots span{width:9px;height:9px;border-radius:50%;background:#2B3634;}
+  .tl-dots span{width:9px;height:9px;border-radius:50%;background:#2B3634;cursor:pointer;transition:background .15s;}
+  .tl-dots span:nth-child(1):hover{background:#FF6E62;}
+  .tl-dots span:nth-child(2):hover{background:#E0A354;}
+  .tl-dots span:nth-child(3):hover{background:#2CF2DA;}
   .tl-path{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-faint);}
   .tl-path b{color:var(--ink-dim);font-weight:500;}
   .tl-badge{
     margin-inline-start:auto;display:flex;align-items:center;gap:6px;
     font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--neon);
   }
-  .tl-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--neon);box-shadow:0 0 8px var(--neon);}
+  .tl-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--neon);box-shadow:0 0 8px var(--neon);animation:pulse-dot 2.5s ease-in-out infinite;}
+  @keyframes pulse-dot{0%,100%{opacity:1;box-shadow:0 0 8px var(--neon);}50%{opacity:.5;box-shadow:0 0 3px var(--neon);}}
+  .status-bar{
+    height:24px;display:flex;align-items:center;padding:0 18px;gap:16px;
+    background:rgba(4,7,6,.8);border-bottom:1px solid var(--glass-border);
+    font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-faint);
+    flex-shrink:0;position:relative;z-index:5;direction:ltr;
+  }
+  .status-bar .sb-item{display:flex;align-items:center;gap:5px;}
+  .status-bar .sb-dot{width:5px;height:5px;border-radius:50%;}
+  .status-bar .sb-dot.green{background:#4ade80;box-shadow:0 0 6px #4ade80;}
+  .status-bar .sb-dot.yellow{background:#fbbf24;box-shadow:0 0 6px #fbbf24;}
+  .status-bar .sb-dot.red{background:var(--danger);}
+  .status-bar .sb-right{margin-left:auto;display:flex;gap:12px;}
 
   /* ===== TOP BAR (workspace tabs) ===== */
   .topbar{
-    height:50px;display:flex;align-items:center;padding:0 18px;gap:18px;
+    height:46px;display:flex;align-items:center;padding:0 18px;gap:18px;
     direction:ltr;flex-shrink:0;position:relative;z-index:5;
     background:rgba(6,11,11,.4);backdrop-filter:blur(16px);
     border-bottom:1px solid var(--glass-border);
   }
   .tabs{display:flex;gap:4px;flex:1;overflow-x:auto;}
+  .tabs::-webkit-scrollbar{height:0;}
   .tab{
     display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:8px;
-    font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-faint);
-    cursor:pointer;white-space:nowrap;border:1px solid transparent;
+    font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-faint);
+    cursor:pointer;white-space:nowrap;border:1px solid transparent;transition:all .15s;
   }
   .tab.active{background:var(--neon-soft);color:var(--ink);border-color:var(--neon-line);}
-  .tab:not(.active):hover{color:var(--ink-dim);}
-  .tab-add{color:var(--ink-faint);padding:7px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;}
+  .tab:not(.active):hover{color:var(--ink-dim);background:rgba(255,255,255,.02);}
+  .tab-add{color:var(--ink-faint);padding:7px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:6px;}
+  .tab-add:hover{color:var(--neon);background:var(--neon-soft);}
 
   /* ===== LAYOUT ===== */
-  .layout{flex:1;display:grid;grid-template-columns:220px 1fr 300px;overflow:hidden;position:relative;z-index:1;}
+  .layout{flex:1;display:grid;grid-template-columns:210px 1fr 290px;overflow:hidden;position:relative;z-index:1;}
   .col{overflow-y:auto;}
-  .col::-webkit-scrollbar{width:7px;}
-  .col::-webkit-scrollbar-thumb{background:var(--glass-border);border-radius:4px;}
+  .col::-webkit-scrollbar{width:5px;}
+  .col::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:4px;}
+  .col::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.14);}
   .col-header{
-    position:sticky;top:0;z-index:2;padding:20px 20px 12px;
-    font-size:13px;color:var(--ink-dim);font-weight:700;background:transparent;
+    position:sticky;top:0;z-index:2;padding:18px 18px 10px;
+    font-size:11px;color:var(--ink-faint);font-weight:700;letter-spacing:.5px;
+    background:transparent;text-transform:uppercase;
   }
 
   /* ===== SOURCES ===== */
   .sources{direction:ltr;border-inline-end:1px solid var(--glass-border);}
-  .src-group{padding:6px 14px;}
-  .src-group-label{font-size:10px;color:var(--ink-faint);font-family:'JetBrains Mono',monospace;padding:10px 6px 6px;letter-spacing:.5px;}
-  .src-item{display:flex;align-items:center;gap:9px;padding:8px 8px;border-radius:8px;cursor:pointer;font-size:12.5px;color:var(--ink-dim);}
-  .src-item:hover{background:rgba(255,255,255,.03);color:var(--ink);}
-  .src-item .ic{width:15px;text-align:center;opacity:.7;font-size:12px;}
+  .src-group{padding:4px 12px;}
+  .src-group-label{font-size:9.5px;color:var(--ink-faint);font-family:'JetBrains Mono',monospace;padding:10px 8px 5px;letter-spacing:.6px;text-transform:uppercase;}
+  .src-item{
+    display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;
+    cursor:pointer;font-size:12px;color:var(--ink-dim);transition:all .12s;
+  }
+  .src-item:hover{background:rgba(255,255,255,.04);color:var(--ink);}
+  .src-item .ic{width:14px;text-align:center;opacity:.7;font-size:11px;flex-shrink:0;}
   .src-item .name{flex:1;font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .src-item .count{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-faint);}
+  .src-item .count{
+    font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-faint);
+    background:rgba(255,255,255,.04);padding:1px 5px;border-radius:4px;
+  }
   .src-item.selected{background:var(--neon-soft);color:var(--neon);}
-  .src-item.selected .count{color:var(--neon);}
+  .src-item.selected .count{color:var(--neon);background:rgba(44,242,218,.1);}
+  /* NIYAH identity card */
+  .niyah-card{
+    margin:8px 12px 4px;padding:10px 12px;border-radius:10px;
+    background:rgba(44,242,218,.04);border:1px solid var(--neon-line);
+  }
+  .niyah-card .nc-name{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--neon);font-weight:600;}
+  .niyah-card .nc-desc{font-size:10.5px;color:var(--ink-dim);margin-top:4px;line-height:1.5;}
+  .niyah-card .nc-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;}
+  .niyah-card .nc-tag{font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 6px;border-radius:3px;background:rgba(255,255,255,.05);color:var(--ink-faint);}
+  /* search stats */
+  .search-stats{padding:6px 12px 10px;display:flex;flex-direction:column;gap:3px;}
+  .ss-row{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10px;}
+  .ss-label{color:var(--ink-faint);}
+  .ss-val{color:var(--ink-dim);}
+  .ss-val.live{color:var(--neon);}
 
   /* ===== WORKBENCH ===== */
   .workbench{display:flex;flex-direction:column;}
-  .stream{flex:1;overflow-y:auto;padding:26px 30px 14px;display:flex;flex-direction:column;gap:22px;}
+  .stream{flex:1;overflow-y:auto;padding:20px 26px 14px;display:flex;flex-direction:column;gap:18px;}
+  .stream::-webkit-scrollbar{width:5px;}
+  .stream::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07);border-radius:4px;}
+
+  /* Welcome screen */
+  .welcome{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:24px;padding:40px;text-align:center;
+  }
+  .welcome-logo{
+    font-family:'JetBrains Mono',monospace;font-size:38px;font-weight:700;
+    color:var(--neon);text-shadow:0 0 40px rgba(44,242,218,.4);letter-spacing:2px;
+  }
+  .welcome-sub{font-size:13px;color:var(--ink-dim);line-height:1.7;max-width:420px;}
+  .welcome-pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:480px;}
+  .welcome-pill{
+    font-size:12px;padding:8px 14px;border-radius:20px;cursor:pointer;
+    border:1px solid var(--glass-border);color:var(--ink-dim);
+    transition:all .15s;direction:rtl;
+  }
+  .welcome-pill:hover{border-color:var(--neon-line);color:var(--neon);background:var(--neon-soft);}
+  .welcome-badges{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+  .welcome-badge{
+    font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 10px;
+    border-radius:4px;background:rgba(255,255,255,.04);color:var(--ink-faint);
+  }
 
   .msg-user{
-    align-self:flex-end;max-width:66%;border-radius:16px 16px 4px 16px;
-    padding:14px 18px;font-size:15px;line-height:1.95;
-    background:rgba(255,255,255,.035);
+    align-self:flex-end;max-width:68%;border-radius:18px 18px 4px 18px;
+    padding:13px 17px;font-size:14.5px;line-height:1.9;
+    background:linear-gradient(135deg,rgba(44,242,218,.08),rgba(255,255,255,.04));
+    border:1px solid rgba(44,242,218,.08);
   }
 
-  .trace{max-width:86%;}
+  .trace{max-width:88%;}
   .trace-head{
     display:flex;align-items:center;gap:9px;padding:4px 2px 8px;cursor:pointer;
-    font-size:12.5px;color:var(--neon);direction:rtl;
+    font-size:12px;color:var(--neon);direction:rtl;-webkit-user-select:none;user-select:none;
   }
-  .trace-head .chev{transition:transform .15s ease;color:var(--ink-faint);font-size:11px;}
+  .trace-head .chev{transition:transform .15s ease;color:var(--ink-faint);font-size:10px;}
   .trace.collapsed .chev{transform:rotate(-90deg);}
-  .trace-head .trace-sub{color:var(--ink-faint);font-family:'JetBrains Mono',monospace;font-size:10.5px;margin-inline-start:auto;}
+  .trace-head .trace-sub{color:var(--ink-faint);font-family:'JetBrains Mono',monospace;font-size:10px;margin-inline-start:auto;}
   .trace-body{direction:ltr;padding-inline-start:2px;}
   .trace.collapsed .trace-body{display:none;}
-  .trace-steps{position:relative;padding-inline-start:22px;display:flex;flex-direction:column;gap:9px;}
+  .trace-steps{position:relative;padding-inline-start:22px;display:flex;flex-direction:column;gap:8px;}
   .trace-steps::before{content:'';position:absolute;left:5px;top:2px;bottom:2px;width:1px;background:var(--glass-border);}
   .trace-runner{
     position:absolute;left:4.5px;width:2px;height:50px;
@@ -135,48 +202,83 @@
     box-shadow:0 0 12px 1px var(--neon);animation:beam-run-small 2.8s linear infinite;pointer-events:none;
   }
   @keyframes beam-run-small{0%{top:-50px;}100%{top:100%;}}
-  .tstep{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-dim);line-height:1.65;position:relative;}
+  .tstep{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-dim);line-height:1.65;position:relative;}
   .tstep::before{content:'';position:absolute;left:-21px;top:5px;width:6px;height:6px;border-radius:50%;background:var(--void);border:1.5px solid var(--neon-dim);}
-  .tstep.warn{color:var(--danger);}
-  .tstep.warn::before{border-color:var(--danger);}
+  .tstep.warn{color:var(--copper);}
+  .tstep.warn::before{border-color:var(--copper);}
+  .tstep.err{color:var(--danger);}
+  .tstep.err::before{border-color:var(--danger);}
   .tstep .tn{color:var(--ink-faint);margin-inline-end:6px;}
+  /* typing indicator */
+  .typing-dots{display:inline-flex;gap:4px;align-items:center;padding:2px 0;}
+  .typing-dots span{width:5px;height:5px;border-radius:50%;background:var(--neon-dim);display:inline-block;}
+  .typing-dots span:nth-child(1){animation:td .9s .0s ease-in-out infinite;}
+  .typing-dots span:nth-child(2){animation:td .9s .2s ease-in-out infinite;}
+  .typing-dots span:nth-child(3){animation:td .9s .4s ease-in-out infinite;}
+  @keyframes td{0%,100%{opacity:.2;transform:translateY(0);}50%{opacity:1;transform:translateY(-4px);}}
 
-  .msg-casper{max-width:86%;display:flex;flex-direction:column;gap:12px;}
-  .msg-casper .p{line-height:2.05;font-size:15px;padding-inline-start:2px;}
+  .msg-casper{max-width:88%;display:flex;flex-direction:column;gap:14px;}
+  .msg-casper .p{line-height:2.0;font-size:14.5px;padding-inline-start:2px;color:var(--ink);}
+  /* confidence bar */
+  .conf-bar-wrap{display:flex;align-items:center;gap:10px;direction:ltr;}
+  .conf-bar{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;max-width:120px;}
+  .conf-bar-fill{height:100%;border-radius:2px;transition:width .6s ease;background:var(--neon);}
+  .conf-bar-fill.low{background:var(--copper);}
+  .conf-bar-fill.vlow{background:var(--danger);}
+  .conf-label{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-faint);}
+
   .chiprow{display:flex;gap:7px;flex-wrap:wrap;direction:ltr;}
   .chip{
     display:inline-flex;align-items:center;gap:5px;background:transparent;
     border:1px solid var(--neon-line);color:var(--neon);
-    font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:4px 9px;border-radius:20px;cursor:pointer;
+    font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 10px;border-radius:20px;cursor:pointer;
+    text-decoration:none;transition:all .12s;
   }
   .chip:hover,.chip.pinged{background:var(--neon-soft);}
   .chip.warn{border-color:var(--danger-line);color:var(--danger);}
   .chip.warn:hover{background:var(--danger-soft);}
+  /* memory badge */
+  .mem-badge{
+    display:inline-flex;align-items:center;gap:5px;
+    font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--copper);
+    border:1px solid rgba(224,163,84,.25);padding:2px 8px;border-radius:12px;background:var(--copper-soft);
+  }
 
   .flags{display:flex;gap:16px;padding:2px 2px 0;font-size:12px;}
   .flag{display:flex;align-items:center;gap:6px;}
   .flag.ok{color:var(--neon);}
   .flag.warn{color:var(--danger);}
 
-  .composer{border-top:1px solid var(--glass-border);padding:16px 24px 22px;display:flex;flex-direction:column;gap:10px;}
-  .mode-row{display:flex;gap:6px;}
+  .composer{
+    border-top:1px solid var(--glass-border);padding:12px 20px 18px;
+    display:flex;flex-direction:column;gap:10px;
+    background:rgba(4,7,6,.5);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  }
+  .composer-top{display:flex;align-items:center;justify-content:space-between;}
+  .mode-row{display:flex;gap:5px;}
   .mode-btn{
-    font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 12px;border-radius:7px;
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:5px 11px;border-radius:6px;
     border:1px solid var(--glass-border);color:var(--ink-faint);cursor:pointer;background:transparent;
+    transition:all .12s;
   }
   .mode-btn.active{border-color:var(--neon-line);color:var(--neon);background:var(--neon-soft);}
-  .input-row{display:flex;gap:10px;align-items:center;}
+  .mode-btn:not(.active):hover{color:var(--ink-dim);}
+  .agent-status{font-family:'JetBrains Mono',monospace;font-size:10px;display:flex;align-items:center;gap:5px;}
+  .input-row{display:flex;gap:8px;align-items:center;}
   .input-row input{
-    flex:1;background:rgba(255,255,255,.035);border:1px solid var(--glass-border);
-    color:var(--ink);padding:13px 16px;border-radius:11px;font-family:'Tajawal',sans-serif;font-size:14.5px;
+    flex:1;background:rgba(255,255,255,.04);border:1px solid var(--glass-border);
+    color:var(--ink);padding:12px 16px;border-radius:12px;font-family:'Tajawal',sans-serif;font-size:14px;
+    transition:border-color .15s;
   }
+  .input-row input:focus{outline:none;border-color:var(--neon-line);background:rgba(44,242,218,.03);}
   .input-row input::placeholder{color:var(--ink-faint);}
   .run-btn{
-    background:var(--neon);color:#04211D;border:none;padding:13px 22px;border-radius:11px;
-    font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:14px;
-    box-shadow:0 0 22px -4px var(--neon);
+    background:var(--neon);color:#04211D;border:none;padding:12px 22px;border-radius:12px;
+    font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:13.5px;
+    box-shadow:0 0 20px -4px var(--neon);transition:all .15s;white-space:nowrap;
   }
-  .run-btn:hover{filter:brightness(1.06);}
+  .run-btn:hover{filter:brightness(1.08);box-shadow:0 0 28px -2px var(--neon);}
+  .run-btn:disabled{opacity:.5;box-shadow:none;cursor:not-allowed;}
 
   /* ===== PROOF LEDGER ===== */
   .ledger{direction:ltr;display:flex;flex-direction:column;border-inline-start:1px solid var(--glass-border);}
@@ -224,6 +326,11 @@
   }
   .ledger-footer b{color:var(--copper);}
 
+  .neon-text{color:var(--neon);}
+  .agent-indicator{width:6px;height:6px;border-radius:50%;background:var(--ink-faint);}
+  .agent-label-text{color:var(--ink-faint);font-size:10px;}
+  .ledger-empty{padding:20px;font-size:11px;color:var(--ink-faint);font-family:'JetBrains Mono',monospace;line-height:1.8;}
+
   @media (max-width:980px){
     .layout{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;}
     .sources{max-height:130px;}
@@ -236,17 +343,30 @@
   <div class="ambient"></div>
 
   <div class="titlebar">
-    <div class="tl-dots"><span></span><span></span><span></span></div>
-    <div class="tl-path"><b>Casper.exe</b> · C:\Users\Admin\casper_engine\Core_CPP</div>
-    <div class="tl-badge"><span class="dot"></span>محلي · يعمل بدون اتصال</div>
+    <div class="tl-dots">
+      <span onclick="if(window.casper)window.casper.Close()"></span>
+      <span onclick="if(window.casper)window.casper.Minimise()"></span>
+      <span onclick="if(window.casper)window.casper.ToggleMaximise()"></span>
+    </div>
+    <div class="tl-path"><b>NIYAH</b> · Casper Engine · v3.0</div>
+    <div class="tl-badge"><span class="dot"></span><span id="conn-label">جارٍ التحقق…</span></div>
+  </div>
+
+  <div class="status-bar">
+    <div class="sb-item"><span class="sb-dot" id="vm-dot"></span><span id="vm-label">VM …</span></div>
+    <div class="sb-item"><span class="sb-dot" id="ddg-dot"></span><span>DDG HTML</span></div>
+    <div class="sb-item mono" id="mem-stat">ذاكرة: —</div>
+    <div class="sb-right">
+      <span class="mono" id="query-count">0 استعلام</span>
+      <span class="mono neon-text">NIYAH v3</span>
+    </div>
   </div>
 
   <div class="topbar">
     <div class="tabs">
-      <div class="tab">◎ الويب</div>
-      <div class="tab active">⌥ github.com/grar00t/casper_engine</div>
-      <div class="tab">📖 MS Learn — SIMD intrinsics</div>
-      <div class="tab-add">+</div>
+      <div class="tab active" data-tab="search">🔍 بحث</div>
+      <div class="tab" data-tab="about">◈ عن NIYAH</div>
+      <div class="tab-add" title="سؤال جديد" onclick="clearStream()">↺</div>
     </div>
   </div>
 
@@ -255,83 +375,86 @@
     <!-- SOURCES -->
     <div class="col sources">
       <div class="col-header">المصادر</div>
-      <div class="src-group">
-        <div class="src-group-label">GITHUB</div>
-        <div class="src-item selected"><span class="ic">⌥</span><span class="name">casper_engine</span><span class="count">144</span></div>
-        <div class="src-item"><span class="ic">⌥</span><span class="name">khawrizm-one</span><span class="count">62</span></div>
-        <div class="src-item"><span class="ic">⌥</span><span class="name">niyah</span><span class="count">31</span></div>
+
+      <!-- NIYAH identity -->
+      <div class="niyah-card">
+        <div class="nc-name">◈ NIYAH Engine</div>
+        <div class="nc-desc">محرك بحث واستخلاص. لا يُوَلِّد من أوزان — يجلب من الويب ويستخرج الحقيقة.</div>
+        <div class="nc-tags">
+          <span class="nc-tag">TF-IDF</span>
+          <span class="nc-tag">DDG HTML</span>
+          <span class="nc-tag">SQLite</span>
+          <span class="nc-tag">SHA-256</span>
+        </div>
       </div>
+
       <div class="src-group">
-        <div class="src-group-label">محلي</div>
-        <div class="src-item"><span class="ic">🗂</span><span class="name">Core_CPP/docs</span><span class="count">18</span></div>
-        <div class="src-item"><span class="ic">🗂</span><span class="name">.nrule</span><span class="count">27</span></div>
+        <div class="src-group-label">مصادر البحث</div>
+        <div class="src-item selected"><span class="ic">🌐</span><span class="name">DuckDuckGo</span><span class="count" id="ddg-count">—</span></div>
+        <div class="src-item"><span class="ic">🧠</span><span class="name">ذاكرة SQLite</span><span class="count" id="mem-count">—</span></div>
       </div>
+
       <div class="src-group">
-        <div class="src-group-label">WEB</div>
-        <div class="src-item"><span class="ic">⌕</span><span class="name">SearXNG</span><span class="count">12</span></div>
-        <div class="src-item"><span class="ic">📖</span><span class="name">MS Learn</span><span class="count">4</span></div>
+        <div class="src-group-label">إحصاءات الجلسة</div>
+        <div class="search-stats" id="session-stats">
+          <div class="ss-row"><span class="ss-label">استعلامات</span><span class="ss-val" id="stat-queries">0</span></div>
+          <div class="ss-row"><span class="ss-label">متوسط ثقة</span><span class="ss-val" id="stat-conf">—</span></div>
+          <div class="ss-row"><span class="ss-label">متوسط وقت</span><span class="ss-val" id="stat-time">—</span></div>
+          <div class="ss-row"><span class="ss-label">من الذاكرة</span><span class="ss-val" id="stat-mem">0</span></div>
+        </div>
+      </div>
+
+      <div class="src-group">
+        <div class="src-group-label">أسئلة مقترحة</div>
+        <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">ما هو Python؟</span></div>
+        <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">كيف يعمل الذكاء الاصطناعي؟</span></div>
+        <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">what is machine learning</span></div>
+        <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">أفضل لغات البرمجة 2025</span></div>
       </div>
     </div>
 
     <!-- WORKBENCH -->
     <div class="col workbench">
-      <div class="stream">
-
-        <div class="msg-user">
-          حلل مسار AVX2 في casper_engine وقارنه بمسار AVX-512 المقترح، وأعطني القرار.
-        </div>
-
-        <div class="trace" data-toggle>
-          <div class="trace-head">
-            <span class="chev">▾</span>
-            <span>أثر التفكير</span>
-            <span class="trace-sub">5 steps · 41ms</span>
+      <div class="stream" id="stream">
+        <!-- welcome screen -->
+        <div class="welcome" id="welcome-screen">
+          <div class="welcome-logo">NIYAH</div>
+          <div class="welcome-sub">
+            محرك بحث واستخلاص سيادي — لا توهّم، لا هلوسة، لا أوزان ضخمة.<br>
+            يجلب من الويب · يستخرج الحقيقة · يوثّق بـ SHA-256
           </div>
-          <div class="trace-body">
-            <div class="trace-steps">
-              <span class="trace-runner"></span>
-              <div class="tstep"><span class="tn">01</span>parse query → 2 constraints extracted</div>
-              <div class="tstep"><span class="tn">02</span>match source pool → 382 candidates, 14 passed filter</div>
-              <div class="tstep"><span class="tn">03</span>unify premises (Robinson) → R14 flagged: target_hw_compat unknown</div>
-              <div class="tstep warn"><span class="tn">04</span>constraint unresolved → recommendation withheld, not rejected</div>
-              <div class="tstep"><span class="tn">05</span>compose response → 2 citations attached, confidence 86%</div>
-            </div>
+          <div class="welcome-pills" id="welcome-pills">
+            <div class="welcome-pill">ما هو الذكاء الاصطناعي؟</div>
+            <div class="welcome-pill">كيف أتعلم البرمجة؟</div>
+            <div class="welcome-pill">what is machine learning</div>
+            <div class="welcome-pill">أفضل frameworks للويب 2025</div>
+            <div class="welcome-pill">ما الفرق بين Python و JavaScript؟</div>
+            <div class="welcome-pill">how does GPT work</div>
           </div>
-        </div>
-
-        <div class="msg-casper">
-          <div class="p">
-            المسار الحالي في <span class="mono">Core_CPP</span> يعتمد AVX2+FMA لعمليات الـ attention، وهذا خيار متعمّد وليس نقص — يوسّع التوافق على معالجات أقدم بدون خسارة كبيرة في throughput لأحجام السياق الحالية.
-          </div>
-          <div class="chiprow">
-            <div class="chip" data-target="l1"><span>1</span> attention.cpp</div>
-            <div class="chip" data-target="l2"><span>2</span> benchmark log</div>
-          </div>
-
-          <div class="p">
-            الانتقال لـ AVX-512 يرفع الأداء نظريًا، لكن القاعدة الرمزية <span class="mono">.nrule</span> رفضت التوصية المباشرة لأن شرط التوافق مع الأجهزة المستهدفة غير محقق — القرار معلّق، مو مرفوض ومو مقبول.
-          </div>
-          <div class="chiprow">
-            <div class="chip warn" data-target="l3"><span>3</span> rule R14 — blocked</div>
-          </div>
-
-          <div class="flags">
-            <div class="flag ok">✓ مصدرين متطابقين</div>
-            <div class="flag warn">⚠ تعارض واحد غير محسوم</div>
+          <div class="welcome-badges">
+            <span class="welcome-badge">TF-IDF extractive</span>
+            <span class="welcome-badge">DDG HTML search</span>
+            <span class="welcome-badge">SQLite memory</span>
+            <span class="welcome-badge">SHA-256 proof</span>
           </div>
         </div>
-
       </div>
 
       <div class="composer">
-        <div class="mode-row">
-          <button class="mode-btn active">بحث</button>
-          <button class="mode-btn">بناء</button>
-          <button class="mode-btn">تحقق فقط</button>
+        <div class="composer-top">
+          <div class="mode-row">
+            <button class="mode-btn active">بحث</button>
+            <button class="mode-btn">من الذاكرة</button>
+            <button class="mode-btn">جديد</button>
+          </div>
+          <div class="agent-status" id="agent-status">
+            <span class="sb-dot agent-indicator" id="agent-dot"></span>
+            <span id="agent-label" class="mono agent-label-text">جارٍ…</span>
+          </div>
         </div>
         <div class="input-row">
-          <input id="query-input" type="text" placeholder="اسأل، أو ألصق رابط مستودع للفهرسة…">
-          <button id="run-btn" class="run-btn">تشغيل</button>
+          <input id="query-input" type="text" placeholder="اسأل أي شيء…" autocomplete="off" spellcheck="false">
+          <button id="run-btn" class="run-btn">تشغيل ↵</button>
         </div>
       </div>
     </div>
@@ -340,54 +463,31 @@
     <div class="col ledger">
       <div class="col-header">سجل الإثبات</div>
       <div class="stat-strip">
-        <div class="stat"><div class="v">86%</div><div class="l">ثقة</div></div>
-        <div class="stat danger"><div class="v">1</div><div class="l">معلّق</div></div>
-        <div class="stat"><div class="v">14</div><div class="l">قاعدة</div></div>
-        <div class="stat"><div class="v">382</div><div class="l">مصدر</div></div>
+        <div class="stat"><div class="v" id="ld-conf">—</div><div class="l">ثقة</div></div>
+        <div class="stat"><div class="v" id="ld-srcs">0</div><div class="l">مصدر</div></div>
+        <div class="stat"><div class="v" id="ld-time">—</div><div class="l">وقت</div></div>
       </div>
 
-      <div class="ledger-list">
+      <div class="ledger-list" id="ledger-list">
         <span class="beam-runner"></span>
-        <div class="lentry" data-n="1" id="l1">
-          <div class="rule">SOURCE · attention.cpp:112</div>
-          <div class="desc">AVX2+FMA intrinsics confirmed in current build path.</div>
-          <div class="meta"><span class="hash">sha256:a1f9c2…</span><span class="delta">+4%</span></div>
-        </div>
-        <div class="lentry" data-n="2" id="l2">
-          <div class="rule">SOURCE · bench/avx2_vs_avx512.log</div>
-          <div class="desc">Throughput delta measured, matches claim within 3%.</div>
-          <div class="meta"><span class="hash">sha256:7c02e4…</span><span class="delta">+8%</span></div>
-        </div>
-        <div class="lentry danger" data-n="3" id="l3">
-          <div class="rule">RULE R14 · backward_chaining</div>
-          <div class="desc">.nrule constraint: target_hw_compat = unknown → recommendation withheld.</div>
-          <div class="meta"><span class="hash">sha256:e441bd…</span><span class="delta neg">blocked</span></div>
-        </div>
-        <div class="lentry verified" data-n="4">
-          <div class="rule">UNIFICATION · Robinson</div>
-          <div class="desc">No contradiction between benchmark claim and rule state.</div>
-          <div class="meta"><span class="hash">sha256:9b30af…</span><span class="delta gold">verified</span></div>
-        </div>
+        <!-- entries injected by JS -->
+        <div class="ledger-empty">اسأل سؤالاً لرؤية<br>سجل الإثبات هنا</div>
       </div>
 
       <div class="ledger-footer">
-        <span>chain length: 4</span>
-        <span><b>VERIFIED</b> · root sha256:2fd8…</span>
+        <span id="ld-chain">chain: —</span>
+        <span id="ld-hash" class="mono">—</span>
       </div>
     </div>
 
   </div>
 
 <script>
-/* ── Casper Bridge ─────────────────────────────────────────────────
-   Search layer: JS fetch (Brave Search API) → context string
-   Reasoning layer: niyah_hybrid.exe (SHA-256 + symbolic gates)
-   ──────────────────────────────────────────────────────────────── */
-
-/* ── Casper Agent — NIYAH Engine v3 ───────────────────────────────
+/* ── NIYAH Engine v3 — Casper UI ──────────────────────────────────
  * POST /api/v1/niyah/ask  { query }
- *   → { answer, citations:[{n,title,url}], confidence, tookMs }
- * Falls back to engine-only if agent is unreachable.              */
+ *   → { answer, citations, confidence, tookMs, fromMemory,
+ *       chain_hash, proof_verified, khz_energy }
+ * ──────────────────────────────────────────────────────────────── */
 const AGENT = (window._agentUrl) || 'http://20.91.208.59';
 
 /**
@@ -409,21 +509,166 @@ async function niyahAsk(q){
 
 async function agentHealthCheck(){
   try{
-    const r = await fetch(AGENT+'/health', { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(AGENT+'/health', { signal: AbortSignal.timeout(4000) });
     return r.ok;
   }catch(e){ return false; }
+}
+
+/* ── Session stats ── */
+let _stats = { queries: 0, totalConf: 0, totalMs: 0, fromMem: 0 };
+
+function updateStats(conf, ms, fromMemory) {
+  _stats.queries++;
+  _stats.totalConf += conf || 0;
+  _stats.totalMs   += ms  || 0;
+  if(fromMemory) _stats.fromMem++;
+  const avgConf = Math.round(_stats.totalConf / _stats.queries * 100);
+  const avgMs   = Math.round(_stats.totalMs   / _stats.queries);
+  document.getElementById('stat-queries').textContent = _stats.queries;
+  document.getElementById('stat-conf').textContent    = avgConf + '%';
+  document.getElementById('stat-time').textContent    = (avgMs/1000).toFixed(1) + 'ث';
+  document.getElementById('stat-mem').textContent     = _stats.fromMem;
+  document.getElementById('query-count').textContent  = _stats.queries + ' استعلام';
+}
+
+/* ── Update ledger panel ── */
+function updateLedger(result) {
+  const conf  = Math.round((result.confidence||0)*100);
+  const srcs  = (result.citations||[]).length;
+  const ms    = result.tookMs || 0;
+  const hash  = result.chain_hash;
+
+  document.getElementById('ld-conf').textContent  = conf + '%';
+  document.getElementById('ld-srcs').textContent  = srcs;
+  document.getElementById('ld-time').textContent  = ms > 0 ? (ms/1000).toFixed(1)+'ث' : '—';
+  document.getElementById('ld-chain').textContent = 'citations: '+srcs;
+  document.getElementById('ld-hash').textContent  = hash ? hash.substring(0,14)+'…' : 'no proof';
+
+  const list = document.getElementById('ledger-list');
+  list.innerHTML = '<span class="beam-runner"></span>';
+
+  /* Citation entries */
+  (result.citations||[]).forEach((c, i) => {
+    const cls = 'lentry verified';
+    const title = escHtml((c.title||c.url||'').substring(0,55));
+    const url   = escHtml(c.url||'');
+    list.innerHTML += `
+      <div class="${cls}" data-n="${i+1}">
+        <div class="rule">CITATION [${c.n}]</div>
+        <div class="desc">${title}</div>
+        <div class="meta">
+          <span class="hash"><a href="${url}" target="_blank" style="color:inherit;text-decoration:none">${url.substring(0,35)}…</a></span>
+          <span class="delta">✓</span>
+        </div>
+      </div>`;
+  });
+
+  /* Proof entry */
+  if(hash){
+    const cls2 = result.proof_verified ? 'lentry verified' : 'lentry';
+    const khz  = result.khz_energy ? Math.round(result.khz_energy*100)+'%' : '—';
+    list.innerHTML += `
+      <div class="${cls2}" data-n="P">
+        <div class="rule">${result.proof_verified ? '✓ SHA-256 Verified' : '~ SHA-256 Hash'}</div>
+        <div class="desc">KHZ energy: ${khz} · C11 audit gate</div>
+        <div class="meta">
+          <span class="hash mono">${hash.substring(0,16)}…</span>
+          <span class="delta ${result.proof_verified?'':'gold'}">${result.proof_verified?'verified':'signed'}</span>
+        </div>
+      </div>`;
+  }
+
+  if(result.fromMemory){
+    list.innerHTML += `
+      <div class="lentry" data-n="M">
+        <div class="rule">⚡ من الذاكرة</div>
+        <div class="desc">تطابق مع سؤال سابق في SQLite</div>
+        <div class="meta"><span class="hash">SQLite cache hit</span><span class="delta gold">cached</span></div>
+      </div>`;
+  }
+}
+
+/* ── Status bar init ── */
+async function initStatus() {
+  const vmDot   = document.getElementById('vm-dot');
+  const vmLabel = document.getElementById('vm-label');
+  const agentDot   = document.getElementById('agent-dot');
+  const agentLabel = document.getElementById('agent-label');
+  const connLabel  = document.getElementById('conn-label');
+  const ddgDot     = document.getElementById('ddg-dot');
+
+  try {
+    const r = await fetch(AGENT+'/api/v1/niyah/health', { signal: AbortSignal.timeout(5000) });
+    if(r.ok){
+      const d = await r.json();
+      vmDot.className    = 'sb-dot green';
+      vmLabel.textContent= 'VM متصل';
+      agentDot.className = 'agent-indicator sb-dot green';
+      agentLabel.textContent = 'متصل · '+d.searchBackend;
+      connLabel.textContent  = 'متصل بالـ Agent';
+      ddgDot.className   = 'sb-dot green';
+
+      /* Memory stats */
+      try {
+        const s = await fetch(AGENT+'/api/v1/niyah/stats', { signal: AbortSignal.timeout(3000) });
+        if(s.ok){
+          const sd = await s.json();
+          document.getElementById('mem-count').textContent  = sd.total_memories||'0';
+          document.getElementById('mem-stat').textContent   = 'ذاكرة: '+(sd.total_memories||0);
+          document.getElementById('ddg-count').textContent  = sd.search_backend||'ddg';
+        }
+      } catch(_){}
+    } else throw new Error('not ok');
+  } catch(e) {
+    vmDot.className    = 'sb-dot yellow';
+    vmLabel.textContent= 'VM غير متاح';
+    agentDot.className = 'agent-indicator sb-dot yellow';
+    agentLabel.textContent = 'محرك محلي فقط';
+    connLabel.textContent  = 'وضع محلي';
+    ddgDot.className   = 'sb-dot yellow';
+  }
+}
+initStatus();
+
+function clearStream() {
+  const stream = document.getElementById('stream');
+  stream.innerHTML = '';
+  document.getElementById('welcome-screen') && stream.appendChild(buildWelcome());
+  _stats = { queries: 0, totalConf: 0, totalMs: 0, fromMem: 0 };
+  updateStats(0, 0, false);
+  document.getElementById('ledger-list').innerHTML = '<span class="beam-runner"></span><div class="ledger-empty">اسأل سؤالاً لرؤية<br>سجل الإثبات هنا</div>';
+}
+
+function buildWelcome() {
+  const w = document.getElementById('welcome-screen');
+  return w;
+}
+
+function askSuggestion(el) {
+  const q = el.querySelector('.name')?.textContent;
+  if(!q) return;
+  document.getElementById('query-input').value = q;
+  document.getElementById('run-btn').click();
 }
 
 (function(){
   const input  = document.getElementById('query-input');
   const btn    = document.getElementById('run-btn');
-  const stream = document.querySelector('.stream');
+  const stream = document.getElementById('stream');
 
   function escHtml(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  function escHtml(s){
+    if(!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
   function appendMsg(html){
+    /* hide welcome on first message */
+    const w = document.getElementById('welcome-screen');
+    if(w) w.remove();
     const div=document.createElement('div');
     div.innerHTML=html;
     stream.appendChild(div);
@@ -433,8 +678,7 @@ async function agentHealthCheck(){
 
   function setRunning(on){
     btn.disabled=on;
-    btn.textContent=on?'جارٍ البحث…':'تشغيل';
-    btn.style.opacity=on?'0.6':'1';
+    btn.textContent=on?'جارٍ…':'تشغيل ↵';
   }
 
   async function sendQuery(){
@@ -443,153 +687,145 @@ async function agentHealthCheck(){
     input.value='';
     setRunning(true);
 
-    /* Show user message */
     appendMsg('<div class="msg-user">'+escHtml(q)+'</div>');
 
-    /* Loading indicator */
-    const loading=appendMsg(
+    /* Typing indicator */
+    const loading = appendMsg(
       '<div class="trace"><div class="trace-head">'+
-      '<span class="trace-runner"></span>جارٍ البحث في الويب…</div></div>'
+      '<span class="trace-runner"></span>'+
+      '<span class="typing-dots"><span></span><span></span><span></span></span>'+
+      '<span style="color:var(--ink-faint);font-size:11px;margin-right:8px">NIYAH يبحث…</span>'+
+      '</div></div>'
     );
 
     try{
-      /* ── 1. Try NIYAH Engine (full pipeline: search → fetch → TF-IDF → cite) ── */
       const agentAlive = await agentHealthCheck();
       let niyahResult = null;
+
       if(agentAlive){
-        loading.querySelector('.trace-head').innerHTML =
-          '<span class="trace-runner"></span>جارٍ البحث عبر NIYAH…';
         niyahResult = await niyahAsk(q);
       }
 
       loading.remove();
 
       if(niyahResult && niyahResult.answer){
-        /* ── NIYAH returned a real answer with citations ── */
-        const conf = Math.round((niyahResult.confidence||0)*100);
+        const conf      = Math.round((niyahResult.confidence||0)*100);
         const citations = niyahResult.citations || [];
-        const fromMem = niyahResult.fromMemory ? ' · من الذاكرة' : '';
-        const tookSec = niyahResult.tookMs ? ' · '+(niyahResult.tookMs/1000).toFixed(1)+'ث' : '';
+        const fromMem   = niyahResult.fromMemory;
+        const tookSec   = niyahResult.tookMs ? (niyahResult.tookMs/1000).toFixed(1)+'ث' : '';
+        const hash      = niyahResult.chain_hash;
 
-        /* Format answer — replace [n] refs with styled spans */
+        /* Format answer */
         let answerHtml = escHtml(niyahResult.answer)
-          .replace(/\[(\d+)\]/g, '<sup class="mono" style="color:var(--neon);font-size:10px"> [$1]</sup>')
+          .replace(/\[(\d+)\]/g,'<sup class="mono neon-text"> [$1]</sup>')
           .replace(/\n/g,'<br>');
 
-        /* Build citation chips */
+        /* Confidence bar */
+        const barClass = conf>=70?'':'conf-bar-fill '+(conf>=45?'low':'vlow');
+        const confBar =
+          '<div class="conf-bar-wrap">'+
+            '<div class="conf-bar"><div class="'+(conf>=70?'conf-bar-fill':barClass)+'" style="width:'+conf+'%"></div></div>'+
+            '<span class="conf-label">'+conf+'% ثقة</span>'+
+            (fromMem?'<span class="mem-badge">⚡ من الذاكرة</span>':'')+
+            (tookSec?'<span class="mono" style="font-size:9.5px;color:var(--ink-faint);margin-right:4px">'+escHtml(tookSec)+'</span>':'')+
+          '</div>';
+
+        /* Citation chips */
         let chips = '';
         if(citations.length > 0){
-          chips = '<div class="chiprow" style="margin-top:10px">';
+          chips='<div class="chiprow">';
           citations.forEach(c=>{
-            chips += '<a class="chip" href="'+escHtml(c.url||'')+'" target="_blank" '+
-              'style="text-decoration:none">['+c.n+'] '+escHtml((c.title||c.url||'').substring(0,45))+'</a>';
+            const t = escHtml((c.title||c.url||'').substring(0,42));
+            chips+='<a class="chip" href="'+escHtml(c.url||'')+'" target="_blank">['+c.n+'] '+t+'</a>';
           });
-          chips += '</div>';
+          chips+='</div>';
         }
 
-        /* C11 proof badge */
-        const hashShort = niyahResult.chain_hash
-          ? niyahResult.chain_hash.substring(0,12)+'…' : null;
-        const proofBadge = niyahResult.proof_verified
-          ? '<span style="color:var(--neon);font-size:11px;margin-right:8px">✓ C11</span>'
-          : (hashShort ? '<span style="color:var(--ink-dim);font-size:11px;margin-right:8px">~ C11</span>' : '');
-        const hashSpan = hashShort
-          ? '<span class="trace-sub mono" title="SHA-256 chain hash">'+escHtml(hashShort)+'</span>' : '';
-        const khzSpan = niyahResult.khz_energy
-          ? '<span style="font-size:10px;color:var(--ink-dim);margin-right:6px">KHZ '+(Math.round(niyahResult.khz_energy*100))+'%</span>'
+        /* C11 badge */
+        const c11 = hash
+          ? '<span class="mono" style="font-size:9.5px;color:'+(niyahResult.proof_verified?'var(--neon)':'var(--ink-faint)')+'">'+
+            (niyahResult.proof_verified?'✓':'~')+' SHA-256</span>'
           : '';
 
-        appendMsg(
-          '<div class="trace" data-toggle>'+
+        const el = appendMsg(
+          '<div class="trace collapsed" data-toggle>'+
             '<div class="trace-head">'+
+              '<span class="chev">▾</span>'+
               '<span class="trace-runner"></span>'+
-              proofBadge+'NIYAH · '+conf+'% ثقة'+fromMem+tookSec+
-              khzSpan+hashSpan+
+              'NIYAH · '+conf+'% ثقة'+
+              (tookSec?' · '+tookSec:'')+
+              (fromMem?' · ذاكرة':'')+
+              (hash?' · '+hash.substring(0,10)+'…':'')+
             '</div>'+
           '</div>'+
           '<div class="msg-casper">'+
+            confBar+
             '<div class="p">'+answerHtml+'</div>'+
             chips+
+            c11+
           '</div>'
         );
 
-      } else {
-        /* ── Fallback: C11 engine only (no web) ── */
-        if(!window.casper) throw new Error('engine-bridge-unavailable');
-        const raw  = await window.casper.Query(q);
-        const data = JSON.parse(raw);
+        /* Activate toggle */
+        el.querySelector('[data-toggle]')?.querySelector('.trace-head')
+          ?.addEventListener('click', function(){
+            this.closest('[data-toggle]').classList.toggle('collapsed');
+          });
 
-        if(data.error){
-          appendMsg(
-            '<div class="msg-casper"><div class="p" style="color:var(--danger)">'+
-            'خطأ: '+escHtml(data.error)+'</div></div>'
-          );
-          return;
+        updateStats(niyahResult.confidence||0, niyahResult.tookMs||0, fromMem);
+        updateLedger(niyahResult);
+
+      } else {
+        /* Fallback: C11 RAG engine */
+        let answer = 'لم يتم العثور على نتائج.';
+        let conf   = 0;
+        let notice = agentAlive
+          ? '<div class="p" style="color:var(--copper);font-size:12px">⚠ البحث أعاد صفر نتائج</div>'
+          : '<div class="p" style="color:var(--ink-dim);font-size:12px">⚫ Agent غير متاح</div>';
+
+        if(window.casper){
+          try{
+            const raw  = await window.casper.Query(q);
+            const data = JSON.parse(raw);
+            if(!data.error){
+              answer = data.output || data.context || answer;
+              conf   = Math.round((data.confidence||0)*100);
+            }
+          }catch(_){}
         }
 
-        /* No web results — show engine output with notice */
-        const conf   = Math.round((data.confidence||0)*100);
-        const answer = data.output || data.context || 'لم يتم العثور على نتائج.';
-        const notice = agentAlive
-          ? '<div class="p" style="color:var(--copper);font-size:12px;margin-top:6px">⚠ البحث أعاد صفر نتائج — تأكد من اتصال الـ VM بالإنترنت</div>'
-          : '<div class="p" style="color:var(--ink-dim);font-size:12px;margin-top:6px">⚫ Agent غير متاح — نتيجة المحرك المحلي فقط</div>';
-
-        let traceSteps='';
-        (data.trace||[]).forEach((s,i)=>{
-          traceSteps+='<div class="tstep'+(s.kind==='warn'?' warn':'')+'">'+
-            '<span class="tn">'+(String(i+1).padStart(2,'0'))+'</span>'+
-            '['+escHtml(s.kind)+'] '+escHtml(s.detail)+'</div>';
-        });
-
         appendMsg(
-          '<div class="trace" data-toggle>'+
-            '<div class="trace-head">'+
-              '<span class="trace-runner"></span>محرك محلي · '+conf+'% ثقة'+
-              (data.chain_hash?'<span class="trace-sub mono">'+data.chain_hash.substring(0,12)+'…</span>':'')+
-            '</div>'+
-            '<div class="trace-body"><div class="trace-steps">'+traceSteps+'</div></div>'+
-          '</div>'+
           '<div class="msg-casper">'+
-            '<div class="p">'+escHtml(answer.substring(0,800))+'</div>'+
+            '<div class="p">'+escHtml(answer.substring(0,600))+'</div>'+
             notice+
           '</div>'
         );
+        updateStats(conf/100, 0, false);
       }
 
     }catch(err){
       loading.remove();
-      const isNoBridge=(err.message||'').includes('bridge-unavailable');
-      appendMsg(
-        '<div class="msg-casper"><div class="p" style="color:var(--danger)">'+
-        (isNoBridge
-          ? 'تعذّر الاتصال بالمحرك. تأكد من تشغيل Casper.exe.'
-          : 'خطأ: '+escHtml(err.message))+
-        '</div></div>'
-      );
+      appendMsg('<div class="msg-casper"><div class="p err-text">خطأ: '+escHtml(err.message)+'</div></div>');
     }finally{
       setRunning(false);
+      stream.scrollTop = stream.scrollHeight;
     }
   }
 
   btn.addEventListener('click', sendQuery);
-  input.addEventListener('keydown', e=>{ if(e.key==='Enter')sendQuery(); });
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey) sendQuery(); });
+
+  /* Welcome pill clicks */
+  document.getElementById('welcome-pills')?.addEventListener('click', e=>{
+    const pill = e.target.closest('.welcome-pill');
+    if(pill){ input.value = pill.textContent; sendQuery(); }
+  });
 }());
 
-document.querySelectorAll('.chip').forEach(chip=>{
-  chip.addEventListener('click',()=>{
-    const id=chip.getAttribute('data-target');
-    const target=document.getElementById(id);
-    if(!target)return;
-    document.querySelectorAll('.lentry.highlight').forEach(e=>e.classList.remove('highlight'));
-    target.classList.add('highlight');
-    target.scrollIntoView({behavior:'smooth',block:'center'});
-    chip.classList.add('pinged');
-    setTimeout(()=>chip.classList.remove('pinged'),600);
-  });
-});
-document.querySelectorAll('[data-toggle]').forEach(el=>{
-  el.querySelector('.trace-head').addEventListener('click',()=>el.classList.toggle('collapsed'));
-});
+/* Error text style */
+document.head.insertAdjacentHTML('beforeend',
+  '<style>.err-text{color:var(--danger);font-size:13px;}</style>');
+
 document.querySelectorAll('.tab').forEach(tab=>{
   tab.addEventListener('click',()=>{
     document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
