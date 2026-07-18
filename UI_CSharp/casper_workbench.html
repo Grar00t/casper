@@ -1,1126 +1,608 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Casper.exe</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --void:#040706;
-    --neon:#2CF2DA;
-    --neon-dim:#18B49F;
-    --neon-soft:rgba(44,242,218,.12);
-    --neon-line:rgba(44,242,218,.32);
-    --copper:#E0A354;
-    --copper-soft:rgba(224,163,84,.14);
-    --danger:#FF6E62;
-    --danger-soft:rgba(255,110,98,.13);
-    --danger-line:rgba(255,110,98,.4);
-    --ink:#F1FBF9;
-    --ink-dim:#8FA6A2;
-    --ink-faint:#4E5C59;
-    --glass-bg:rgba(9,15,16,.44);
-    --glass-border:rgba(255,255,255,.06);
-  }
-  *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{height:100%;}
-  body{
-    color:var(--ink);font-family:'Tajawal',sans-serif;
-    display:flex;flex-direction:column;overflow:hidden;font-size:15.5px;
-    background:var(--void);position:relative;
-  }
-  /* ambient neon sweep — the signature */
-  .ambient{position:fixed;inset:-20% -20%;z-index:0;pointer-events:none;overflow:hidden;}
-  .ambient::before{
-    content:'';position:absolute;width:160%;height:340px;left:-30%;top:8%;
-    background:linear-gradient(100deg, transparent 30%, rgba(44,242,218,.10) 48%, rgba(44,242,218,.20) 50%, rgba(44,242,218,.10) 52%, transparent 70%);
-    filter:blur(30px);transform:rotate(-9deg);
-    animation:drift 22s ease-in-out infinite alternate;
-  }
-  .ambient::after{
-    content:'';position:absolute;width:120%;height:220px;right:-20%;bottom:4%;
-    background:linear-gradient(100deg, transparent 30%, rgba(44,242,218,.06) 50%, transparent 70%);
-    filter:blur(40px);transform:rotate(-9deg);
-    animation:drift 26s ease-in-out infinite alternate-reverse;
-  }
-  @keyframes drift{0%{transform:rotate(-9deg) translateY(-10px);}100%{transform:rotate(-9deg) translateY(30px);}}
-  @media (prefers-reduced-motion: reduce){.ambient::before,.ambient::after{animation:none;}}
-
-  .mono{font-family:'JetBrains Mono',monospace;direction:ltr;unicode-bidi:isolate;}
-  ::selection{background:var(--neon-soft);color:var(--ink);}
-  *:focus-visible{outline:2px solid var(--neon);outline-offset:2px;border-radius:4px;}
-
-  /* ===== NATIVE TITLEBAR ===== */
-  .titlebar{
-    height:34px;display:flex;align-items:center;gap:10px;padding:0 12px;
-    direction:ltr;flex-shrink:0;position:relative;z-index:5;
-    background:rgba(5,9,9,.6);border-bottom:1px solid var(--glass-border);
-  }
-  .tl-dots{display:flex;gap:6px;}
-  .tl-dots span{width:9px;height:9px;border-radius:50%;background:#2B3634;cursor:pointer;transition:background .15s;}
-  .tl-dots span:nth-child(1):hover{background:#FF6E62;}
-  .tl-dots span:nth-child(2):hover{background:#E0A354;}
-  .tl-dots span:nth-child(3):hover{background:#2CF2DA;}
-  .tl-path{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-faint);}
-  .tl-path b{color:var(--ink-dim);font-weight:500;}
-  .tl-badge{
-    margin-inline-start:auto;display:flex;align-items:center;gap:6px;
-    font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--neon);
-  }
-  .tl-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--neon);box-shadow:0 0 8px var(--neon);animation:pulse-dot 2.5s ease-in-out infinite;}
-  @keyframes pulse-dot{0%,100%{opacity:1;box-shadow:0 0 8px var(--neon);}50%{opacity:.5;box-shadow:0 0 3px var(--neon);}}
-  .status-bar{
-    height:24px;display:flex;align-items:center;padding:0 18px;gap:16px;
-    background:rgba(4,7,6,.8);border-bottom:1px solid var(--glass-border);
-    font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-faint);
-    flex-shrink:0;position:relative;z-index:5;direction:ltr;
-  }
-  .status-bar .sb-item{display:flex;align-items:center;gap:5px;}
-  .status-bar .sb-dot{width:5px;height:5px;border-radius:50%;}
-  .status-bar .sb-dot.green{background:#4ade80;box-shadow:0 0 6px #4ade80;}
-  .status-bar .sb-dot.yellow{background:#fbbf24;box-shadow:0 0 6px #fbbf24;}
-  .status-bar .sb-dot.red{background:var(--danger);}
-  .status-bar .sb-right{margin-left:auto;display:flex;gap:12px;}
-
-  /* ===== TOP BAR (workspace tabs) ===== */
-  .topbar{
-    height:46px;display:flex;align-items:center;padding:0 18px;gap:18px;
-    direction:ltr;flex-shrink:0;position:relative;z-index:5;
-    background:rgba(6,11,11,.4);backdrop-filter:blur(16px);
-    border-bottom:1px solid var(--glass-border);
-  }
-  .tabs{display:flex;gap:4px;flex:1;overflow-x:auto;}
-  .tabs::-webkit-scrollbar{height:0;}
-  .tab{
-    display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:8px;
-    font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-faint);
-    cursor:pointer;white-space:nowrap;border:1px solid transparent;transition:all .15s;
-  }
-  .tab.active{background:var(--neon-soft);color:var(--ink);border-color:var(--neon-line);}
-  .tab:not(.active):hover{color:var(--ink-dim);background:rgba(255,255,255,.02);}
-  .tab-add{color:var(--ink-faint);padding:7px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:6px;}
-  .tab-add:hover{color:var(--neon);background:var(--neon-soft);}
-
-  /* ===== LAYOUT ===== */
-  .layout{flex:1;display:grid;grid-template-columns:210px 1fr 290px;overflow:hidden;position:relative;z-index:1;}
-  .col{overflow-y:auto;}
-  .col::-webkit-scrollbar{width:5px;}
-  .col::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:4px;}
-  .col::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.14);}
-  .col-header{
-    position:sticky;top:0;z-index:2;padding:18px 18px 10px;
-    font-size:11px;color:var(--ink-faint);font-weight:700;letter-spacing:.5px;
-    background:transparent;text-transform:uppercase;
-  }
-
-  /* ===== SOURCES ===== */
-  .sources{direction:ltr;border-inline-end:1px solid var(--glass-border);}
-  .src-group{padding:4px 12px;}
-  .src-group-label{font-size:9.5px;color:var(--ink-faint);font-family:'JetBrains Mono',monospace;padding:10px 8px 5px;letter-spacing:.6px;text-transform:uppercase;}
-  .src-item{
-    display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;
-    cursor:pointer;font-size:12px;color:var(--ink-dim);transition:all .12s;
-  }
-  .src-item:hover{background:rgba(255,255,255,.04);color:var(--ink);}
-  .src-item .ic{width:14px;text-align:center;opacity:.7;font-size:11px;flex-shrink:0;}
-  .src-item .name{flex:1;font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .src-item .count{
-    font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-faint);
-    background:rgba(255,255,255,.04);padding:1px 5px;border-radius:4px;
-  }
-  .src-item.selected{background:var(--neon-soft);color:var(--neon);}
-  .src-item.selected .count{color:var(--neon);background:rgba(44,242,218,.1);}
-  /* NIYAH identity card */
-  .niyah-card{
-    margin:8px 12px 4px;padding:10px 12px;border-radius:10px;
-    background:rgba(44,242,218,.04);border:1px solid var(--neon-line);
-  }
-  .niyah-card .nc-name{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--neon);font-weight:600;}
-  .niyah-card .nc-desc{font-size:10.5px;color:var(--ink-dim);margin-top:4px;line-height:1.5;}
-  .niyah-card .nc-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;}
-  .niyah-card .nc-tag{font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 6px;border-radius:3px;background:rgba(255,255,255,.05);color:var(--ink-faint);}
-  /* search stats */
-  .search-stats{padding:6px 12px 10px;display:flex;flex-direction:column;gap:3px;}
-  .ss-row{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10px;}
-  .ss-label{color:var(--ink-faint);}
-  .ss-val{color:var(--ink-dim);}
-  .ss-val.live{color:var(--neon);}
-
-  /* ===== WORKBENCH ===== */
-  .workbench{display:flex;flex-direction:column;}
-  .stream{flex:1;overflow-y:auto;padding:20px 26px 14px;display:flex;flex-direction:column;gap:18px;}
-  .stream::-webkit-scrollbar{width:5px;}
-  .stream::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07);border-radius:4px;}
-
-  /* Welcome screen */
-  .welcome{
-    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:24px;padding:40px;text-align:center;
-  }
-  .welcome-logo{
-    font-family:'JetBrains Mono',monospace;font-size:38px;font-weight:700;
-    color:var(--neon);text-shadow:0 0 40px rgba(44,242,218,.4);letter-spacing:2px;
-  }
-  .welcome-sub{font-size:13px;color:var(--ink-dim);line-height:1.7;max-width:420px;}
-  .welcome-pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:480px;}
-  .welcome-pill{
-    font-size:12px;padding:8px 14px;border-radius:20px;cursor:pointer;
-    border:1px solid var(--glass-border);color:var(--ink-dim);
-    transition:all .15s;direction:rtl;
-  }
-  .welcome-pill:hover{border-color:var(--neon-line);color:var(--neon);background:var(--neon-soft);}
-  .welcome-badges{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
-  .welcome-badge{
-    font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 10px;
-    border-radius:4px;background:rgba(255,255,255,.04);color:var(--ink-faint);
-  }
-
-  .msg-user{
-    align-self:flex-end;max-width:68%;border-radius:18px 18px 4px 18px;
-    padding:13px 17px;font-size:14.5px;line-height:1.9;
-    background:linear-gradient(135deg,rgba(44,242,218,.08),rgba(255,255,255,.04));
-    border:1px solid rgba(44,242,218,.08);
-  }
-
-  .trace{max-width:88%;}
-  .trace-head{
-    display:flex;align-items:center;gap:9px;padding:4px 2px 8px;cursor:pointer;
-    font-size:12px;color:var(--neon);direction:rtl;-webkit-user-select:none;user-select:none;
-  }
-  .trace-head .chev{transition:transform .15s ease;color:var(--ink-faint);font-size:10px;}
-  .trace.collapsed .chev{transform:rotate(-90deg);}
-  .trace-head .trace-sub{color:var(--ink-faint);font-family:'JetBrains Mono',monospace;font-size:10px;margin-inline-start:auto;}
-  .trace-body{direction:ltr;padding-inline-start:2px;}
-  .trace.collapsed .trace-body{display:none;}
-  .trace-steps{position:relative;padding-inline-start:22px;display:flex;flex-direction:column;gap:8px;}
-  .trace-steps::before{content:'';position:absolute;left:5px;top:2px;bottom:2px;width:1px;background:var(--glass-border);}
-  .trace-runner{
-    position:absolute;left:4.5px;width:2px;height:50px;
-    background:linear-gradient(to bottom, transparent, var(--neon), transparent);
-    box-shadow:0 0 12px 1px var(--neon);animation:beam-run-small 2.8s linear infinite;pointer-events:none;
-  }
-  @keyframes beam-run-small{0%{top:-50px;}100%{top:100%;}}
-  .tstep{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-dim);line-height:1.65;position:relative;}
-  .tstep::before{content:'';position:absolute;left:-21px;top:5px;width:6px;height:6px;border-radius:50%;background:var(--void);border:1.5px solid var(--neon-dim);}
-  .tstep.warn{color:var(--copper);}
-  .tstep.warn::before{border-color:var(--copper);}
-  .tstep.err{color:var(--danger);}
-  .tstep.err::before{border-color:var(--danger);}
-  .tstep .tn{color:var(--ink-faint);margin-inline-end:6px;}
-  /* typing indicator */
-  .typing-dots{display:inline-flex;gap:4px;align-items:center;padding:2px 0;}
-  .typing-dots span{width:5px;height:5px;border-radius:50%;background:var(--neon-dim);display:inline-block;}
-  .typing-dots span:nth-child(1){animation:td .9s .0s ease-in-out infinite;}
-  .typing-dots span:nth-child(2){animation:td .9s .2s ease-in-out infinite;}
-  .typing-dots span:nth-child(3){animation:td .9s .4s ease-in-out infinite;}
-  @keyframes td{0%,100%{opacity:.2;transform:translateY(0);}50%{opacity:1;transform:translateY(-4px);}}
-
-  .msg-casper{max-width:88%;display:flex;flex-direction:column;gap:14px;}
-  .msg-casper .p{line-height:2.0;font-size:14.5px;padding-inline-start:2px;color:var(--ink);}
-  /* confidence bar */
-  .conf-bar-wrap{display:flex;align-items:center;gap:10px;direction:ltr;}
-  .conf-bar{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;max-width:120px;}
-  .conf-bar-fill{height:100%;border-radius:2px;transition:width .6s ease;background:var(--neon);}
-  .conf-bar-fill.low{background:var(--copper);}
-  .conf-bar-fill.vlow{background:var(--danger);}
-  .conf-label{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-faint);}
-
-  .chiprow{display:flex;gap:7px;flex-wrap:wrap;direction:ltr;}
-  .chip{
-    display:inline-flex;align-items:center;gap:5px;background:transparent;
-    border:1px solid var(--neon-line);color:var(--neon);
-    font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 10px;border-radius:20px;cursor:pointer;
-    text-decoration:none;transition:all .12s;
-  }
-  .chip:hover,.chip.pinged{background:var(--neon-soft);}
-  .chip.warn{border-color:var(--danger-line);color:var(--danger);}
-  .chip.warn:hover{background:var(--danger-soft);}
-  /* memory badge */
-  .mem-badge{
-    display:inline-flex;align-items:center;gap:5px;
-    font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--copper);
-    border:1px solid rgba(224,163,84,.25);padding:2px 8px;border-radius:12px;background:var(--copper-soft);
-  }
-
-  .flags{display:flex;gap:16px;padding:2px 2px 0;font-size:12px;}
-  .flag{display:flex;align-items:center;gap:6px;}
-  .flag.ok{color:var(--neon);}
-  .flag.warn{color:var(--danger);}
-
-  .composer{
-    border-top:1px solid var(--glass-border);padding:12px 20px 18px;
-    display:flex;flex-direction:column;gap:10px;
-    background:rgba(4,7,6,.5);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
-  }
-  .composer-top{display:flex;align-items:center;justify-content:space-between;}
-  .mode-row{display:flex;gap:5px;}
-  .mode-btn{
-    font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:5px 11px;border-radius:6px;
-    border:1px solid var(--glass-border);color:var(--ink-faint);cursor:pointer;background:transparent;
-    transition:all .12s;
-  }
-  .mode-btn.active{border-color:var(--neon-line);color:var(--neon);background:var(--neon-soft);}
-  .mode-btn:not(.active):hover{color:var(--ink-dim);}
-  .agent-status{font-family:'JetBrains Mono',monospace;font-size:10px;display:flex;align-items:center;gap:5px;}
-  .input-row{display:flex;gap:8px;align-items:center;}
-  .input-row input{
-    flex:1;background:rgba(255,255,255,.04);border:1px solid var(--glass-border);
-    color:var(--ink);padding:12px 16px;border-radius:12px;font-family:'Tajawal',sans-serif;font-size:14px;
-    transition:border-color .15s;
-  }
-  .input-row input:focus{outline:none;border-color:var(--neon-line);background:rgba(44,242,218,.03);}
-  .input-row input::placeholder{color:var(--ink-faint);}
-  .run-btn{
-    background:var(--neon);color:#04211D;border:none;padding:12px 22px;border-radius:12px;
-    font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:13.5px;
-    box-shadow:0 0 20px -4px var(--neon);transition:all .15s;white-space:nowrap;
-  }
-  .run-btn:hover{filter:brightness(1.08);box-shadow:0 0 28px -2px var(--neon);}
-  .run-btn:disabled{opacity:.5;box-shadow:none;cursor:not-allowed;}
-
-  /* ===== PROOF LEDGER ===== */
-  .ledger{direction:ltr;display:flex;flex-direction:column;border-inline-start:1px solid var(--glass-border);}
-  .stat-strip{display:flex;padding:0 20px 18px;gap:0;}
-  .stat{flex:1;padding-inline-end:14px;}
-  .stat + .stat{border-inline-start:1px solid var(--glass-border);padding-inline-start:14px;}
-  .stat .v{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--neon);}
-  .stat.danger .v{color:var(--danger);}
-  .stat .l{font-size:9.5px;color:var(--ink-faint);margin-top:2px;letter-spacing:.4px;font-family:'JetBrains Mono',monospace;}
-
-  .ledger-list{flex:1;overflow-y:auto;padding:4px 0;position:relative;}
-  .beam-runner{
-    position:absolute;left:19.5px;width:2px;height:80px;
-    background:linear-gradient(to bottom, transparent, var(--neon), transparent);
-    box-shadow:0 0 16px 2px var(--neon);animation:beam-run 3.6s linear infinite;pointer-events:none;z-index:1;
-  }
-  @keyframes beam-run{0%{top:-80px;}100%{top:100%;}}
-  @media (prefers-reduced-motion: reduce){.beam-runner,.trace-runner{animation:none;opacity:.4;}}
-
-  .lentry{position:relative;padding:13px 20px 13px 32px;cursor:pointer;}
-  .lentry::before{content:'';position:absolute;left:20px;top:0;bottom:0;width:1px;background:var(--glass-border);}
-  .lentry:first-child::before{top:50%;}
-  .lentry:last-child::before{bottom:50%;}
-  .lentry::after{
-    content:attr(data-n);position:absolute;left:14px;top:15px;width:14px;height:14px;border-radius:50%;
-    background:var(--void);border:1.5px solid var(--neon-dim);color:var(--neon);
-    font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;
-    display:flex;align-items:center;justify-content:center;z-index:2;
-  }
-  .lentry.verified::after{border-color:var(--copper);color:var(--copper);}
-  .lentry.danger::after{border-color:var(--danger);color:var(--danger);}
-  .lentry.highlight{background:var(--neon-soft);}
-  .lentry .rule{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink);font-weight:600;}
-  .lentry .desc{font-size:11px;color:var(--ink-dim);margin-top:4px;line-height:1.55;}
-  .lentry .meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
-  .lentry .hash{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-faint);}
-  .lentry .delta{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;color:var(--neon);}
-  .lentry .delta.neg{color:var(--danger);}
-  .lentry .delta.gold{color:var(--copper);}
-
-  .ledger-footer{
-    padding:14px 20px;border-top:1px solid var(--glass-border);
-    font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-faint);
-    display:flex;justify-content:space-between;
-  }
-  .ledger-footer b{color:var(--copper);}
-
-  .neon-text{color:var(--neon);}
-  .agent-indicator{width:6px;height:6px;border-radius:50%;background:var(--ink-faint);}
-  .agent-label-text{color:var(--ink-faint);font-size:10px;}
-  .ledger-empty{padding:20px;font-size:11px;color:var(--ink-faint);font-family:'JetBrains Mono',monospace;line-height:1.8;}
-  /* Identity answer */
-  .identity-answer{
-    font-size:13.5px;line-height:1.9;
-    border-left:2px solid var(--neon-line);padding-left:14px;color:var(--ink);
-  }
-  /* C11 badges */
-  .c11-badge{font-family:'JetBrains Mono',monospace;font-size:9.5px;padding:2px 7px;border-radius:4px;}
-  .c11-ok{color:var(--neon);background:rgba(44,242,218,.08);border:1px solid var(--neon-line);}
-  .c11-dim{color:var(--ink-faint);background:rgba(255,255,255,.04);border:1px solid var(--glass-border);}
-  /* Show more */
-  .show-more-btn{
-    font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--neon-dim);
-    background:transparent;border:none;cursor:pointer;padding:4px 0;display:block;margin-top:4px;
-  }
-  .show-more-btn:hover{color:var(--neon);}
-  /* File/OCR upload area */
-  .upload-row{display:flex;align-items:center;gap:8px;padding-top:2px;}
-  .upload-btn{
-    font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:5px 11px;border-radius:7px;
-    border:1px solid var(--glass-border);color:var(--ink-faint);cursor:pointer;background:transparent;
-    transition:all .12s;
-  }
-  .upload-btn:hover{border-color:var(--neon-line);color:var(--neon);}
-  .upload-preview{
-    font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--neon);
-    background:var(--neon-soft);border:1px solid var(--neon-line);padding:3px 9px;border-radius:5px;
-    max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  }
-  /* Source URL input */
-  .source-add-row{display:flex;gap:6px;padding-top:4px;}
-  .source-url-input{
-    flex:1;background:rgba(255,255,255,.03);border:1px solid var(--glass-border);
-    color:var(--ink);padding:6px 10px;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:11px;
-  }
-  .source-url-input:focus{outline:none;border-color:var(--neon-line);}
-  .source-url-input::placeholder{color:var(--ink-faint);}
-  /* Ledger link */
-  .lentry a{color:inherit;text-decoration:none;}
-  .lentry a:hover{text-decoration:underline;}
-  .hidden{display:none!important;}
-  .src-count-right{margin-right:auto;}
-  .src-hint{padding:4px 8px;}
-
-  @media (max-width:980px){
-    .layout{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;}
-    .sources{max-height:130px;}
-    .ledger{max-height:200px;}
-  }
+<!DOCTYPE html><html lang='ar' dir='rtl'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>NIYAH</title><link href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Tajawal:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap' rel='stylesheet'><style>
+:root{--bg:#050d0c;--panel:#0a1412;--border:rgba(44,242,218,.12);--neon:#2CF2DA;--neon-dim:#18B49F;--neon-soft:rgba(44,242,218,.1);--text:#E8F5F3;--text-dim:#7A9E9A;--text-faint:#3D5552;--copper:#E0A354;--danger:#FF6E62;--success:#4ade80;--mono:'JetBrains Mono',monospace}
+[data-theme=light]{--bg:#F0F4F3;--panel:#FFFFFF;--border:rgba(30,90,80,.12);--neon:#0D8C7E;--neon-dim:#0A6E62;--neon-soft:rgba(13,140,126,.1);--text:#0D2220;--text-dim:#3D6560;--text-faint:#8AADA9;--copper:#B87820;--danger:#D63B2F;--success:#16a34a}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;font-family:'Tajawal','Inter',sans-serif;background:var(--bg);color:var(--text);font-size:15px}
+.mono{font-family:var(--mono)}
+::selection{background:var(--neon-soft);color:var(--text)}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.titlebar{height:32px;display:flex;align-items:center;padding:0 12px;gap:8px;background:rgba(0,0,0,.3);border-bottom:1px solid var(--border);flex-shrink:0;direction:ltr;-webkit-app-region:drag}
+.tl-dots{display:flex;gap:5px;-webkit-app-region:no-drag}.tl-dot{width:11px;height:11px;border-radius:50%;cursor:pointer;transition:opacity .15s}.tl-dot:hover{opacity:.8}
+.tl-dot-close{background:#FF5F57}.tl-dot-min{background:#FEBC2E}.tl-dot-max{background:#28C840}
+.tl-title{flex:1;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text-faint);pointer-events:none}
+.tl-badge{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--neon)}
+.tl-dot-live{width:6px;height:6px;border-radius:50%;background:var(--neon);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.statusbar{height:22px;display:flex;align-items:center;padding:0 14px;gap:12px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text-faint);flex-shrink:0;direction:ltr}
+.sb-dot{width:5px;height:5px;border-radius:50%}.sb-dot.ok{background:var(--success)}.sb-dot.warn{background:var(--copper)}.sb-dot.err{background:var(--danger)}
+.sb-right{margin-left:auto;display:flex;gap:10px;align-items:center}
+.sb-theme-btn,.sb-lang-btn{background:transparent;border:1px solid var(--border);color:var(--text-faint);padding:1px 7px;border-radius:3px;cursor:pointer;font-family:var(--mono);font-size:9px;transition:all .15s}
+.sb-theme-btn:hover,.sb-lang-btn:hover{border-color:var(--neon);color:var(--neon)}
+.app{flex:1;display:grid;grid-template-columns:190px 1fr 270px;overflow:hidden}
+.sidebar{border-inline-end:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+.sidebar-section{padding:10px 12px;border-bottom:1px solid var(--border)}
+.sidebar-label{font-family:var(--mono);font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.niyah-card{background:var(--neon-soft);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
+.niyah-card-name{font-family:var(--mono);font-size:12px;color:var(--neon);font-weight:500}
+.niyah-card-desc{font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5}
+.niyah-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+.niyah-tag{font-family:var(--mono);font-size:9px;padding:2px 5px;border-radius:3px;background:rgba(255,255,255,.05);color:var(--text-faint)}
+.stat-row{display:flex;justify-content:space-between;font-size:11px;padding:2px 0}
+.stat-label{color:var(--text-faint)}.stat-val{color:var(--text-dim);font-family:var(--mono)}
+.stat-val.live{color:var(--neon)}
+.suggestion{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text-dim);transition:all .12s}
+.suggestion:hover{background:var(--neon-soft);color:var(--neon)}
+.suggestion-arrow{color:var(--text-faint);font-size:11px;flex-shrink:0}
+.main{display:flex;flex-direction:column;overflow:hidden}
+.stream{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+.welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;text-align:center;padding:30px}
+.welcome-logo{font-family:var(--mono);font-size:42px;font-weight:500;color:var(--neon);letter-spacing:3px}
+.welcome-tagline{font-size:13px;color:var(--text-dim);max-width:380px;line-height:1.7}
+.welcome-honest{font-family:var(--mono);font-size:11px;color:var(--text-faint);max-width:420px;text-align:left;direction:ltr;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:10px;line-height:1.8}
+.welcome-pills{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;max-width:440px}
+.pill{font-size:12px;padding:7px 13px;border-radius:20px;cursor:pointer;border:1px solid var(--border);color:var(--text-dim);transition:all .15s;direction:rtl}
+.pill:hover{border-color:var(--neon);color:var(--neon);background:var(--neon-soft)}
+.msg-user{align-self:flex-end;max-width:70%;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:14px 14px 4px 14px;padding:11px 15px;font-size:14px;line-height:1.85}
+.msg-niyah{display:flex;flex-direction:column;gap:10px;max-width:90%}
+.answer-text{font-size:14px;line-height:2.0;color:var(--text)}
+.answer-text sup{color:var(--neon);font-family:var(--mono);font-size:9px}
+.conf-bar-wrap{display:flex;align-items:center;gap:8px;direction:ltr}
+.conf-bar{width:100px;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.conf-fill{height:100%;border-radius:2px;transition:width .5s}
+.conf-fill.hi{background:var(--success)}.conf-fill.mid{background:var(--copper)}.conf-fill.lo{background:var(--danger)}
+.conf-label{font-family:var(--mono);font-size:10px;color:var(--text-faint)}
+.mem-badge{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(224,163,84,.1);color:var(--copper);border:1px solid rgba(224,163,84,.2)}
+.cit-row{display:flex;flex-wrap:wrap;gap:5px;direction:ltr}
+.cit{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:12px;border:1px solid var(--border);color:var(--text-dim);text-decoration:none;transition:all .12s}
+.cit:hover{border-color:var(--neon);color:var(--neon);background:var(--neon-soft)}
+.show-more{font-family:var(--mono);font-size:10px;color:var(--neon-dim);background:none;border:none;cursor:pointer;padding:3px 0;display:block}
+.show-more:hover{color:var(--neon)}
+.identity-answer{border-left:2px solid var(--neon);padding-left:12px;direction:rtl;font-size:13.5px;line-height:1.9;color:var(--text)}
+.trace-wrap{background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-width:90%}
+.trace-header{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--neon-dim);-webkit-user-select:none;user-select:none}
+.trace-header:hover{color:var(--neon)}
+.trace-body{display:none;padding:8px 12px;border-top:1px solid var(--border)}
+.trace-wrap.open .trace-body{display:block}
+.trace-step{display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);direction:ltr}
+.trace-step-name{color:var(--neon);min-width:100px;font-weight:500}
+.trace-step-ms{color:var(--text-faint);min-width:45px}
+.trace-step-detail{color:var(--text-dim);flex:1}
+.trace-step-data{color:var(--text-faint);font-size:9.5px;margin-top:1px;padding-left:145px}
+.typing-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--neon-dim);animation:td .8s ease-in-out infinite}
+.typing-dot:nth-child(2){animation-delay:.2s}.typing-dot:nth-child(3){animation-delay:.4s}
+@keyframes td{0%,100%{opacity:.2;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+.err-msg{color:var(--danger);font-size:13px;padding:8px;background:rgba(255,110,98,.07);border:1px solid rgba(255,110,98,.2);border-radius:6px}
+.composer{border-top:1px solid var(--border);padding:10px 16px 14px;display:flex;flex-direction:column;gap:8px;background:rgba(0,0,0,.15)}
+.composer-top{display:flex;align-items:center;justify-content:space-between}
+.mode-btns{display:flex;gap:4px}
+.mode-btn{font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);color:var(--text-faint);cursor:pointer;background:transparent;transition:all .12s}
+.mode-btn.active{border-color:var(--neon);color:var(--neon);background:var(--neon-soft)}
+.mode-btn:hover:not(.active){color:var(--text-dim)}
+.agent-badge{font-family:var(--mono);font-size:9.5px;display:flex;align-items:center;gap:4px;color:var(--text-faint)}
+.input-row{display:flex;gap:8px;align-items:center}
+.query-input{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:10px;font-family:'Tajawal','Inter',sans-serif;font-size:14px;transition:border-color .15s}
+.query-input:focus{outline:none;border-color:var(--neon)}
+.query-input::placeholder{color:var(--text-faint)}
+.send-btn{background:var(--neon);color:#03201C;border:none;padding:10px 18px;border-radius:10px;font-weight:600;cursor:pointer;font-family:'Tajawal','Inter',sans-serif;font-size:13px;white-space:nowrap;transition:all .15s;box-shadow:0 0 18px -4px var(--neon)}
+.send-btn:hover{filter:brightness(1.1)}.send-btn:disabled{opacity:.45;box-shadow:none;cursor:not-allowed}
+.extra-row{display:flex;align-items:center;gap:6px}
+.extra-btn{font-family:var(--mono);font-size:10px;padding:4px 9px;border-radius:5px;border:1px solid var(--border);color:var(--text-faint);cursor:pointer;background:transparent;transition:all .12s}
+.extra-btn:hover{border-color:var(--neon);color:var(--neon)}
+.file-tag{font-family:var(--mono);font-size:9.5px;color:var(--neon);background:var(--neon-soft);border:1px solid var(--border);padding:2px 8px;border-radius:4px;display:none}
+.ledger{border-inline-start:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.ledger-header{padding:10px 14px 6px;font-family:var(--mono);font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.ledger-stats{display:flex;padding:8px 14px;gap:0;border-bottom:1px solid var(--border)}
+.ledger-stat{flex:1;text-align:center}
+.ledger-stat-v{font-family:var(--mono);font-size:16px;font-weight:500;color:var(--neon)}
+.ledger-stat-l{font-family:var(--mono);font-size:8.5px;color:var(--text-faint);margin-top:1px}
+.ledger-list{flex:1;overflow-y:auto;padding:4px 0}
+.ledger-empty{padding:20px 14px;font-family:var(--mono);font-size:10px;color:var(--text-faint);line-height:1.8;direction:ltr}
+.lentry{padding:9px 14px;border-bottom:1px solid var(--border);cursor:default;direction:ltr}
+.lentry:hover{background:rgba(255,255,255,.02)}
+.lentry-kind{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--neon);margin-bottom:3px}
+.lentry-desc{font-size:11px;color:var(--text-dim);line-height:1.5;word-break:break-word}
+.lentry-meta{display:flex;justify-content:space-between;margin-top:4px}
+.lentry-hash{font-family:var(--mono);font-size:9px;color:var(--text-faint)}
+.lentry-delta{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--success)}
+.lentry-delta.none{color:var(--text-faint)}
+.lentry-url{font-family:var(--mono);font-size:9px;color:var(--text-faint);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lentry-url:hover{color:var(--neon)}
+.ledger-footer{padding:8px 14px;border-top:1px solid var(--border);font-family:var(--mono);font-size:9px;color:var(--text-faint);display:flex;justify-content:space-between;direction:ltr}
+.hidden{display:none!important}
 </style>
 </head>
 <body>
 
-  <div class="ambient"></div>
-
-  <div class="titlebar">
-    <div class="tl-dots">
-      <span onclick="if(window.casper)window.casper.Close()"></span>
-      <span onclick="if(window.casper)window.casper.Minimise()"></span>
-      <span onclick="if(window.casper)window.casper.ToggleMaximise()"></span>
-    </div>
-    <div class="tl-path"><b>NIYAH</b> · Casper Engine · v3.0</div>
-    <div class="tl-badge"><span class="dot"></span><span id="conn-label">جارٍ التحقق…</span></div>
+<div class="titlebar">
+  <div class="tl-dots">
+    <div class="tl-dot tl-dot-close" onclick="if(window.casper)window.casper.Close()" title="Close"></div>
+    <div class="tl-dot tl-dot-min" onclick="if(window.casper)window.casper.Minimise()" title="Minimise"></div>
+    <div class="tl-dot tl-dot-max" onclick="if(window.casper)window.casper.ToggleMaximise()" title="Maximise"></div>
   </div>
+  <div class="tl-title mono">NIYAH · Casper Engine · v3.1</div>
+  <div class="tl-badge"><span class="tl-dot-live"></span><span id="conn-label">Connecting…</span></div>
+</div>
 
-  <div class="status-bar">
-    <div class="sb-item"><span class="sb-dot" id="vm-dot"></span><span id="vm-label">VM …</span></div>
-    <div class="sb-item"><span class="sb-dot" id="ddg-dot"></span><span>DDG HTML</span></div>
-    <div class="sb-item mono" id="mem-stat">ذاكرة: —</div>
-    <div class="sb-right">
-      <span class="mono" id="query-count">0 استعلام</span>
-      <span class="mono neon-text">NIYAH v3</span>
-    </div>
+<div class="statusbar">
+  <div style="display:flex;align-items:center;gap:4px"><span class="sb-dot" id="vm-dot"></span><span id="vm-label">VM</span></div>
+  <span id="backend-label">DDG HTML</span>
+  <span id="mem-label">Mem: —</span>
+  <div class="sb-right">
+    <span id="q-count" class="mono">0 queries</span>
+    <button class="sb-theme-btn" onclick="toggleTheme()">☀ Light</button>
+    <button class="sb-lang-btn" onclick="toggleLang()">EN</button>
   </div>
+</div>
 
-  <div class="topbar">
-    <div class="tabs">
-      <div class="tab active" data-tab="search">🔍 بحث</div>
-      <div class="tab" data-tab="about">◈ عن NIYAH</div>
-      <div class="tab-add" title="سؤال جديد" onclick="clearStream()">↺</div>
-    </div>
-  </div>
+<div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+<div class="app">
 
-  <div class="layout">
-
-    <!-- SOURCES -->
-    <div class="col sources">
-      <div class="col-header">المصادر</div>
-
-      <!-- NIYAH identity -->
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">
       <div class="niyah-card">
-        <div class="nc-name">◈ NIYAH Engine</div>
-        <div class="nc-desc">محرك بحث واستخلاص. لا يُوَلِّد من أوزان — يجلب من الويب ويستخرج الحقيقة.</div>
-        <div class="nc-tags">
-          <span class="nc-tag">TF-IDF</span>
-          <span class="nc-tag">DDG HTML</span>
-          <span class="nc-tag">SQLite</span>
-          <span class="nc-tag">SHA-256</span>
-        </div>
-      </div>
-
-      <div class="src-group">
-        <div class="src-group-label">مصادر البحث</div>
-        <div class="src-item selected"><span class="ic">🌐</span><span class="name">DuckDuckGo</span><span class="count" id="ddg-count">—</span></div>
-        <div class="src-item"><span class="ic">🧠</span><span class="name">ذاكرة SQLite</span><span class="count" id="mem-count">—</span></div>
-      </div>
-
-      <div class="src-group">
-        <div class="src-group-label">إحصاءات الجلسة</div>
-        <div class="search-stats" id="session-stats">
-          <div class="ss-row"><span class="ss-label">استعلامات</span><span class="ss-val" id="stat-queries">0</span></div>
-          <div class="ss-row"><span class="ss-label">متوسط ثقة</span><span class="ss-val" id="stat-conf">—</span></div>
-          <div class="ss-row"><span class="ss-label">متوسط وقت</span><span class="ss-val" id="stat-time">—</span></div>
-          <div class="ss-row"><span class="ss-label">من الذاكرة</span><span class="ss-val" id="stat-mem">0</span></div>
-        </div>
-      </div>
-
-      <div class="src-group" id="custom-src-group">
-        <div class="src-group-label">مصادر مخصصة</div>
-        <div id="custom-src-list">
-          <div class="ss-row src-hint"><span class="ss-label">+ مصدر لإضافته</span></div>
-        </div>
-      </div>
-
-      <div class="src-group">
-        <div class="src-group-label">أسئلة مقترحة</div>
-        <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">ما هو Python؟</span></div>
-        <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">كيف يعمل الذكاء الاصطناعي؟</span></div>
-        <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">what is machine learning</span></div>
-        <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">من أنت؟</span></div>
+        <div class="niyah-card-name">◈ NIYAH Engine</div>
+        <div class="niyah-card-desc" id="nc-desc">محرك بحث واستخلاص. لا يُنشئ نصاً — يجلب من الويب.</div>
+        <div class="niyah-tags"><span class="niyah-tag">TF-IDF</span><span class="niyah-tag">DDG HTML</span><span class="niyah-tag">SQLite</span><span class="niyah-tag">SHA-256</span></div>
       </div>
     </div>
-
-    <!-- WORKBENCH -->
-    <div class="col workbench">
-      <div class="stream" id="stream">
-        <!-- welcome screen -->
-        <div class="welcome" id="welcome-screen">
-          <div class="welcome-logo">NIYAH</div>
-          <div class="welcome-sub">
-            محرك بحث واستخلاص سيادي — لا توهّم، لا هلوسة، لا أوزان ضخمة.<br>
-            يجلب من الويب · يستخرج الحقيقة · يوثّق بـ SHA-256
-          </div>
-          <div class="welcome-pills" id="welcome-pills">
-            <div class="welcome-pill">ما هو الذكاء الاصطناعي؟</div>
-            <div class="welcome-pill">كيف أتعلم البرمجة؟</div>
-            <div class="welcome-pill">what is machine learning</div>
-            <div class="welcome-pill">أفضل frameworks للويب 2025</div>
-            <div class="welcome-pill">ما الفرق بين Python و JavaScript؟</div>
-            <div class="welcome-pill">how does GPT work</div>
-          </div>
-          <div class="welcome-badges">
-            <span class="welcome-badge">TF-IDF extractive</span>
-            <span class="welcome-badge">DDG HTML search</span>
-            <span class="welcome-badge">SQLite memory</span>
-            <span class="welcome-badge">SHA-256 proof</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="composer">
-        <div class="composer-top">
-          <div class="mode-row">
-            <button class="mode-btn active">بحث</button>
-            <button class="mode-btn">من الذاكرة</button>
-            <button class="mode-btn" title="تجاهل الذاكرة وابحث من جديد">جديد ↺</button>
-          </div>
-          <div class="agent-status" id="agent-status">
-            <span class="sb-dot agent-indicator" id="agent-dot"></span>
-            <span id="agent-label" class="mono agent-label-text">جارٍ…</span>
-          </div>
-        </div>
-        <div class="input-row">
-          <input id="query-input" type="text" placeholder="اسأل أي شيء… أو الصق URL مصدر" autocomplete="off" spellcheck="false">
-          <button id="run-btn" class="run-btn">تشغيل ↵</button>
-        </div>
-        <!-- File upload + OCR + source URL row -->
-        <div class="upload-row">
-          <button class="upload-btn" id="file-btn" title="رفع ملف (PDF/صورة/نص)">📎 ملف</button>
-          <button class="upload-btn" id="ocr-btn" title="استخراج نص من صورة (OCR)">🔍 OCR</button>
-          <button class="upload-btn" id="src-btn" title="إضافة رابط مصدر للبحث فيه">+ مصدر</button>
-          <span id="file-preview" class="upload-preview hidden"></span>
-          <span id="src-count" class="conf-label src-count-right"></span>
-          <input type="file" id="file-input" accept=".txt,.pdf,.md,.png,.jpg,.jpeg,.webp" class="hidden">
-        </div>
-        <!-- Source URL row (shown when + مصدر clicked) -->
-        <div class="source-add-row hidden" id="source-add-row">
-          <input class="source-url-input" id="source-url-input" type="url" placeholder="https://example.com/article">
-          <button class="upload-btn" id="add-src-btn">إضافة</button>
-          <button class="upload-btn" id="cancel-src-btn">✕</button>
-        </div>
-      </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label" id="lbl-stats">Session Stats</div>
+      <div class="stat-row"><span class="stat-label" id="lbl-queries">Queries</span><span class="stat-val live" id="st-queries">0</span></div>
+      <div class="stat-row"><span class="stat-label" id="lbl-avgconf">Avg Confidence</span><span class="stat-val" id="st-conf">—</span></div>
+      <div class="stat-row"><span class="stat-label" id="lbl-avgtime">Avg Time</span><span class="stat-val" id="st-time">—</span></div>
+      <div class="stat-row"><span class="stat-label" id="lbl-cached">From Cache</span><span class="stat-val" id="st-cache">0</span></div>
     </div>
-
-    <!-- PROOF LEDGER -->
-    <div class="col ledger">
-      <div class="col-header">سجل الإثبات</div>
-      <div class="stat-strip">
-        <div class="stat"><div class="v" id="ld-conf">—</div><div class="l">ثقة</div></div>
-        <div class="stat"><div class="v" id="ld-srcs">0</div><div class="l">مصدر</div></div>
-        <div class="stat"><div class="v" id="ld-time">—</div><div class="l">وقت</div></div>
-      </div>
-
-      <div class="ledger-list" id="ledger-list">
-        <span class="beam-runner"></span>
-        <!-- entries injected by JS -->
-        <div class="ledger-empty">اسأل سؤالاً لرؤية<br>سجل الإثبات هنا</div>
-      </div>
-
-      <div class="ledger-footer">
-        <span id="ld-chain">chain: —</span>
-        <span id="ld-hash" class="mono">—</span>
-      </div>
+    <div class="sidebar-section" style="flex:1">
+      <div class="sidebar-label" id="lbl-suggest">Suggestions</div>
+      <div id="suggestions"></div>
     </div>
-
   </div>
 
+  <!-- MAIN WORKBENCH -->
+  <div class="main">
+    <div class="stream" id="stream">
+      <div class="welcome" id="welcome">
+        <div class="welcome-logo">NIYAH</div>
+        <div class="welcome-tagline" id="w-tagline">Sovereign search — no model weights, no hallucination.</div>
+        <div class="welcome-honest" id="w-how">
+DDG HTML scrape → strip tags → TF-IDF cosine rank → top sentences → [n] citations → SHA-256 sign<br>
+Not LLaMA. Not GPT. Not DeepSeek.<br>
+Arabic · English · Chinese — any language DDG indexes.
+        </div>
+        <div class="welcome-pills" id="welcome-pills"></div>
+      </div>
+    </div>
+    <div class="composer">
+      <div class="composer-top">
+        <div class="mode-btns">
+          <button class="mode-btn active" id="btn-search" onclick="setMode('search')">Search</button>
+          <button class="mode-btn" id="btn-cache" onclick="setMode('cache')">Cached</button>
+          <button class="mode-btn" id="btn-fresh" onclick="setMode('fresh')">Fresh ↺</button>
+        </div>
+        <div class="agent-badge"><span class="sb-dot" id="agent-dot"></span><span id="agent-label">…</span></div>
+      </div>
+      <div class="input-row">
+        <input class="query-input" id="qi" type="text" placeholder="Ask anything…" autocomplete="off">
+        <button class="send-btn" id="send-btn" onclick="sendQuery()">Send ↵</button>
+      </div>
+      <div class="extra-row">
+        <button class="extra-btn" onclick="document.getElementById('file-input').click()">📎 File</button>
+        <button class="extra-btn" onclick="clearStream()">↺ Clear</button>
+        <span class="file-tag" id="file-tag"></span>
+        <input type="file" id="file-input" accept=".txt,.md,.pdf,.png,.jpg,.jpeg" class="hidden">
+      </div>
+    </div>
+  </div>
+
+  <!-- PROOF LEDGER -->
+  <div class="ledger">
+    <div class="ledger-header" id="lbl-ledger">Proof Ledger</div>
+    <div class="ledger-stats">
+      <div class="ledger-stat"><div class="ledger-stat-v" id="ld-conf">—</div><div class="ledger-stat-l">confidence</div></div>
+      <div class="ledger-stat"><div class="ledger-stat-v" id="ld-cit">0</div><div class="ledger-stat-l">citations</div></div>
+      <div class="ledger-stat"><div class="ledger-stat-v" id="ld-ms">—</div><div class="ledger-stat-l">ms</div></div>
+    </div>
+    <div class="ledger-list" id="ledger-list">
+      <div class="ledger-empty" id="ledger-empty">Run a query to see the real pipeline steps here.</div>
+    </div>
+    <div class="ledger-footer"><span id="ld-chain">chain: —</span><span id="ld-hash" class="mono">—</span></div>
+  </div>
+
+</div>
+</div>
 <script>
-/* ── NIYAH Engine v3 — Casper UI ──────────────────────────────────
- * POST /api/v1/niyah/ask  { query }
- *   → { answer, citations, confidence, tookMs, fromMemory,
- *       chain_hash, proof_verified, khz_energy }
- * ──────────────────────────────────────────────────────────────── */
+'use strict';
+/* ═══════════════════════════════════════════════════════════
+   NIYAH Casper UI v3.1
+   Honest: shows real pipeline steps, real timings, real data.
+   No fake "intent analysis", no fake "thinking steps".
+   ═══════════════════════════════════════════════════════════ */
+
 const AGENT = (window._agentUrl) || 'http://20.91.208.59';
 
-/* ── Shared helpers (global scope) ── */
-function escHtml(s){
-  if(!s) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+/* ── Global helpers ── */
+function h(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function qs(id){ return document.getElementById(id); }
+function ael(id,ev,fn){ const el=qs(id); if(el) el.addEventListener(ev,fn); }
+
+/* ── Theme ── */
+let _theme = localStorage.getItem('theme')||'dark';
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', _theme==='light'?'light':'');
+  qs('send-btn')&&(qs('send-btn').style.color=_theme==='light'?'#fff':null);
 }
-
-/* ── Identity / persona answers (صادقة — بدون هلوسة) ── */
-const IDENTITY_PATTERNS = [
-  /من\s+أنت|من\s+انت|عرّف\s+نفسك|عرف\s+نفسك|اعرفني\s+عليك/i,
-  /what\s+are\s+you|who\s+are\s+you|tell\s+me\s+about\s+you/i,
-  /ما\s+هو\s+نياه|ما\s+نياه|ايش\s+نياه|ايش\s+هو\s+نياه/i,
-  /^نياه$|^niyah$/i,
-];
-const IDENTITY_ANSWER = `NIYAH هو محرك بحث واستخلاص سيادي — ليس نموذج لغوي ولا chatbot.
-
-كيف يعمل بصدق:
-① يستقبل سؤالك
-② يبحث في DuckDuckGo (HTML مباشرة، بدون API key)
-③ يجلب صفحات الويب الأعلى صلة
-④ يستخرج الجمل الأكثر تطابقاً بـ TF-IDF (إحصاء لغوي، لا شبكة عصبية)
-⑤ يُرفق الاستشهادات [n] ويوقّع الناتج بـ SHA-256
-
-ليس LLaMA، ليس DeepSeek، ليس GPT.
-لا أوزان مدرّبة، لا هلوسة، لا تزوير — فقط نص حقيقي من الويب.
-
-المحرك: C11 (niyah_hybrid.exe) + Node.js search layer
-المصدر: github.com/Grar00t/casper | MIT License`;
-
-function checkIdentity(q) {
-  return IDENTITY_PATTERNS.some(p => p.test(q.trim()));
+function toggleTheme(){
+  _theme = _theme==='dark'?'light':'dark';
+  localStorage.setItem('theme',_theme);
+  applyTheme();
+  const btn=document.querySelector('.sb-theme-btn');
+  if(btn) btn.textContent=_theme==='dark'?'☀ Light':'🌙 Dark';
 }
+applyTheme();
 
-/* ── Custom sources (URLs user can add) ── */
-let _customSources = []; // [{url, label}]
+/* ── Language ── */
+let _lang = localStorage.getItem('ui-lang')||'ar';
+const L = {
+  ar:{
+    send:'أرسل ↵',placeholder:'اسأل أي شيء…',search:'بحث',cache:'محفوظ',fresh:'جديد ↺',
+    stats:'إحصاءات الجلسة',queries:'الاستعلامات',avgconf:'متوسط الثقة',avgtime:'متوسط الوقت',cached:'من الذاكرة',
+    suggest:'أسئلة مقترحة',ledger:'سجل الإثبات',connecting:'جارٍ الاتصال…',connected:'متصل',
+    offline:'غير متاح',clear:'مسح ↺',file:'📎 ملف',
+    tagline:'بحث سيادي — بدون أوزان نماذج، بدون هلوسة.',
+    how:'استخراج DDG HTML → تجريد الوسوم → ترتيب TF-IDF → أفضل الجمل → استشهادات [n] → SHA-256\nليس LLaMA. ليس GPT. ليس DeepSeek.\nعربي · إنجليزي · صيني — أي لغة يفهرسها DDG.',
+    identity:'NIYAH محرك بحث واستخلاص — ليس نموذجاً لغوياً.\n\nما يفعله فعلياً:\n① يرسل سؤالك لـ DuckDuckGo HTML (بدون API)\n② يجلب الصفحات الأعلى صلة بـ HTTP GET\n③ يجرّد HTML ويقسّم النص لجمل\n④ يحسب cosine similarity (TF-IDF) بين السؤال وكل جملة\n⑤ يختار الجمل الأعلى صلة ويرفق أرقام المصادر [n]\n⑥ يوقّع الناتج بـ SHA-256\n\nلا هلوسة. لا أوزان مدرّبة. النص يأتي من الويب حرفياً.',
+    pills:['كيف يعمل الذكاء الاصطناعي؟','ما هو Python؟','ما الفرق بين React و Vue؟','من أنت؟','كيف أتعلم البرمجة؟','ما هو التعلم الآلي؟'],
+    ncDesc:'محرك بحث واستخلاص. لا يُنشئ نصاً — يجلب من الويب.',
+  },
+  en:{
+    send:'Send ↵',placeholder:'Ask anything…',search:'Search',cache:'Cached',fresh:'Fresh ↺',
+    stats:'Session Stats',queries:'Queries',avgconf:'Avg Confidence',avgtime:'Avg Time',cached:'From Cache',
+    suggest:'Suggestions',ledger:'Proof Ledger',connecting:'Connecting…',connected:'Connected',
+    offline:'Offline',clear:'Clear ↺',file:'📎 File',
+    tagline:'Sovereign search — no model weights, no hallucination.',
+    how:'DDG HTML scrape → strip tags → TF-IDF cosine rank → top sentences → [n] citations → SHA-256 sign\nNot LLaMA. Not GPT. Not DeepSeek.\nArabic · English · Chinese — any language DDG indexes.',
+    identity:'NIYAH is a search+extraction engine — NOT a language model.\n\nWhat it actually does:\n① Sends your query to DuckDuckGo HTML (no API key)\n② Fetches top-ranked pages via HTTP GET\n③ Strips HTML tags, splits text into sentences\n④ Computes TF-IDF cosine similarity between query and each sentence\n⑤ Picks highest-scoring sentences, attaches source numbers [n]\n⑥ Signs output with SHA-256\n\nNo hallucination. No trained weights. Text comes verbatim from the web.',
+    pills:['How does AI work?','What is Python?','React vs Vue difference?','Who are you?','How to learn programming?','What is machine learning?'],
+    ncDesc:'Search & extraction engine. Generates nothing — fetches from the web.',
+  },
+};
 
-/* ── niyahAsk with optional custom sources ── */
-async function niyahAsk(q, forceFresh){
-  try{
-    const body = { query: q };
-    if(forceFresh) body.forceFresh = true;
-    const r = await fetch(AGENT+'/api/v1/niyah/ask', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(45000),
-    });
-    if(!r.ok) return null;
-    return await r.json();
-  }catch(e){ return null; }
+function t(key){ return (L[_lang]||L.en)[key]||key; }
+
+function applyLang(){
+  const dir = _lang==='ar'?'rtl':'ltr';
+  document.documentElement.setAttribute('lang',_lang);
+  document.documentElement.setAttribute('dir',dir);
+  const qi=qs('qi'); if(qi) qi.placeholder=t('placeholder');
+  const sb=qs('send-btn'); if(sb) sb.textContent=t('send');
+  qs('btn-search')&&(qs('btn-search').textContent=t('search'));
+  qs('btn-cache')&&(qs('btn-cache').textContent=t('cache'));
+  qs('btn-fresh')&&(qs('btn-fresh').textContent=t('fresh'));
+  qs('lbl-stats')&&(qs('lbl-stats').textContent=t('stats'));
+  qs('lbl-queries')&&(qs('lbl-queries').textContent=t('queries'));
+  qs('lbl-avgconf')&&(qs('lbl-avgconf').textContent=t('avgconf'));
+  qs('lbl-avgtime')&&(qs('lbl-avgtime').textContent=t('avgtime'));
+  qs('lbl-cached')&&(qs('lbl-cached').textContent=t('cached'));
+  qs('lbl-suggest')&&(qs('lbl-suggest').textContent=t('suggest'));
+  qs('lbl-ledger')&&(qs('lbl-ledger').textContent=t('ledger'));
+  qs('nc-desc')&&(qs('nc-desc').textContent=t('ncDesc'));
+  qs('w-tagline')&&(qs('w-tagline').textContent=t('tagline'));
+  qs('w-how')&&(qs('w-how').textContent=t('how'));
+  buildPills();
 }
-
-/**
- * niyahAsk — full pipeline: DDG search → fetch pages → TF-IDF extract → cite
- * Returns { answer, citations, confidence, tookMs, fromMemory } or null
- */
-async function niyahAsk(q){
-  try{
-    const r = await fetch(AGENT+'/api/v1/niyah/ask', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: q }),
-      signal: AbortSignal.timeout(45000),
-    });
-    if(!r.ok) return null;
-    return await r.json();
-  }catch(e){ return null; }
+function toggleLang(){
+  _lang=_lang==='ar'?'en':'ar';
+  localStorage.setItem('ui-lang',_lang);
+  const btn=document.querySelector('.sb-lang-btn');
+  if(btn) btn.textContent=_lang==='ar'?'EN':'ع';
+  applyLang();
 }
-
-async function agentHealthCheck(){
-  try{
-    const r = await fetch(AGENT+'/health', { signal: AbortSignal.timeout(4000) });
-    return r.ok;
-  }catch(e){ return false; }
-}
-
 /* ── Session stats ── */
-let _stats = { queries: 0, totalConf: 0, totalMs: 0, fromMem: 0 };
-
-function updateStats(conf, ms, fromMemory) {
-  _stats.queries++;
-  _stats.totalConf += conf || 0;
-  _stats.totalMs   += ms  || 0;
-  if(fromMemory) _stats.fromMem++;
-  const avgConf = Math.round(_stats.totalConf / _stats.queries * 100);
-  const avgMs   = Math.round(_stats.totalMs   / _stats.queries);
-  document.getElementById('stat-queries').textContent = _stats.queries;
-  document.getElementById('stat-conf').textContent    = avgConf + '%';
-  document.getElementById('stat-time').textContent    = (avgMs/1000).toFixed(1) + 'ث';
-  document.getElementById('stat-mem').textContent     = _stats.fromMem;
-  document.getElementById('query-count').textContent  = _stats.queries + ' استعلام';
+let _stats={q:0,conf:0,ms:0,mem:0};
+function updateStats(conf,ms,fromMem){
+  _stats.q++;_stats.conf+=conf||0;_stats.ms+=ms||0;if(fromMem)_stats.mem++;
+  qs('st-queries').textContent=_stats.q;
+  qs('q-count').textContent=_stats.q+' queries';
+  qs('st-conf').textContent=_stats.q?Math.round(_stats.conf/_stats.q*100)+'%':'—';
+  qs('st-time').textContent=_stats.q?((_stats.ms/_stats.q)/1000).toFixed(1)+'s':'—';
+  qs('st-cache').textContent=_stats.mem;
 }
 
-/* ── Update ledger panel ── */
-function updateLedger(result) {
-  const conf  = Math.round((result.confidence||0)*100);
-  const srcs  = (result.citations||[]).length;
-  const ms    = result.tookMs || 0;
-  const hash  = result.chain_hash;
+/* ── Mode ── */
+let _mode='search';
+function setMode(m){
+  _mode=m;
+  ['search','cache','fresh'].forEach(id=>qs('btn-'+id)?.classList.remove('active'));
+  qs('btn-'+m)?.classList.add('active');
+}
 
-  document.getElementById('ld-conf').textContent  = conf + '%';
-  document.getElementById('ld-srcs').textContent  = srcs;
-  document.getElementById('ld-time').textContent  = ms > 0 ? (ms/1000).toFixed(1)+'ث' : '—';
-  document.getElementById('ld-chain').textContent = 'citations: '+srcs;
-  document.getElementById('ld-hash').textContent  = hash ? hash.substring(0,14)+'…' : 'no proof';
+/* ── Identity patterns (honest answers, no DDG search) ── */
+const ID_PAT=[
+  /من\s*أنت|من\s*انت|عرّف\s*نفسك|عرف\s*نفسك|ايش\s*نياه|ما\s*نياه|ما\s*هو\s*نياه/i,
+  /who\s*are\s*you|what\s*(are|is)\s*you|tell\s*me\s*about\s*you(rself)?/i,
+  /^(niyah|نياه)\s*\??$/i,
+];
+function isIdentityQ(q){ return ID_PAT.some(p=>p.test(q.trim())); }
 
-  const list = document.getElementById('ledger-list');
-  list.innerHTML = '<span class="beam-runner"></span>';
-
-  /* Citation entries */
-  (result.citations||[]).forEach((c, i) => {
-    const cls = 'lentry verified';
-    const title = escHtml((c.title||c.url||'').substring(0,55));
-    const url   = escHtml(c.url||'');
-    list.innerHTML += `
-      <div class="${cls}" data-n="${i+1}">
-        <div class="rule">CITATION [${c.n}]</div>
-        <div class="desc">${title}</div>
-        <div class="meta">
-          <span class="hash"><a href="${url}" target="_blank" style="color:inherit;text-decoration:none">${url.substring(0,35)}…</a></span>
-          <span class="delta">✓</span>
-        </div>
-      </div>`;
+/* ── API ── */
+async function niyahAsk(q,forceFresh){
+  const r=await fetch(AGENT+'/api/v1/niyah/ask',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({query:q,forceFresh:!!forceFresh}),
+    signal:AbortSignal.timeout(50000),
   });
-
-  /* Proof entry */
-  if(hash){
-    const cls2 = result.proof_verified ? 'lentry verified' : 'lentry';
-    const khz  = result.khz_energy ? Math.round(result.khz_energy*100)+'%' : '—';
-    list.innerHTML += `
-      <div class="${cls2}" data-n="P">
-        <div class="rule">${result.proof_verified ? '✓ SHA-256 Verified' : '~ SHA-256 Hash'}</div>
-        <div class="desc">KHZ energy: ${khz} · C11 audit gate</div>
-        <div class="meta">
-          <span class="hash mono">${hash.substring(0,16)}…</span>
-          <span class="delta ${result.proof_verified?'':'gold'}">${result.proof_verified?'verified':'signed'}</span>
-        </div>
-      </div>`;
-  }
-
-  if(result.fromMemory){
-    list.innerHTML += `
-      <div class="lentry" data-n="M">
-        <div class="rule">⚡ من الذاكرة</div>
-        <div class="desc">تطابق مع سؤال سابق في SQLite</div>
-        <div class="meta"><span class="hash">SQLite cache hit</span><span class="delta gold">cached</span></div>
-      </div>`;
-  }
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  return r.json();
+}
+async function healthCheck(){
+  try{ const r=await fetch(AGENT+'/health',{signal:AbortSignal.timeout(4000)}); return r.ok; }
+  catch{ return false; }
 }
 
 /* ── Status bar init ── */
-async function initStatus() {
-  const vmDot   = document.getElementById('vm-dot');
-  const vmLabel = document.getElementById('vm-label');
-  const agentDot   = document.getElementById('agent-dot');
-  const agentLabel = document.getElementById('agent-label');
-  const connLabel  = document.getElementById('conn-label');
-  const ddgDot     = document.getElementById('ddg-dot');
-
-  try {
-    const r = await fetch(AGENT+'/api/v1/niyah/health', { signal: AbortSignal.timeout(5000) });
-    if(r.ok){
-      const d = await r.json();
-      vmDot.className    = 'sb-dot green';
-      vmLabel.textContent= 'VM متصل';
-      agentDot.className = 'agent-indicator sb-dot green';
-      agentLabel.textContent = 'متصل · '+d.searchBackend;
-      connLabel.textContent  = 'متصل بالـ Agent';
-      ddgDot.className   = 'sb-dot green';
-
-      /* Memory stats */
-      try {
-        const s = await fetch(AGENT+'/api/v1/niyah/stats', { signal: AbortSignal.timeout(3000) });
-        if(s.ok){
-          const sd = await s.json();
-          document.getElementById('mem-count').textContent  = sd.total_memories||'0';
-          document.getElementById('mem-stat').textContent   = 'ذاكرة: '+(sd.total_memories||0);
-          document.getElementById('ddg-count').textContent  = sd.search_backend||'ddg';
-        }
-      } catch(_){}
-    } else throw new Error('not ok');
-  } catch(e) {
-    vmDot.className    = 'sb-dot yellow';
-    vmLabel.textContent= 'VM غير متاح';
-    agentDot.className = 'agent-indicator sb-dot yellow';
-    agentLabel.textContent = 'محرك محلي فقط';
-    connLabel.textContent  = 'وضع محلي';
-    ddgDot.className   = 'sb-dot yellow';
+async function initStatus(){
+  qs('conn-label').textContent=t('connecting');
+  const alive=await healthCheck();
+  qs('vm-dot').className='sb-dot '+(alive?'ok':'err');
+  qs('vm-label').textContent=alive?'VM':'VM '+t('offline');
+  qs('agent-dot').className='sb-dot '+(alive?'ok':'warn');
+  qs('agent-label').textContent=alive?t('connected'):t('offline');
+  qs('conn-label').textContent=alive?t('connected'):t('offline');
+  if(alive){
+    try{
+      const s=await fetch(AGENT+'/api/v1/niyah/stats',{signal:AbortSignal.timeout(3000)});
+      if(s.ok){ const d=await s.json();
+        qs('mem-label').textContent='Mem: '+(d.total_memories||0);
+        qs('backend-label').textContent=d.search_backend||'DDG HTML';
+      }
+    }catch{}
   }
 }
 initStatus();
 
-function clearStream() {
-  const stream = document.getElementById('stream');
-  stream.innerHTML = '';
-  document.getElementById('welcome-screen') && stream.appendChild(buildWelcome());
-  _stats = { queries: 0, totalConf: 0, totalMs: 0, fromMem: 0 };
-  updateStats(0, 0, false);
-  document.getElementById('ledger-list').innerHTML = '<span class="beam-runner"></span><div class="ledger-empty">اسأل سؤالاً لرؤية<br>سجل الإثبات هنا</div>';
+/* ── Clear stream ── */
+function clearStream(){
+  const stream=qs('stream');
+  stream.innerHTML='';
+  const w=document.createElement('div');
+  w.className='welcome'; w.id='welcome';
+  w.innerHTML='<div class="welcome-logo">NIYAH</div><div class="welcome-tagline" id="w-tagline"></div><div class="welcome-honest" id="w-how"></div><div class="welcome-pills" id="welcome-pills"></div>';
+  stream.appendChild(w);
+  applyLang();
+  _stats={q:0,conf:0,ms:0,mem:0};
+  updateStats(0,0,false);_stats={q:0,conf:0,ms:0,mem:0};
+  qs('st-queries').textContent='0'; qs('st-conf').textContent='—'; qs('st-time').textContent='—'; qs('st-cache').textContent='0'; qs('q-count').textContent='0 queries';
+  resetLedger();
 }
 
-function buildWelcome() {
-  const w = document.getElementById('welcome-screen');
-  return w;
+/* ── Build pills ── */
+function buildPills(){
+  const c=qs('welcome-pills'); if(!c) return;
+  c.innerHTML='';
+  const sc=qs('suggestions'); if(sc) sc.innerHTML='';
+  (t('pills')||[]).forEach(q=>{
+    const pill=document.createElement('div');
+    pill.className='pill'; pill.textContent=q;
+    pill.onclick=()=>{ qs('qi').value=q; sendQuery(); };
+    c.appendChild(pill);
+    if(sc){
+      const s=document.createElement('div');
+      s.className='suggestion';
+      s.innerHTML='<span class="suggestion-arrow">→</span><span>'+h(q)+'</span>';
+      s.onclick=()=>{ qs('qi').value=q; sendQuery(); };
+      sc.appendChild(s);
+    }
+  });
 }
 
-function askSuggestion(el) {
-  const q = el.querySelector('.name')?.textContent;
+/* ── Append message ── */
+function appendEl(el){ const w=qs('welcome'); if(w) w.remove(); const s=qs('stream'); s.appendChild(el); s.scrollTop=99999; return el; }
+function appendDiv(cls,html){ const d=document.createElement('div'); d.className=cls; d.innerHTML=html; return appendEl(d); }
+
+/* ── Ledger updates ── */
+function resetLedger(){
+  qs('ld-conf').textContent='—'; qs('ld-cit').textContent='0'; qs('ld-ms').textContent='—';
+  qs('ld-chain').textContent='chain: —'; qs('ld-hash').textContent='—';
+  qs('ledger-list').innerHTML='<div class="ledger-empty" id="ledger-empty">'+
+    (t('ledger')||'Proof Ledger')+'</div>';
+}
+resetLedger();
+
+function updateLedger(result){
+  const conf=Math.round((result.confidence||0)*100);
+  qs('ld-conf').textContent=conf+'%';
+  qs('ld-cit').textContent=(result.citations||[]).length;
+  qs('ld-ms').textContent=(result.tookMs||0)+'ms';
+  qs('ld-hash').textContent=result.chain_hash?result.chain_hash.substring(0,14)+'…':'no proof';
+  qs('ld-chain').textContent='cit: '+(result.citations||[]).length;
+
+  const list=qs('ledger-list');
+  list.innerHTML='';
+
+  /* Real pipeline trace steps */
+  (result.trace||[]).forEach(step=>{
+    const el=document.createElement('div');
+    el.className='lentry';
+    el.innerHTML='<div class="lentry-kind">'+h(step.step)+'</div>'+
+      '<div class="lentry-desc">'+h(step.detail||'')+'</div>'+
+      (step.data?'<div class="lentry-hash mono" style="margin-top:3px">'+h(step.data)+'</div>':'')+
+      '<div class="lentry-meta"><span class="lentry-hash">'+step.ms+'ms</span>'+
+      '<span class="lentry-delta">✓</span></div>';
+    list.appendChild(el);
+  });
+
+  /* Citations */
+  (result.citations||[]).forEach((c,i)=>{
+    const el=document.createElement('div');
+    el.className='lentry';
+    el.innerHTML='<div class="lentry-kind">CITATION ['+c.n+']</div>'+
+      '<div class="lentry-desc">'+h((c.title||'').substring(0,60))+'</div>'+
+      '<a class="lentry-url" href="'+h(c.url||'')+'" target="_blank">'+h((c.url||'').substring(0,50))+'</a>'+
+      '<div class="lentry-meta"><span class="lentry-hash">source</span><span class="lentry-delta">✓</span></div>';
+    list.appendChild(el);
+  });
+
+  /* Proof */
+  if(result.chain_hash){
+    const el=document.createElement('div');
+    el.className='lentry';
+    el.innerHTML='<div class="lentry-kind">'+(result.proof_verified?'✓ SHA-256 VERIFIED':'~ SHA-256 SIGNED')+'</div>'+
+      '<div class="lentry-desc">KHZ energy: '+(result.khz_energy?Math.round(result.khz_energy*100)+'%':'n/a')+'</div>'+
+      '<div class="lentry-hash mono" style="margin-top:3px">'+h(result.chain_hash.substring(0,20))+'…</div>'+
+      '<div class="lentry-meta"><span class="lentry-hash">C11 gate</span><span class="lentry-delta '+(result.proof_verified?'':'none')+'">'+(result.proof_verified?'verified':'signed')+'</span></div>';
+    list.appendChild(el);
+  }
+}
+/* ── Format answer ── */
+function formatAnswer(text, maxSentences){
+  if(!text) return ['',''];
+  const lines = text.split('\n').filter(l=>l.trim().length>5);
+  const vis = lines.slice(0,maxSentences).map(l=>
+    h(l).replace(/\[(\d+)\]/g,'<sup> [$1]</sup>')
+  ).join('<br>');
+  const hidden = lines.slice(maxSentences);
+  let moreHtml='';
+  if(hidden.length>0){
+    const mid='m'+Date.now();
+    moreHtml='<div id="'+mid+'" class="hidden">'+
+      hidden.map(l=>h(l).replace(/\[(\d+)\]/g,'<sup> [$1]</sup>')).join('<br>')+
+      '</div><button class="show-more" onclick="(function(b){var d=document.getElementById(\''+mid+'\');var open=d.classList.toggle(\'hidden\');b.textContent=open?\'▸ Show '+hidden.length+' more\':\'▾ Hide\'})(this)">▸ Show '+hidden.length+' more</button>';
+  }
+  return [vis, moreHtml];
+}
+
+/* ── Build confidence bar ── */
+function confBar(conf){
+  const cls=conf>=70?'hi':conf>=45?'mid':'lo';
+  return '<div class="conf-bar-wrap">'+
+    '<div class="conf-bar"><div class="conf-fill '+cls+'" style="width:'+conf+'%"></div></div>'+
+    '<span class="conf-label">'+conf+'% confidence</span>'+
+  '</div>';
+}
+
+/* ── Build citation chips ── */
+function citChips(citations){
+  if(!citations||!citations.length) return '';
+  return '<div class="cit-row">'+
+    citations.map(c=>'<a class="cit" href="'+h(c.url||'')+'" target="_blank">['+c.n+'] '+h((c.title||c.url||'').substring(0,38))+'</a>').join('')+
+  '</div>';
+}
+
+/* ── Main send query ── */
+async function sendQuery(){
+  const qi=qs('qi');
+  let q=(qi.value||'').trim();
   if(!q) return;
-  document.getElementById('query-input').value = q;
-  document.getElementById('run-btn').click();
+
+  /* Prepend attached file text */
+  let displayQ=q;
+  if(window._fileText){
+    q=q+'\n\n[Attached file: '+window._fileName+']\n'+window._fileText.substring(0,2000);
+    window._fileText=''; window._fileName='';
+    qs('file-tag').style.display='none';
+    displayQ+=' 📎';
+  }
+
+  qi.value='';
+  const btn=qs('send-btn');
+  btn.disabled=true; btn.textContent='…';
+
+  appendDiv('msg-user', h(displayQ));
+
+  /* Typing indicator */
+  const loading=appendDiv('trace-wrap','<div class="trace-header"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span> <span style="margin-left:6px;font-size:11px">NIYAH searching…</span></div>');
+
+  try{
+    /* Identity shortcut */
+    if(isIdentityQ(q)){
+      loading.remove();
+      const ans=appendDiv('msg-niyah','');
+      ans.innerHTML='<div class="identity-answer" style="white-space:pre-line">'+h(t('identity'))+'</div>';
+      btn.disabled=false; btn.textContent=t('send'); return;
+    }
+
+    const alive=await healthCheck();
+    if(!alive){
+      loading.remove();
+      appendDiv('err-msg','Agent offline. Check VM: '+AGENT);
+      btn.disabled=false; btn.textContent=t('send'); return;
+    }
+
+    const result=await niyahAsk(q, _mode==='fresh');
+    loading.remove();
+
+    if(!result||!result.answer){
+      appendDiv('err-msg','No answer returned.');
+      btn.disabled=false; btn.textContent=t('send'); return;
+    }
+
+    const conf=Math.round((result.confidence||0)*100);
+    const [vis,more]=formatAnswer(result.answer,4);
+    const fromMem=result.fromMemory;
+    const ms=result.tookMs||0;
+
+    /* Trace block */
+    const hasTrace=(result.trace||[]).length>0;
+    const traceSteps=(result.trace||[]).map((s,i)=>
+      '<div class="trace-step">'+
+        '<span class="trace-step-name">'+h(s.step)+'</span>'+
+        '<span class="trace-step-ms">'+s.ms+'ms</span>'+
+        '<span class="trace-step-detail">'+h(s.detail||'')+'</span>'+
+      '</div>'+
+      (s.data?'<div class="trace-step-data">'+h(s.data)+'</div>':'')+''
+    ).join('');
+
+    const traceId='tr'+Date.now();
+    const traceHtml=hasTrace?
+      '<div class="trace-wrap" id="'+traceId+'">'+
+        '<div class="trace-header" onclick="document.getElementById(\''+traceId+'\').classList.toggle(\'open\')">'+
+          '▸ Pipeline · '+ms+'ms'+(fromMem?' · ⚡ cached':'')+
+        '</div>'+
+        '<div class="trace-body">'+traceSteps+'</div>'+
+      '</div>':'';
+
+    const msgEl=appendDiv('msg-niyah','');
+    msgEl.innerHTML=
+      confBar(conf)+
+      (fromMem?'<span class="mem-badge">⚡ from memory</span>':'')+
+      '<div class="answer-text">'+vis+more+'</div>'+
+      citChips(result.citations)+
+      traceHtml+
+      (result.chain_hash?'<div style="margin-top:4px;font-family:var(--mono);font-size:9px;color:var(--text-faint)">'+(result.proof_verified?'✓':'~')+' SHA-256 '+result.chain_hash.substring(0,16)+'…</div>':'');
+
+    updateStats(result.confidence||0, ms, fromMem);
+    updateLedger(result);
+
+  }catch(err){
+    loading.remove();
+    appendDiv('err-msg','Error: '+h(err.message));
+  }finally{
+    btn.disabled=false; btn.textContent=t('send');
+    qs('stream').scrollTop=99999;
+  }
 }
 
-(function(){
-  const input  = document.getElementById('query-input');
-  const btn    = document.getElementById('run-btn');
-  const stream = document.getElementById('stream');
-
-  function escHtml(s){
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  function appendMsg(html){
-    /* hide welcome on first message */
-    const w = document.getElementById('welcome-screen');
-    if(w) w.remove();
-    const div=document.createElement('div');
-    div.innerHTML=html;
-    stream.appendChild(div);
-    stream.scrollTop=stream.scrollHeight;
-    return div;
-  }
-
-  function setRunning(on){
-    btn.disabled=on;
-    btn.textContent=on?'جارٍ…':'تشغيل ↵';
-  }
-
-  async function sendQuery(){
-    const q=input.value.trim();
-    if(!q)return;
-    input.value='';
-    setRunning(true);
-
-    /* Merge attached file text into query if present */
-    let finalQuery = q;
-    if(window._attachedFileText && window._attachedFileText.length > 10){
-      finalQuery = q + '\n\n[ملف مرفق: ' + (window._attachedFileName||'file') + ']\n' + window._attachedFileText.substring(0,2000);
-      // Clear after use
-      window._attachedFileText = '';
-      window._attachedFileName = '';
-      const preview = document.getElementById('file-preview');
-      if(preview) preview.classList.add('hidden');
-    }
-
-    appendMsg('<div class="msg-user">'+escHtml(q)+(finalQuery!==q?'<span class="conf-label"> 📎</span>':'')+'</div>');
-
-    /* ── Identity shortcut — no web search ── */
-    if(checkIdentity(q)){
-      setTimeout(()=>{
-        appendMsg(
-          '<div class="msg-casper">'+
-          '<div class="p identity-answer">'+escHtml(IDENTITY_ANSWER).replace(/\n/g,'<br>').replace(/①|②|③|④|⑤/g,s=>'<span class="neon-text">'+s+'</span>')+'</div>'+
-          '</div>'
-        );
-        setRunning(false);
-        stream.scrollTop=stream.scrollHeight;
-      }, 300);
-      return;
-    }
-
-    /* Typing indicator */
-    const loading = appendMsg(
-      '<div class="trace"><div class="trace-head">'+
-      '<span class="trace-runner"></span>'+
-      '<span class="typing-dots"><span></span><span></span><span></span></span>'+
-      '<span class="agent-label-text" style="margin-right:8px">NIYAH يبحث…</span>'+
-      '</div></div>'
-    );
-
-    try{
-      const agentAlive = await agentHealthCheck();
-      let niyahResult = null;
-      const isForceFresh = document.querySelector('.mode-btn.active')?.textContent?.includes('جديد');
-
-      if(agentAlive){
-        niyahResult = await niyahAsk(finalQuery, isForceFresh);
-      }
-
-      loading.remove();
-
-      if(niyahResult && niyahResult.answer){
-        const conf      = Math.round((niyahResult.confidence||0)*100);
-        const citations = niyahResult.citations || [];
-        const fromMem   = niyahResult.fromMemory;
-        const tookSec   = niyahResult.tookMs ? (niyahResult.tookMs/1000).toFixed(1)+'ث' : '';
-        const hash      = niyahResult.chain_hash;
-
-        /* Format answer — split into sentences, trim HTML entities */
-        const rawAnswer = niyahResult.answer || '';
-        // Split by citation markers to get clean sentences
-        const sentences = rawAnswer.split('\n').filter(s=>s.trim().length > 10);
-        const MAX_VISIBLE = 4; // max sentences before "show more"
-        const visibleSentences = sentences.slice(0, MAX_VISIBLE);
-        const hiddenSentences  = sentences.slice(MAX_VISIBLE);
-
-        function formatSentence(s){
-          return escHtml(s).replace(/\[(\d+)\]/g,'<sup class="mono neon-text"> [$1]</sup>');
-        }
-
-        let answerHtml = visibleSentences.map(formatSentence).join('<br>');
-        let moreHtml = '';
-        if(hiddenSentences.length > 0){
-          const moreId = 'more-'+Date.now();
-          moreHtml =
-            '<div class="more-block" id="'+moreId+'" style="display:none">'+
-            '<br>'+hiddenSentences.map(formatSentence).join('<br>')+'</div>'+
-            '<button class="show-more-btn" onclick="toggleMore(\''+moreId+'\',this)">'+
-            '▸ '+(hiddenSentences.length)+' جملة أخرى</button>';
-        }
-
-        /* Confidence bar */
-        const confFillClass = conf>=70?'conf-bar-fill':('conf-bar-fill '+(conf>=45?'low':'vlow'));
-        const confBar =
-          '<div class="conf-bar-wrap">'+
-            '<div class="conf-bar"><div class="'+confFillClass+'" style="width:'+conf+'%"></div></div>'+
-            '<span class="conf-label">'+conf+'% ثقة</span>'+
-            (fromMem?'<span class="mem-badge">⚡ من الذاكرة</span>':'')+
-            (tookSec?'<span class="conf-label">'+escHtml(tookSec)+'</span>':'')+
-          '</div>';
-
-        /* Citation chips */
-        let chips = '';
-        if(citations.length > 0){
-          chips='<div class="chiprow">';
-          citations.forEach(c=>{
-            const t = escHtml((c.title||c.url||'Source').substring(0,40));
-            chips+='<a class="chip" href="'+escHtml(c.url||'')+'" target="_blank">['+c.n+'] '+t+'</a>';
-          });
-          chips+='</div>';
-        }
-
-        /* C11 badge */
-        const c11 = hash
-          ? '<span class="c11-badge '+(niyahResult.proof_verified?'c11-ok':'c11-dim')+'">'+
-            (niyahResult.proof_verified?'✓ SHA-256':'~ SHA-256')+'</span>'
-          : '';
-
-        const el = appendMsg(
-          '<div class="trace collapsed" data-toggle>'+
-            '<div class="trace-head">'+
-              '<span class="chev">▾</span>'+
-              '<span class="trace-runner"></span>'+
-              'NIYAH · '+conf+'% ثقة'+
-              (tookSec?' · '+tookSec:'')+
-              (fromMem?' · ذاكرة':'')+
-              (hash?' · '+hash.substring(0,10)+'…':'')+
-            '</div>'+
-          '</div>'+
-          '<div class="msg-casper">'+
-            confBar+
-            '<div class="p">'+answerHtml+moreHtml+'</div>'+
-            chips+
-            c11+
-          '</div>'
-        );
-
-        /* Activate toggle */
-        el.querySelector('[data-toggle]')?.querySelector('.trace-head')
-          ?.addEventListener('click', function(){
-            this.closest('[data-toggle]').classList.toggle('collapsed');
-          });
-
-        updateStats(niyahResult.confidence||0, niyahResult.tookMs||0, fromMem);
-        updateLedger(niyahResult);
-
-      } else {
-        /* Fallback: C11 RAG engine */
-        let answer = 'لم يتم العثور على نتائج.';
-        let conf   = 0;
-        let notice = agentAlive
-          ? '<div class="p" style="color:var(--copper);font-size:12px">⚠ البحث أعاد صفر نتائج</div>'
-          : '<div class="p" style="color:var(--ink-dim);font-size:12px">⚫ Agent غير متاح</div>';
-
-        if(window.casper){
-          try{
-            const raw  = await window.casper.Query(q);
-            const data = JSON.parse(raw);
-            if(!data.error){
-              answer = data.output || data.context || answer;
-              conf   = Math.round((data.confidence||0)*100);
-            }
-          }catch(_){}
-        }
-
-        appendMsg(
-          '<div class="msg-casper">'+
-            '<div class="p">'+escHtml(answer.substring(0,600))+'</div>'+
-            notice+
-          '</div>'
-        );
-        updateStats(conf/100, 0, false);
-      }
-
-    }catch(err){
-      loading.remove();
-      appendMsg('<div class="msg-casper"><div class="p err-text">خطأ: '+escHtml(err.message)+'</div></div>');
-    }finally{
-      setRunning(false);
-      stream.scrollTop = stream.scrollHeight;
-    }
-  }
-
-  btn.addEventListener('click', sendQuery);
-  input.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey) sendQuery(); });
-
-  /* Welcome pill clicks */
-  document.getElementById('welcome-pills')?.addEventListener('click', e=>{
-    const pill = e.target.closest('.welcome-pill');
-    if(pill){ input.value = pill.textContent; sendQuery(); }
-  });
-}());
-
-/* ── Show/hide "more" sentences ── */
-function toggleMore(id, btn){
-  const el = document.getElementById(id);
-  if(!el) return;
-  const open = el.style.display !== 'none';
-  el.style.display = open ? 'none' : 'block';
-  btn.textContent = open ? '▸ '+btn.textContent.replace(/[▸▾]\s*/,'') : '▾ إخفاء';
-}
-
-/* ── File upload + OCR ── */
-(function(){
-  const fileBtn   = document.getElementById('file-btn');
-  const ocrBtn    = document.getElementById('ocr-btn');
-  const fileInput = document.getElementById('file-input');
-  const preview   = document.getElementById('file-preview');
-  let   fileMode  = 'attach'; // 'attach' or 'ocr'
-  let   _fileText = '';
-
-  function setPreview(name){
-    preview.textContent = '📎 '+name;
-    preview.classList.remove('hidden');
-  }
-
-  fileBtn.addEventListener('click',()=>{
-    fileMode = 'attach';
-    fileInput.accept = '.txt,.md,.pdf';
-    fileInput.click();
-  });
-  ocrBtn.addEventListener('click',()=>{
-    fileMode = 'ocr';
-    fileInput.accept = '.png,.jpg,.jpeg,.webp,.gif,.bmp';
-    fileInput.click();
-  });
-
-  fileInput.addEventListener('change', async ()=>{
-    const f = fileInput.files[0];
-    if(!f) return;
-    setPreview(f.name);
-
-    if(fileMode === 'ocr'){
-      // OCR via Tesseract.js (loaded on demand) or fallback to VM /fetch
-      preview.textContent = '⏳ OCR جارٍ…';
-      try{
-        const img = await readFileAsDataURL(f);
-        // Try browser OCR via fetch to /summarize as base64 — simple approach
-        // since full Tesseract.js would require loading ~10MB
-        _fileText = '[صورة مرفقة: '+f.name+'] — اكتب سؤالك عن محتوى الصورة';
-        setPreview(f.name+' (جاهز)');
-        document.getElementById('query-input').placeholder = 'اسأل عن الصورة…';
-      }catch(e){
-        preview.textContent = '⚠ فشل OCR';
-      }
-    } else {
-      // Text file
-      try{
-        const text = await readFileAsText(f);
-        _fileText = text.substring(0, 3000);
-        setPreview(f.name+' ('+Math.round(text.length/1000)+'KB)');
-      }catch(e){
-        _fileText = '';
-        preview.textContent = '⚠ تعذّر قراءة الملف';
-      }
-    }
-    // Expose to main sendQuery
-    window._attachedFileText = _fileText;
-    window._attachedFileName = f.name;
-  });
-
-  function readFileAsText(f){
-    return new Promise((res,rej)=>{
-      const r = new FileReader();
-      r.onload = e => res(e.target.result);
-      r.onerror = rej;
-      r.readAsText(f, 'utf-8');
-    });
-  }
-  function readFileAsDataURL(f){
-    return new Promise((res,rej)=>{
-      const r = new FileReader();
-      r.onload = e => res(e.target.result);
-      r.onerror = rej;
-      r.readAsDataURL(f);
-    });
-  }
-})();
-
-/* ── Custom source URL management ── */
-(function(){
-  const srcBtn    = document.getElementById('src-btn');
-  const addRow    = document.getElementById('source-add-row');
-  const addBtn    = document.getElementById('add-src-btn');
-  const cancelBtn = document.getElementById('cancel-src-btn');
-  const urlInput  = document.getElementById('source-url-input');
-  const srcCount  = document.getElementById('src-count');
-
-  function updateCount(){
-    srcCount.textContent = _customSources.length > 0
-      ? _customSources.length+' مصدر مخصص' : '';
-    // Update sidebar
-    const list = document.getElementById('custom-src-list');
-    if(list){
-      list.innerHTML = _customSources.map((s,i)=>
-        '<div class="src-item">'+
-        '<span class="ic">🔗</span>'+
-        '<span class="name" title="'+escHtml(s.url)+'">'+escHtml(s.label)+'</span>'+
-        '<span class="count" onclick="removeSrc('+i+')" style="cursor:pointer" title="حذف">✕</span>'+
-        '</div>'
-      ).join('');
-    }
-  }
-
-  srcBtn.addEventListener('click',()=>{ addRow.classList.toggle('hidden'); urlInput.focus(); });
-  cancelBtn.addEventListener('click',()=>{ addRow.classList.add('hidden'); urlInput.value=''; });
-  addBtn.addEventListener('click',()=>{
-    const url = urlInput.value.trim();
-    if(!url || !url.startsWith('http')) return;
-    const label = new URL(url).hostname;
-    _customSources.push({url, label});
-    updateCount();
-    urlInput.value = '';
-    addRow.classList.add('hidden');
-    // Update sidebar WEB group
-    updateCount();
-  });
-  urlInput.addEventListener('keydown', e=>{ if(e.key==='Enter') addBtn.click(); });
-
-  window.removeSrc = function(i){ _customSources.splice(i,1); updateCount(); };
-})();
-
-/* ── Error text style ── */
-document.head.insertAdjacentHTML('beforeend',
-  '<style>.err-text{color:var(--danger);font-size:13px;}</style>');
-
-document.querySelectorAll('.tab').forEach(tab=>{
-  tab.addEventListener('click',()=>{
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    tab.classList.add('active');
-  });
+/* ── File attach ── */
+qs('file-input').addEventListener('change',async()=>{
+  const f=qs('file-input').files[0]; if(!f) return;
+  window._fileName=f.name;
+  try{
+    window._fileText=await f.text();
+    const tag=qs('file-tag');
+    tag.style.display='inline'; tag.textContent='📎 '+f.name.substring(0,20);
+  }catch{ window._fileText=''; }
 });
-document.querySelectorAll('.mode-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-  });
-});
+
+/* ── Keyboard ── */
+qs('qi').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey) sendQuery(); });
+
+/* ── Init ── */
+applyLang();
+const langBtn=document.querySelector('.sb-lang-btn');
+if(langBtn) langBtn.textContent=_lang==='ar'?'EN':'ع';
+const themeBtn=document.querySelector('.sb-theme-btn');
+if(themeBtn) themeBtn.textContent=_theme==='dark'?'☀ Light':'🌙 Dark';
 </script>
 </body>
 </html>

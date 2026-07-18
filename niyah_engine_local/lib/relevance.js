@@ -1,65 +1,130 @@
 'use strict';
 
+/* ══════════════════════════════════════════════════════════════════
+   relevance.js — TF-IDF + cosine similarity
+   Supports: Arabic · English · Chinese (basic)
+   No neural networks. No hallucination. Pure math.
+   ══════════════════════════════════════════════════════════════════ */
+
 const STOPWORDS = new Set([
-  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'of', 'to', 'in', 'on', 'for',
-  'and', 'or', 'but', 'with', 'this', 'that', 'it', 'as', 'be', 'by', 'at',
-  'من', 'الى', 'إلى', 'على', 'في', 'عن', 'مع', 'هذا', 'هذه', 'ذلك', 'التي',
-  'الذي', 'كان', 'هو', 'هي', 'ما', 'لا', 'ان', 'إن', 'او', 'أو', 'ثم', 'قد',
+  // English
+  'the','a','an','is','are','was','were','of','to','in','on','for','and','or',
+  'but','with','this','that','it','as','be','by','at','from','has','have','had',
+  'not','no','so','if','its','than','then','into','about','which','when','there',
+  'their','they','we','our','you','your','he','she','his','her','been','will',
+  'do','does','did','can','could','would','should','may','might','shall',
+  // Arabic
+  'من','الى','إلى','على','في','عن','مع','هذا','هذه','ذلك','التي','الذي',
+  'كان','هو','هي','ما','لا','ان','إن','او','أو','ثم','قد','كل','أن','وأن',
+  'بعض','غير','حتى','عند','بين','منذ','حول','خلال','ضمن','هنا','هناك',
+  'أيضا','أيضاً','جدا','جداً','جميع','مثل','فقط','وقد','وكان','وهو','وهي',
+  'وان','والتي','والذي','ولا','وما','وأن','إذ','إذا','لذا','لذلك','لأن',
+  // Chinese common function words
+  '的','了','在','是','我','有','和','就','不','都','一','上','也','这','到',
+  '他','她','它','们','个','说','要','去','会','着','没','与','从','以','被',
 ]);
 
+/* ── Language detection (char frequency heuristic) ── */
+function detectLang(text) {
+  if (!text) return 'en';
+  const ar = (text.match(/[\u0600-\u06FF]/g) || []).length;
+  const zh = (text.match(/[\u4E00-\u9FFF]/g) || []).length;
+  const tot = text.replace(/\s/g,'').length || 1;
+  if (zh / tot > 0.15) return 'zh';
+  if (ar / tot > 0.15) return 'ar';
+  return 'en';
+}
+
+/* ── Tokenize — Unicode-aware, strips Arabic diacritics ── */
 function tokenize(text) {
   if (!text) return [];
   return text
     .toLowerCase()
     .normalize('NFKC')
-    .replace(/[\u064B-\u065F\u0670]/g, '')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '') // strip tashkeel + tatweel
     .match(/[\p{L}\p{N}]+/gu) || [];
 }
 
 function termFrequencies(tokens) {
   const tf = new Map();
-  for (const raw of tokens) {
-    if (STOPWORDS.has(raw) || raw.length < 2) continue;
-    tf.set(raw, (tf.get(raw) || 0) + 1);
+  for (const t of tokens) {
+    if (STOPWORDS.has(t) || t.length < 2) continue;
+    tf.set(t, (tf.get(t) || 0) + 1);
   }
   return tf;
 }
 
 function cosineSim(tfA, tfB) {
   let dot = 0, magA = 0, magB = 0;
-  for (const [term, freqA] of tfA) {
-    magA += freqA * freqA;
-    if (tfB.has(term)) dot += freqA * tfB.get(term);
+  for (const [term, fa] of tfA) {
+    magA += fa * fa;
+    if (tfB.has(term)) dot += fa * tfB.get(term);
   }
-  for (const freqB of tfB.values()) magB += freqB * freqB;
-  if (magA === 0 || magB === 0) return 0;
+  for (const fb of tfB.values()) magB += fb * fb;
+  if (!magA || !magB) return 0;
   return dot / (Math.sqrt(magA) * Math.sqrt(magB));
 }
 
 function rankByRelevance(query, items, textExtractor) {
-  const queryTf = termFrequencies(tokenize(query));
+  const qTf = termFrequencies(tokenize(query));
   return items
-    .map((item) => {
-      const itemTf = termFrequencies(tokenize(textExtractor(item)));
-      const score = cosineSim(queryTf, itemTf);
-      return { ...item, relevanceScore: score };
-    })
+    .map(item => ({
+      ...item,
+      relevanceScore: cosineSim(qTf, termFrequencies(tokenize(textExtractor(item)))),
+    }))
     .sort((a, b) => b.relevanceScore - a.relevanceScore);
+}
+
+/* ── Junk sentence patterns — navigation, footers, social, ads ── */
+const JUNK_RE = [
+  /^(الرئيس|الرئيسية|تسجيل|اتصل بنا|سياسة|حقوق|للأعلى|للأسفل|شارك|إغلاق)/,
+  /جميع الحقوق محفوظة/,
+  /powered by/i,
+  /^(Home|Login|Sign in|Privacy|Contact|All rights reserved|Back to top|Cookie)/i,
+  /^(Facebook|Twitter|Instagram|YouTube|تويتر|فيسبوك|يوتيوب)[\s|$]/i,
+  /^\s*[\d\W]{0,6}\s*$/,
+  /شاهد أيض|مواضيع ذات صل/,
+  /اشترك في النشرة|Subscribe to/i,
+  /أضف تعليق|Add comment/i,
+];
+
+function isJunk(s) {
+  if (!s) return true;
+  const trimmed = s.trim();
+  if (trimmed.length < 20 || trimmed.length > 500) return true;
+  return JUNK_RE.some(p => p.test(trimmed));
+}
+
+/* ── Near-duplicate removal (cosine threshold) ── */
+function dedup(sentences, threshold = 0.82) {
+  const kept = [];
+  const keptTfs = [];
+  for (const s of sentences) {
+    const tf = termFrequencies(tokenize(s));
+    const isDup = keptTfs.some(k => cosineSim(tf, k) >= threshold);
+    if (!isDup) { kept.push(s); keptTfs.push(tf); }
+  }
+  return kept;
 }
 
 function splitSentences(text) {
   if (!text) return [];
-  return text
-    .split(/(?<=[.!?؟。])\s+|\n+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 15);
+  const raw = text
+    .split(/(?<=[.!?؟。])\s+|\n{2,}|\n(?=[A-Z\u0600-\u06FF])/)
+    .map(s => s.replace(/\s+/g, ' ').trim())
+    .filter(s => !isJunk(s));
+  return dedup(raw);
 }
 
 function extractTopSentences(query, longText, n = 3) {
   const sentences = splitSentences(longText);
-  if (sentences.length === 0) return [];
-  const ranked = rankByRelevance(query, sentences.map((s) => ({ text: s })), (i) => i.text);
-  return ranked.slice(0, n).filter((r) => r.relevanceScore > 0);
+  if (!sentences.length) return [];
+  return rankByRelevance(query, sentences.map(s => ({ text: s })), i => i.text)
+    .slice(0, n)
+    .filter(r => r.relevanceScore > 0.01);
 }
 
-module.exports = { tokenize, termFrequencies, cosineSim, rankByRelevance, splitSentences, extractTopSentences };
+module.exports = {
+  tokenize, termFrequencies, cosineSim, rankByRelevance,
+  splitSentences, extractTopSentences, detectLang, dedup, isJunk,
+};
