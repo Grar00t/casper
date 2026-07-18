@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/build_gcc.sh — NIYAH v3.0 sovereign build script
+# scripts/build_gcc.sh — NIYAH v3.0 build script
 #
 # Usage:
 #   bash scripts/build_gcc.sh              # release (auto-detects arch+SIMD)

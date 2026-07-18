@@ -1,7 +1,5 @@
 /*
- * niyah_core.h — NIYAH Sovereign Inference Engine v3.0
- *
- * نحن ورثة الخوارزمي — لا يوجد مستحيل في الدنيا
+ * niyah_core.h — NIYAH Inference Engine v3.0
  *
  * Zero external dependencies. C99 clean. C++17 compatible.
  * Targets: x86_64 (AVX2+FMA), aarch64 (NEON), scalar fallback.

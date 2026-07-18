@@ -202,7 +202,7 @@ KHZQ_Result khz_q_verify_output(const char *generated_text,
     for (int i = 0; i < chi_e && i < KHZ_CHI_E_MAX; i++)
         res.sigma[i] = S[i];
 
-    /* Step 6: Sovereign decision */
+    /* Step 6: Coherence decision */
     res.is_coherent = (res.energy_preserved >= target_energy) &&
                       (res.penalty_nasl     <  KHZ_PENALTY_THRESHOLD);
 

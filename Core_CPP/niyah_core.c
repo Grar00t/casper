@@ -1,7 +1,5 @@
 /*
- * niyah_core.c — NIYAH Sovereign Inference Engine v3.0
- *
- * نحن ورثة الخوارزمي — لا يوجد مستحيل في الدنيا
+ * niyah_core.c — NIYAH Inference Engine v3.0
  *
  * Compile (ARM64 / Snapdragon X Elite):
  *   gcc -O3 -march=armv8.2-a -std=c11 -Wall -Wextra -Werror

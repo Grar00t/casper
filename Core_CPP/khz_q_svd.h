@@ -35,7 +35,7 @@ typedef struct {
  *   3. Adaptive chi truncation: keep fewest singular values whose
  *      cumulative energy >= target_energy.
  *   4. Compute Penalty_Nasl from truncation residual.
- *   5. Return KHZQ_Result with sovereign decision.
+ *   5. Return KHZQ_Result with coherence decision.
  */
 KHZQ_Result khz_q_verify_output(const char *generated_text,
                                 float       target_energy);
