@@ -1,3 +1,4 @@
 {
-    "chat.permissions.default": "autopilot"
+    "chat.permissions.default": "autopilot",
+    "markdown.validate.enabled": true
 }

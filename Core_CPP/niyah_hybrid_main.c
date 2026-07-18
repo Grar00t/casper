@@ -2,23 +2,26 @@
  * niyah_hybrid_main.c — NIYAH Hybrid Neuro-Symbolic CLI
  *
  * Separate binary from the smoke test. Provides:
- *   --model model.bin   Load a trained model
- *   --rules rules.nrule Load symbolic verification rules
- *   --interactive       Interactive prompt loop
- *   --smoke             Run all smoke tests (neural + symbolic + rules)
- *   --verify-proof f    Verify a .proof file (Task 5)
+ *   --model model.bin        Load a trained model
+ *   --rules rules.nrule      Load symbolic verification rules
+ *   --interactive            Interactive neural prompt loop
+ *   --rag                    RAG mode: web search → context → answer
+ *   --backend ddg|bing|searxng  RAG backend (default: ddg)
+ *   --smoke                  Run all smoke tests
+ *   --verify-proof f         Verify a .proof file
  *
  * Build:
  *   gcc -O2 -std=c11 -Wall -Wextra -Werror -Wstrict-prototypes -Wcast-align \
  *       niyah_core.c hybrid_reasoner.c constraint_solver.c rule_parser.c \
- *       proof_generator.c khz_q_svd.c niyah_hybrid_main.c ../tokenizer.c \
- *       -o niyah_hybrid -lm
+ *       proof_generator.c khz_q_svd.c casper_rag.c niyah_hybrid_main.c \
+ *       ../tokenizer.c -o niyah_hybrid -lm
  */
 
 #include "niyah_core.h"
 #include "rule_parser.h"
 #include "proof_generator.h"
 #include "khz_q_svd.h"
+#include "casper_rag.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -362,7 +365,96 @@ static int run_all_smoke(void) {
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * §3  Interactive mode
+ * §3  RAG mode — web search → grounded context → answer
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+static void rag_loop(RagBackend backend, NiyahRuleKB *rules) {
+    const char *backend_name =
+        (backend == RAG_BACKEND_BING)    ? "Bing"    :
+        (backend == RAG_BACKEND_SEARXNG) ? "SearXNG" : "DuckDuckGo";
+
+    printf("\n=== NIYAH RAG Mode ===\n");
+    printf("  Backend : %s\n", backend_name);
+    printf("  Online  : %s\n", casper_rag_online(backend) ? "YES" : "NO (offline)");
+    if (rules)
+        printf("  Rules   : %u loaded\n", rules->count);
+    printf("  Type a question and press Enter. Type 'quit' to exit.\n\n");
+
+    char line[2048];
+    while (1) {
+        printf("[RAG] > ");
+        fflush(stdout);
+        if (!fgets(line, sizeof(line), stdin)) break;
+
+        size_t len = strlen(line);
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r'))
+            line[--len] = '\0';
+
+        if (len == 0) continue;
+        if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0) break;
+
+        /* Build RAG context */
+        printf("[RAG] Searching...\n");
+        RagCtx *ctx = casper_rag_query(line, backend, NULL);
+        if (!ctx) {
+            printf("[RAG] Query failed (OOM)\n\n");
+            continue;
+        }
+
+        /* Print reasoning trace */
+        printf("\n--- Reasoning Trace (%d steps, %.0f ms) ---\n",
+               ctx->n_steps, (double)ctx->elapsed_ms);
+        for (int i = 0; i < ctx->n_steps; i++) {
+            const TraceStep *s = &ctx->trace[i];
+            const char *kind_str[] = {
+                "parse","search","fetch","rank","context","symbolic","compose","warn"
+            };
+            int ki = (int)s->kind;
+            if (ki < 0 || ki > 7) ki = 7;
+            printf("  [%02d] %-8s | conf=%.2f | %s\n",
+                   i+1, kind_str[ki], (double)s->confidence, s->detail);
+        }
+
+        /* Print sources */
+        if (ctx->n_results > 0) {
+            printf("\n--- Sources (%d) ---\n", ctx->n_results);
+            for (int i = 0; i < ctx->n_results; i++) {
+                printf("  [%d] %.60s\n", i+1, ctx->results[i].title);
+                printf("      %.80s\n", ctx->results[i].url);
+                if (ctx->results[i].snippet[0])
+                    printf("      %.120s\n", ctx->results[i].snippet);
+            }
+        } else {
+            printf("\n  [No web results — offline or query failed]\n");
+        }
+
+        /* Print assembled context (answer material) */
+        if (ctx->context[0]) {
+            printf("\n--- Answer Context ---\n%s\n", ctx->context);
+        }
+
+        /* Optional rule check on the context */
+        if (rules && ctx->context[0]) {
+            const char *violation = niyah_rule_check(rules, line, ctx->context);
+            if (violation) {
+                printf("[RAG] Rule violation: %s\n", violation);
+            }
+        }
+
+        /* Chain hash for audit */
+        char hex[65];
+        niyah_hash_to_hex(ctx->chain_hash, hex);
+        printf("\n  chain_hash: %.16s...  confidence: %.2f\n\n",
+               hex, (double)ctx->confidence);
+
+        casper_rag_free(ctx);
+    }
+
+    printf("\nGoodbye.\n");
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * §4  Interactive neural mode
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 static void interactive_loop(NiyahModel *m, NiyahRuleKB *rules) {
@@ -419,25 +511,40 @@ static void usage(const char *prog) {
     fprintf(stderr, "NIYAH Hybrid Neuro-Symbolic Engine\n\n");
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "  %s --smoke\n", prog);
+    fprintf(stderr, "  %s --rag [--backend ddg|bing|searxng] [--rules rules.nrule]\n", prog);
     fprintf(stderr, "  %s --model model.bin [--rules rules.nrule] --interactive\n", prog);
     fprintf(stderr, "  %s --verify-proof response.proof\n\n", prog);
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "  --smoke           Run all smoke tests\n");
-    fprintf(stderr, "  --model PATH      Load model from .bin file\n");
-    fprintf(stderr, "  --rules PATH      Load verification rules from .nrule file\n");
-    fprintf(stderr, "  --interactive     Start interactive prompt loop\n");
-    fprintf(stderr, "  --verify-proof P  Verify a .proof file\n");
+    fprintf(stderr, "  --smoke              Run all smoke tests\n");
+    fprintf(stderr, "  --rag                RAG mode: web search -> grounded context\n");
+    fprintf(stderr, "  --backend NAME       RAG backend: ddg (default), bing, searxng\n");
+    fprintf(stderr, "  --model PATH         Load model from .bin file\n");
+    fprintf(stderr, "  --rules PATH         Load verification rules from .nrule file\n");
+    fprintf(stderr, "  --interactive        Start neural interactive prompt loop\n");
+    fprintf(stderr, "  --verify-proof PATH  Verify a .proof file\n");
 }
 
 int main(int argc, char **argv) {
     const char *model_path = NULL;
     const char *rules_path = NULL;
-    bool do_smoke = false;
+    bool do_smoke       = false;
     bool do_interactive = false;
+    bool do_rag         = false;
+    RagBackend rag_backend = RAG_BACKEND_DDG;  /* default: DuckDuckGo */
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--smoke") == 0) {
             do_smoke = true;
+        } else if (strcmp(argv[i], "--rag") == 0) {
+            do_rag = true;
+        } else if (strcmp(argv[i], "--backend") == 0 && i+1 < argc) {
+            ++i;
+            if (strcmp(argv[i], "bing") == 0)
+                rag_backend = RAG_BACKEND_BING;
+            else if (strcmp(argv[i], "searxng") == 0)
+                rag_backend = RAG_BACKEND_SEARXNG;
+            else
+                rag_backend = RAG_BACKEND_DDG;
         } else if (strcmp(argv[i], "--model") == 0 && i+1 < argc) {
             model_path = argv[++i];
         } else if (strcmp(argv[i], "--rules") == 0 && i+1 < argc) {
@@ -470,6 +577,21 @@ int main(int argc, char **argv) {
         }
         printf("SMOKE FAIL — %d failed\n", failed);
         return 1;
+    }
+
+    if (do_rag) {
+        NiyahRuleKB *rules = NULL;
+        if (rules_path) {
+            rules = niyah_rule_load(rules_path);
+            if (!rules) {
+                fprintf(stderr, "[NIYAH] Failed to load rules: %s\n", rules_path);
+                return 1;
+            }
+            printf("[NIYAH] Loaded %u rules from: %s\n", rules->count, rules_path);
+        }
+        rag_loop(rag_backend, rules);
+        if (rules) niyah_rule_free(rules);
+        return 0;
     }
 
     if (do_interactive) {
