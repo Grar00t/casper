@@ -49,3 +49,10 @@ Refactor_Plan.md
 Roadmap.md
 
 dist/
+
+# Secrets
+niyah_engine_local/.env
+haven_ide_source/
+scripts/gen_html.py
+*.crdownload
+
