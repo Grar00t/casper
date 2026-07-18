@@ -5,30 +5,61 @@ namespace CasperUI;
 
 /// <summary>
 /// Host object exposed to JavaScript as window.casper.
-/// JS calls: await window.casper.query("...") and receives a JSON string.
+/// Provides: Query (NIYAH search), PTY terminal, window controls.
 /// </summary>
 [ClassInterface(ClassInterfaceType.AutoDual)]
 [ComVisible(true)]
 public class CasperBridge(MainWindow owner)
 {
     private readonly MainWindow _owner = owner;
+    private PtyBridge? _pty;
 
-    /// <summary>
-    /// Run a RAG query through niyah_hybrid.exe and return JSON result.
-    /// Called from JavaScript: const result = await window.casper.query(text)
-    /// </summary>
+    // ── NIYAH search ──────────────────────────────────────────────────────────
     public Task<string> Query(string text) => _owner.RunQuery(text);
 
-    /// <summary>Minimise the window.</summary>
+    // ── Real Terminal (ConPTY) ────────────────────────────────────────────────
+    /// <summary>
+    /// Start a real PowerShell PTY session.
+    /// xterm.js calls this once on load.
+    /// </summary>
+    public void TerminalStart(int cols = 120, int rows = 30)
+    {
+        _owner.Dispatcher.Invoke(() =>
+        {
+            _pty?.Dispose();
+            _pty = new PtyBridge();
+            _pty.Start(_owner.WebView.CoreWebView2, (short)cols, (short)rows);
+        });
+        // Note: _owner.WebView is the WebView2 control (x:Name="WebView" in XAML)
+    }
+
+    /// <summary>
+    /// Send raw input from xterm.js → real shell.
+    /// Called on every keystroke.
+    /// </summary>
+    public void TerminalInput(string data)
+    {
+        _pty?.SendInput(data);
+    }
+
+    /// <summary>Resize PTY when terminal window size changes.</summary>
+    public void TerminalResize(int cols, int rows)
+    {
+        _pty?.Resize((short)cols, (short)rows);
+    }
+
+    // ── Window controls ────────────────────────────────────────────────────────
     public void Minimise() => _owner.Dispatcher.Invoke(() =>
         _owner.WindowState = System.Windows.WindowState.Minimized);
 
-    /// <summary>Toggle maximise / restore.</summary>
     public void ToggleMaximise() => _owner.Dispatcher.Invoke(() =>
         _owner.WindowState = _owner.WindowState == System.Windows.WindowState.Maximized
             ? System.Windows.WindowState.Normal
             : System.Windows.WindowState.Maximized);
 
-    /// <summary>Close the application.</summary>
-    public void Close() => _owner.Dispatcher.Invoke(_owner.Close);
+    public void Close()
+    {
+        _pty?.Dispose();
+        _owner.Dispatcher.Invoke(_owner.Close);
+    }
 }

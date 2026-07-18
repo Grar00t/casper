@@ -23,6 +23,9 @@ public partial class MainWindow : Window
     private const int AgentPort = 3000;
     private string _agentUrl = "http://20.91.208.59"; // updated after StartNodeAgent()
 
+    // WebView is x:Name in XAML — directly accessible as 'WebView' property
+    // CasperBridge accesses _owner.WebView.CoreWebView2 for PTY output
+
     public MainWindow()
     {
         InitializeComponent();

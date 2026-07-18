@@ -211,6 +211,20 @@ Arabic · English · Chinese — any language DDG indexes.
 
 </div>
 </div>
+
+<!-- ── REAL TERMINAL (hidden until user opens it) ── -->
+<div id="terminal-panel" style="display:none;position:fixed;bottom:0;left:0;right:0;height:40%;background:#0a0a0a;border-top:2px solid var(--neon);z-index:100;flex-direction:column">
+  <div style="display:flex;align-items:center;padding:4px 12px;background:rgba(0,0,0,.5);font-family:var(--mono);font-size:11px;color:var(--neon)">
+    <span>⬛ Terminal — PowerShell</span>
+    <span style="margin-left:8px;color:var(--text-faint)" id="pty-status">connecting…</span>
+    <button onclick="closeTerminal()" style="margin-left:auto;background:transparent;border:none;color:var(--danger);cursor:pointer;font-size:14px">✕</button>
+  </div>
+  <div id="xterm-container" style="flex:1;overflow:hidden"></div>
+</div>
+
+<!-- xterm.js from CDN -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+
 <script>
 'use strict';
 /* ═══════════════════════════════════════════════════════════
@@ -603,6 +617,80 @@ const langBtn=document.querySelector('.sb-lang-btn');
 if(langBtn) langBtn.textContent=_lang==='ar'?'EN':'ع';
 const themeBtn=document.querySelector('.sb-theme-btn');
 if(themeBtn) themeBtn.textContent=_theme==='dark'?'☀ Light':'🌙 Dark';
+
+/* ══════════════════════════════════════════════════════════
+   REAL TERMINAL — xterm.js + ConPTY via window.casper bridge
+   Ctrl+` to toggle · runs actual PowerShell via C# ConPTY API
+   ══════════════════════════════════════════════════════════ */
+let _term = null;
+let _termOpen = false;
+
+function openTerminal() {
+  const panel = document.getElementById('terminal-panel');
+  if (!panel) return;
+  panel.style.display = 'flex';
+  _termOpen = true;
+  if (_term) { _term.focus(); return; }
+
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js';
+  s.onload = () => {
+    const {Terminal} = window;
+    _term = new Terminal({
+      cols:120, rows:30,
+      fontFamily:'"JetBrains Mono",monospace',
+      fontSize:13,
+      theme:{background:'#0a0a0a',foreground:'#e8f5f3',cursor:'#2CF2DA'},
+      convertEol:true, cursorBlink:true,
+    });
+    _term.open(document.getElementById('xterm-container'));
+
+    /* C# sends base64 PTY output → decode → write to xterm */
+    window.__ptyData = (b64) => {
+      try {
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        _term.write(new TextDecoder('utf-8').decode(bytes));
+      } catch {}
+    };
+
+    /* xterm input → C# → real shell */
+    _term.onData(data => { window.casper?.TerminalInput?.(data); });
+
+    /* Start PTY session */
+    if (window.casper?.TerminalStart) {
+      window.casper.TerminalStart(120, 30);
+      const st = document.getElementById('pty-status');
+      if(st) st.textContent = 'connected';
+    } else {
+      _term.write('\r\n\x1b[33mOpen Casper.exe for real terminal.\x1b[0m\r\n');
+    }
+    _term.focus();
+  };
+  document.head.appendChild(s);
+}
+
+function closeTerminal() {
+  const panel = document.getElementById('terminal-panel');
+  if(panel) panel.style.display = 'none';
+  _termOpen = false;
+}
+
+/* Ctrl+` toggle */
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === '`') { _termOpen ? closeTerminal() : openTerminal(); }
+});
+
+/* Add Terminal button to status bar */
+(function(){
+  const sb = document.querySelector('.sb-right');
+  if(!sb) return;
+  const btn = document.createElement('button');
+  btn.className = 'sb-theme-btn';
+  btn.textContent = '⬛ Terminal';
+  btn.title = 'Ctrl+` to toggle';
+  btn.onclick = openTerminal;
+  sb.insertBefore(btn, sb.firstChild);
+})();
 </script>
 </body>
 </html>
