@@ -10,9 +10,9 @@
 const { extractTopSentences, rankByRelevance, detectLang } = require('./relevance');
 
 function synthesize(query, sourcesWithText, opts = {}) {
-  const sentencesPerSource = opts.sentencesPerSource || 3;
-  const maxSentencesTotal  = opts.maxSentencesTotal  || 8;
-  const minScore           = opts.minScore           || 0.05;
+  const sentencesPerSource = opts.sentencesPerSource || 2;
+  const maxSentencesTotal  = opts.maxSentencesTotal  || 5;
+  const minScore           = opts.minScore           || 0.12; // higher = less noise
 
   const candidates = [];
 
