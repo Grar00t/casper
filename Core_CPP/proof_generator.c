@@ -314,7 +314,7 @@ int niyah_proof_smoke(void) {
     /* §3.3 — SHA-256 deterministic */
     {
         uint8_t h1[32], h2[32];
-        const char *msg = "niyah sovereign engine";
+        const char *msg = "niyah inference engine";
         niyah_sha256((const uint8_t *)msg, strlen(msg), h1);
         niyah_sha256((const uint8_t *)msg, strlen(msg), h2);
         PROOF_PASS(memcmp(h1, h2, 32) == 0, "SHA-256 is deterministic");
@@ -400,3 +400,4 @@ int main(void) {
     return failed;
 }
 #endif
+

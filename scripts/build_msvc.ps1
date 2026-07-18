@@ -113,13 +113,14 @@ $hybridSrc = @(
     "$Root\Core_CPP\rule_parser.c",
     "$Root\Core_CPP\proof_generator.c",
     "$Root\Core_CPP\khz_q_svd.c",
+    "$Root\Core_CPP\casper_rag.c",
     "$Root\tokenizer.c"
 )
 $benchSrc = @("$Root\Core_CPP\bench_niyah.c", "$Root\Core_CPP\niyah_core.c")
 
 Invoke-ClBuild -Sources $niyahSrc -Out "$Root\Core_CPP\niyah.exe" -ExtraFlags @('/std:c17')
 Invoke-ClBuild -Sources $niyahTrainSrc -Out "$Root\niyah_train.exe" -ExtraFlags @('/std:c17')
-Invoke-ClBuild -Sources $hybridSrc -Out "$Root\Core_CPP\niyah_hybrid.exe" -ExtraFlags @('/std:c17')
+Invoke-ClBuild -Sources $hybridSrc -Out "$Root\Core_CPP\niyah_hybrid.exe" -ExtraFlags @('/std:c17', '/DWINHTTP_LINK')
 Invoke-ClBuild -Sources $benchSrc -Out "$Root\Core_CPP\bench_niyah.exe" -ExtraFlags @('/std:c17')
 
 Write-Host "`n[build_msvc] Artifact checksums (SHA256):"

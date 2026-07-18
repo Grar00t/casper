@@ -90,7 +90,7 @@ void tokenizer_init(void) {
         "forward","backward","sample","generate","decode","encode","norm",
         "softmax","relu","silu","gelu","linear","bias","scale","sum","dot",
         "compute","algorithm","system","engine","core","base","key","value",
-        "arabic","quran","bismillah","sovereign","inference","symbolic","logic",
+        "arabic","quran","bismillah","inference","symbolic","logic",
         "constraint","solver","rational","arithmetic","sha","cryptographic",
         /* Arabic transliterations that appear in comments/data */
         "niyah","casper","khwarizmi","adam","rope","swiglu","rmsnorm","gqa",
@@ -238,3 +238,4 @@ int main(void) {
 #ifdef __cplusplus
 }
 #endif
+

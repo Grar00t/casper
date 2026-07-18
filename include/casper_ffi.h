@@ -10,7 +10,7 @@
  *   - The library is responsible for its own thread-safety; KSpike calls
  *     these functions from any tokio worker.
  *
- *   Casper-Sovereign-1.0
+ *   Casper-1.0
  */
 
 #ifndef KSPIKE_CASPER_FFI_H
@@ -66,3 +66,4 @@ const char *casper_version(void);
 #endif
 
 #endif /* KSPIKE_CASPER_FFI_H */
+
