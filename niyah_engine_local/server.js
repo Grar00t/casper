@@ -15,6 +15,7 @@
 
 const express = require('express');
 const niyahRouter = require('./routes/niyah');
+const { phiChat, phiHealthCheck, phiImproveAnswer } = require('./lib/phiEngine');
 
 const app = express();
 
@@ -79,8 +80,74 @@ app.get('/summarize', (req, res) => {
   res.json({ ok: true, summary, chars: summary.length });
 });
 
-// ── NIYAH Engine (new full pipeline) ─────────────────────────────────────────
+// ── NIYAH Engine (search + extract) ──────────────────────────────────────────
 app.use('/api/v1/niyah', niyahRouter);
+
+// ── Phi-3.5 mini (local LLM via llama-server) ─────────────────────────────────
+app.get('/api/v1/phi/health', async (req, res) => {
+  const alive = await phiHealthCheck();
+  res.json({ available: alive, host: process.env.PHI_HOST || 'http://127.0.0.1:8080' });
+});
+
+app.post('/api/v1/phi/chat', async (req, res) => {
+  const { message, history, systemPrompt, maxTokens, temperature } = req.body || {};
+  if (!message) return res.status(400).json({ error: 'message required' });
+  const result = await phiChat(message, history || [], { systemPrompt, maxTokens, temperature });
+  if (!result) return res.status(503).json({ error: 'Phi server not available. Start llama-server first.' });
+  res.json(result);
+});
+
+// ── Hybrid: NIYAH search + Phi synthesis ──────────────────────────────────────
+app.post('/api/v1/ask', async (req, res) => {
+  const { query, mode } = req.body || {};
+  if (!query) return res.status(400).json({ error: 'query required' });
+
+  // Always search with NIYAH first
+  let niyahResult = null;
+  try {
+    const nr = await fetch(`http://localhost:${process.env.PORT || 3000}/api/v1/niyah/ask`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }), signal: AbortSignal.timeout(40000),
+    });
+    if (nr.ok) niyahResult = await nr.json();
+  } catch (_) {}
+
+  const phiAlive = await phiHealthCheck();
+
+  // If Phi available and mode=hybrid, improve the answer
+  if (phiAlive && niyahResult?.answer && mode !== 'search-only') {
+    const improved = await phiImproveAnswer(query, niyahResult.answer);
+    if (improved) {
+      return res.json({
+        answer: improved,
+        citations: niyahResult.citations || [],
+        confidence: niyahResult.confidence,
+        tookMs: niyahResult.tookMs,
+        mode: 'hybrid',
+        sources: { niyah: true, phi: true },
+      });
+    }
+  }
+
+  // Fallback: Phi direct if NIYAH failed
+  if (phiAlive && (!niyahResult || !niyahResult.answer)) {
+    const phiResult = await phiChat(query);
+    if (phiResult) {
+      return res.json({
+        answer: phiResult.answer,
+        citations: [],
+        confidence: 0.6,
+        tookMs: phiResult.tookMs,
+        mode: 'phi-only',
+        sources: { niyah: false, phi: true },
+      });
+    }
+  }
+
+  // Return NIYAH result as-is
+  if (niyahResult) return res.json({ ...niyahResult, mode: 'search-only', sources: { niyah: true, phi: false } });
+  res.status(503).json({ error: 'Both NIYAH and Phi unavailable' });
+});
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 app.get('/', (req, res) => res.json({
