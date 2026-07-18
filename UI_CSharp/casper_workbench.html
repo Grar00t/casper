@@ -380,9 +380,30 @@
 
 <script>
 /* ── Casper Bridge ─────────────────────────────────────────────────
-   Sends query to niyah_hybrid.exe via the C# host object.
-   Falls back to a clear error message if the bridge is unavailable.
+   Search layer: JS fetch (Brave Search API) → context string
+   Reasoning layer: niyah_hybrid.exe (SHA-256 + symbolic gates)
    ──────────────────────────────────────────────────────────────── */
+
+/* ── Web search via Brave Search API (free 2000 req/month) ─────── *
+ * Get key: https://api.search.brave.com/app/dashboard#api-keys    *
+ * Set BRAVE_KEY in the env or replace the constant below.         */
+const BRAVE_KEY = (window._braveKey) || '';
+
+async function webSearch(q){
+  if(!BRAVE_KEY) return [];
+  try{
+    const url='https://api.search.brave.com/res/v1/web/search?q='+
+      encodeURIComponent(q)+'&count=8&search_lang=ar&country=SA';
+    const r=await fetch(url,{
+      headers:{'Accept':'application/json','Accept-Encoding':'gzip',
+               'X-Subscription-Token':BRAVE_KEY}
+    });
+    if(!r.ok) return [];
+    const d=await r.json();
+    return (d.web&&d.web.results)||[];
+  }catch(e){return [];}
+}
+
 (function(){
   const input  = document.getElementById('query-input');
   const btn    = document.getElementById('run-btn');
@@ -422,11 +443,30 @@
     );
 
     try{
-      /* window.casper is registered by CasperBridge.cs */
-      if(!window.casper)throw new Error('engine-bridge-unavailable');
+      /* 1. JS-side web search (Brave API, no C11 HTML parser) */
+      const webResults = await webSearch(q);
+      let context = '';
+      if(webResults.length>0){
+        context = webResults.slice(0,6).map((r,i)=>
+          '['+(i+1)+'] '+r.title+'\n'+(r.description||'')+'\n'+r.url
+        ).join('\n\n');
+      }
 
-      const raw  = await window.casper.Query(q);
+      /* 2. Send query + context to C11 engine for SHA-256 + symbolic gates */
+      if(!window.casper)throw new Error('engine-bridge-unavailable');
+      const queryWithCtx = webResults.length>0
+        ? q+'\n\n[WEB_CONTEXT]\n'+context
+        : q;
+
+      const raw  = await window.casper.Query(queryWithCtx);
       const data = JSON.parse(raw);
+
+      /* Merge JS web results into data */
+      if(webResults.length>0 && !data.n_sources){
+        data._webResults = webResults;
+        data._context    = context;
+        data.confidence  = data.confidence||0.7;
+      }
       loading.remove();
 
       if(data.error){
@@ -450,21 +490,23 @@
         });
       }
 
-      /* Build sources chips */
+      /* Build sources chips — prefer JS web results */
       let chips='';
-      if(data.n_sources>0){
+      const srcList = data._webResults||(data.sources||[]);
+      if(srcList.length>0){
         chips='<div class="chiprow">';
-        (data.sources||[]).forEach(src=>{
-          chips+='<span class="chip">'+escHtml(
-            src.title?(src.title.substring(0,40)):'مصدر'
-          )+'</span>';
+        srcList.slice(0,6).forEach(src=>{
+          const title=src.title?(src.title.substring(0,40)):'مصدر';
+          const url=src.url||src.url||'';
+          chips+='<a class="chip" href="'+escHtml(url)+'" target="_blank" '+
+            'style="text-decoration:none">'+escHtml(title)+'</a>';
         });
         chips+='</div>';
       }
 
       /* Main answer area */
       const conf=Math.round((data.confidence||0)*100);
-      const answer=data.context||(data.output||'لم يتم العثور على نتائج.');
+      const answer=data._context||(data.context)||(data.output||'لم يتم العثور على نتائج.');
 
       appendMsg(
         '<div class="trace" data-toggle>'+
