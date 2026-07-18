@@ -1,6 +1,6 @@
 # Casper / NIYAH Engine — Agent Instructions
 
-**NIYAH v3.0** is a sovereign, local-first, neuro-symbolic AI inference and training engine written in C11. It fuses a Transformer neural core with a Prolog-like symbolic reasoner, exact rational constraint solver, and SHA-256-signed proof generation. Zero external runtime dependencies (libc + libm only).
+**NIYAH v3.0** is a local-first, neuro-symbolic AI inference and training engine written in C11. It combines a Transformer neural core with a Prolog-like symbolic reasoner, exact rational constraint solver, and SHA-256-signed proof generation. No external runtime dependencies beyond libc and libm.
 
 ---
 

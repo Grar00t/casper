@@ -70,7 +70,7 @@ void tokenizer_init(void) {
     }
 
     /* IDs 90+: common English and domain words for better decode quality.
-     * These cover the sovereign_knowledge training corpus vocabulary. */
+     * These cover the training corpus vocabulary. */
     const char *words[] = {
         /* function / structure words */
         "the","a","an","and","or","is","in","of","to","for","with","on",
