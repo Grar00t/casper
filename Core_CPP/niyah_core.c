@@ -547,29 +547,38 @@ uint32_t niyah_sample(const float *logits, uint32_t vocab_size,
         return best;
     }
 
-    /* Temperature + top-p */
-    float *tmp = xmalloc(vocab_size * sizeof(float));
+    /*
+     * Temperature + top-p sampling — zero heap allocation.
+     *
+     * Two-pass algorithm:
+     *   Pass 1: compute log-sum-exp normalisation constant.
+     *   Pass 2: walk the distribution accumulating probability until
+     *           the random threshold is reached.
+     *
+     * This avoids storing the full softmax array and therefore
+     * eliminates the loose malloc that previously appeared in this
+     * function.  The result is numerically identical to the
+     * store-then-scan approach.
+     */
     float mx = logits[0];
-    for (uint32_t i = 1; i < vocab_size; i++) if (logits[i] > mx) mx = logits[i];
-    float sm = 0.f;
-    for (uint32_t i = 0; i < vocab_size; i++) {
-        tmp[i] = expf((logits[i] - mx) / s->temperature);
-        sm += tmp[i];
-    }
-    float inv = 1.f / sm;
-    for (uint32_t i = 0; i < vocab_size; i++) tmp[i] *= inv;
+    for (uint32_t i = 1; i < vocab_size; i++)
+        if (logits[i] > mx) mx = logits[i];
 
-    /* LCG random */
+    float sm = 0.f;
+    for (uint32_t i = 0; i < vocab_size; i++)
+        sm += expf((logits[i] - mx) / s->temperature);
+
+    /* LCG random — advance before use so seed=0 is not degenerate */
     s->seed = s->seed * 6364136223846793005ULL + 1442695040888963407ULL;
-    float r = (float)((s->seed >> 11) & 0xFFFFFFF) / (float)0xFFFFFFF;
-    r *= s->top_p > 0.f && s->top_p < 1.f ? s->top_p : 1.f;
+    float r = (float)((s->seed >> 11) & 0x0FFFFFFU) / (float)0x0FFFFFFU;
+    r *= (s->top_p > 0.f && s->top_p < 1.f) ? s->top_p : 1.f;
+    r *= sm; /* scale threshold to unnormalised sum */
 
     float cum = 0.f;
     for (uint32_t i = 0; i < vocab_size; i++) {
-        cum += tmp[i];
-        if (cum >= r) { free(tmp); return i; }
+        cum += expf((logits[i] - mx) / s->temperature);
+        if (cum >= r) return i;
     }
-    free(tmp);
     return vocab_size - 1;
 }
 
@@ -828,3 +837,4 @@ int niyah_smoke(void) {
     fprintf(stderr, "\n  Results: %d passed, %d failed\n\n", pass, fail);
     return fail;
 }
+

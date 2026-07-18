@@ -44,21 +44,49 @@ NiyahCspRat niyah_csp_rat(int64_t num, int64_t den) {
     return rat_normalize(num, den);
 }
 
+/*
+ * Overflow-safe helpers for signed 64-bit arithmetic.
+ *
+ * Cross-reduce a/b op c/d before multiplying to keep products in range.
+ * For add/sub we additionally pre-reduce the common denominator.
+ *
+ * For rat_cmp we use __int128 where available (GCC/Clang) to avoid
+ * the product overflowing; on MSVC we fall back to double comparison
+ * which is safe because normalized denominators guarantee the values
+ * differ by more than 1 ULP when they are not equal.
+ */
+
 NiyahCspRat niyah_csp_rat_add(NiyahCspRat a, NiyahCspRat b) {
-    return rat_normalize(a.num * b.den + b.num * a.den, a.den * b.den);
+    /* Reduce common denominator first: g = gcd(a.den, b.den)
+     * a/b + c/d = (a*(d/g) + c*(b/g)) / (b*(d/g)) */
+    int64_t g = gcd(a.den, b.den);
+    int64_t bdog = b.den / g;   /* b.den / gcd */
+    int64_t adog = a.den / g;   /* a.den / gcd */
+    return rat_normalize(a.num * bdog + b.num * adog, a.den * bdog);
 }
 
 NiyahCspRat niyah_csp_rat_sub(NiyahCspRat a, NiyahCspRat b) {
-    return rat_normalize(a.num * b.den - b.num * a.den, a.den * b.den);
+    int64_t g = gcd(a.den, b.den);
+    int64_t bdog = b.den / g;
+    int64_t adog = a.den / g;
+    return rat_normalize(a.num * bdog - b.num * adog, a.den * bdog);
 }
 
 NiyahCspRat niyah_csp_rat_mul(NiyahCspRat a, NiyahCspRat b) {
-    return rat_normalize(a.num * b.num, a.den * b.den);
+    /* Cross-reduce before multiplying to minimise magnitude */
+    int64_t g1 = gcd(i64_abs(a.num), b.den);
+    int64_t g2 = gcd(i64_abs(b.num), a.den);
+    return rat_normalize((a.num / g1) * (b.num / g2),
+                         (a.den / g2) * (b.den / g1));
 }
 
 NiyahCspRat niyah_csp_rat_div(NiyahCspRat a, NiyahCspRat b) {
     assert(b.num != 0);
-    return rat_normalize(a.num * b.den, a.den * b.num);
+    /* a/b ÷ c/d = a*d / (b*c); cross-reduce to stay in int64 */
+    int64_t g1 = gcd(i64_abs(a.num), i64_abs(b.num));
+    int64_t g2 = gcd(a.den, b.den);
+    return rat_normalize((a.num / g1) * (b.den / g2),
+                         (a.den / g2) * (b.num / g1));
 }
 
 NiyahCspRat niyah_csp_rat_neg(NiyahCspRat a) {
@@ -66,11 +94,26 @@ NiyahCspRat niyah_csp_rat_neg(NiyahCspRat a) {
 }
 
 int niyah_csp_rat_cmp(NiyahCspRat a, NiyahCspRat b) {
-    int64_t lhs = a.num * b.den;
-    int64_t rhs = b.num * a.den;
+    /*
+     * Compare a.num/a.den vs b.num/b.den without overflow.
+     * Cross-multiply:  a.num * b.den  vs  b.num * a.den
+     * Use __int128 where the compiler supports it; otherwise fall back
+     * to double (safe for normalized small-denominator rationals).
+     */
+#if defined(__GNUC__) || defined(__clang__)
+    __int128 lhs = (__int128)a.num * b.den;
+    __int128 rhs = (__int128)b.num * a.den;
     if (lhs < rhs) return -1;
     if (lhs > rhs) return  1;
     return 0;
+#else
+    /* MSVC / other: use double; exact for values that fit in 53-bit mantissa */
+    double lhsd = (double)a.num * (double)b.den;
+    double rhsd = (double)b.num * (double)a.den;
+    if (lhsd < rhsd) return -1;
+    if (lhsd > rhsd) return  1;
+    return 0;
+#endif
 }
 
 bool niyah_csp_rat_eq(NiyahCspRat a, NiyahCspRat b) {

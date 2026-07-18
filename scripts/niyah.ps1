@@ -59,8 +59,8 @@ function Invoke-Train {
 function Invoke-Smoke {
     Write-Host "[niyah] smoke..."
     Ensure-Build
-    $smoke = Join-Path $RepoRoot "Core_CPP\niyah.exe"
-    & $smoke
+    $smoke = Join-Path $RepoRoot "Core_CPP\niyah_hybrid.exe"
+    & $smoke --smoke
 }
 
 function Invoke-Bench {

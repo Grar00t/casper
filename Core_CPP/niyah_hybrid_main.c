@@ -163,6 +163,15 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
         }
     }
 
+    /* Fallback: if every attempt was rejected by KHZ_Q or rules,
+     * return a safe placeholder rather than NULL so callers always
+     * receive a valid (malloc'd) string. */
+    if (!result) {
+        result = malloc(32);
+        if (result)
+            snprintf(result, 32, "[Output rejected]");
+    }
+
     /* Generate proof hash if requested */
     if (proof_out && opts && opts->generate_proof && result) {
         niyah_proof_generate(prompt, result, NULL, proof_out);
