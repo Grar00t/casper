@@ -507,13 +507,165 @@ static void interactive_loop(NiyahModel *m, NiyahRuleKB *rules) {
  * §4  Main entry point
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * §5  Audit-stdin mode — Node.js IPC bridge
+ *
+ * Reads one JSON object from stdin:
+ *   { "prompt": "...", "text": "...", "rules": "path.nrule" }
+ * Writes one JSON object to stdout:
+ *   { "verified": true, "chain_hash": "hex64", "confidence": 0.87,
+ *     "elapsed_ms": 3, "khz_energy": 0.91, "rule_violation": null }
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+#include <time.h>
+
+/* ── Portable millisecond timer (works on both MSVC/Windows and GCC/Linux) ── */
+#ifdef _WIN32
+#  include <windows.h>
+static long portable_elapsed_ms(LARGE_INTEGER t0) {
+    LARGE_INTEGER t1, freq;
+    QueryPerformanceCounter(&t1);
+    QueryPerformanceFrequency(&freq);
+    return (long)((t1.QuadPart - t0.QuadPart) * 1000LL / freq.QuadPart);
+}
+#  define TIMER_TYPE       LARGE_INTEGER
+#  define TIMER_START(t)   QueryPerformanceCounter(&(t))
+#  define TIMER_MS(t)      portable_elapsed_ms(t)
+#else
+#  include <time.h>
+static long portable_elapsed_ms(struct timespec t0) {
+    struct timespec t1;
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    return (long)((t1.tv_sec - t0.tv_sec)*1000L + (t1.tv_nsec - t0.tv_nsec)/1000000L);
+}
+#  define TIMER_TYPE       struct timespec
+#  define TIMER_START(t)   clock_gettime(CLOCK_MONOTONIC, &(t))
+#  define TIMER_MS(t)      portable_elapsed_ms(t)
+#endif
+
+/* Minimal JSON string extractor — no external deps */
+static char *json_extract_string(const char *json, const char *key) {
+    char search[128];
+    snprintf(search, sizeof(search), "\"%s\"", key);
+    const char *p = strstr(json, search);
+    if (!p) return NULL;
+    p += strlen(search);
+    while (*p == ' ' || *p == ':' || *p == '\t') p++;
+    if (*p != '"') return NULL;
+    p++; /* skip opening quote */
+    const char *start = p;
+    size_t len = 0;
+    while (*p && *p != '"') {
+        if (*p == '\\') p++; /* skip escaped char */
+        p++; len++;
+    }
+    char *out = malloc(len + 1);
+    if (!out) return NULL;
+    memcpy(out, start, len);
+    out[len] = '\0';
+    return out;
+}
+
+static void audit_stdin_mode(void) {
+    /* Read all of stdin into buffer (max 64KB) using fread for Windows pipe compat */
+    char *buf = malloc(65536);
+    if (!buf) { printf("{\"error\":\"OOM\"}\n"); fflush(stdout); return; }
+    size_t total = 0;
+    size_t n;
+    /* fread handles Windows pipe/stdin better than getchar loop */
+    while ((n = fread(buf + total, 1, 65535 - total, stdin)) > 0)
+        total += n;
+    buf[total] = '\0';
+
+    /* If nothing was read via fread, try reading as text line by line */
+    if (total == 0) {
+        printf("{\"error\":\"empty stdin\"}\n");
+        fflush(stdout);
+        free(buf);
+        return;
+    }
+
+    /* Extract fields */
+    char *prompt     = json_extract_string(buf, "prompt");
+    char *text       = json_extract_string(buf, "text");
+    char *rules_path = json_extract_string(buf, "rules");
+    free(buf);
+
+    if (!prompt) prompt = malloc(1), prompt[0] = '\0';
+    if (!text)   text   = malloc(1), text[0]   = '\0';
+
+    TIMER_TYPE t0;
+    TIMER_START(t0);
+
+    /* KHZ_Q coherence gate */
+    KHZQ_Result khz = khz_q_verify_output(text, 0.85f);
+
+    /* Rule check (optional) */
+    const char *violation = NULL;
+    NiyahRuleKB *rules = NULL;
+    if (rules_path && rules_path[0]) {
+        rules = niyah_rule_load(rules_path);
+        if (rules) {
+            violation = niyah_rule_check(rules, prompt, text);
+        }
+    }
+
+    /* SHA-256 proof */
+    uint8_t hash[32];
+    niyah_proof_generate(prompt, text, rules_path && rules_path[0] ? rules_path : NULL, hash);
+    char hex[65];
+    niyah_hash_to_hex(hash, hex);
+
+    long elapsed_ms = TIMER_MS(t0);
+
+    /* Confidence: KHZ energy * 0.7 + (no violation) * 0.3 */
+    double confidence = (double)khz.energy_preserved * 0.7 +
+                        (violation == NULL ? 0.3 : 0.0);
+    if (confidence > 1.0) confidence = 1.0;
+
+    bool verified = khz.is_coherent && (violation == NULL);
+
+    /* Output JSON to stdout */
+    if (violation) {
+        printf("{"
+               "\"verified\":false,"
+               "\"chain_hash\":\"%s\","
+               "\"confidence\":%.4f,"
+               "\"elapsed_ms\":%ld,"
+               "\"khz_energy\":%.4f,"
+               "\"rule_violation\":\"%s\""
+               "}\n",
+               hex, confidence, elapsed_ms,
+               (double)khz.energy_preserved, violation);
+    } else {
+        printf("{"
+               "\"verified\":%s,"
+               "\"chain_hash\":\"%s\","
+               "\"confidence\":%.4f,"
+               "\"elapsed_ms\":%ld,"
+               "\"khz_energy\":%.4f,"
+               "\"rule_violation\":null"
+               "}\n",
+               verified ? "true" : "false",
+               hex, confidence, elapsed_ms,
+               (double)khz.energy_preserved);
+    }
+
+    fflush(stdout);
+    free(prompt);
+    free(text);
+    if (rules_path) free(rules_path);
+    if (rules) niyah_rule_free(rules);
+}
+
 static void usage(const char *prog) {
     fprintf(stderr, "NIYAH Hybrid Neuro-Symbolic Engine\n\n");
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "  %s --smoke\n", prog);
     fprintf(stderr, "  %s --rag [--backend ddg|bing|searxng] [--rules rules.nrule]\n", prog);
     fprintf(stderr, "  %s --model model.bin [--rules rules.nrule] --interactive\n", prog);
-    fprintf(stderr, "  %s --verify-proof response.proof\n\n", prog);
+    fprintf(stderr, "  %s --verify-proof response.proof\n", prog);
+    fprintf(stderr, "  %s --audit-stdin   (read JSON from stdin, write result to stdout)\n\n", prog);
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  --smoke              Run all smoke tests\n");
     fprintf(stderr, "  --rag                RAG mode: web search -> grounded context\n");
@@ -522,18 +674,22 @@ static void usage(const char *prog) {
     fprintf(stderr, "  --rules PATH         Load verification rules from .nrule file\n");
     fprintf(stderr, "  --interactive        Start neural interactive prompt loop\n");
     fprintf(stderr, "  --verify-proof PATH  Verify a .proof file\n");
+    fprintf(stderr, "  --audit-stdin        IPC bridge: read JSON {prompt,text,rules}, write result JSON\n");
 }
 
 int main(int argc, char **argv) {
     const char *model_path = NULL;
     const char *rules_path = NULL;
-    bool do_smoke       = false;
-    bool do_interactive = false;
-    bool do_rag         = false;
+    bool do_smoke        = false;
+    bool do_interactive  = false;
+    bool do_rag          = false;
+    bool do_audit_stdin  = false;
     RagBackend rag_backend = RAG_BACKEND_DDG;  /* default: DuckDuckGo */
 
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--smoke") == 0) {
+        if (strcmp(argv[i], "--audit-stdin") == 0) {
+            do_audit_stdin = true;
+        } else if (strcmp(argv[i], "--smoke") == 0) {
             do_smoke = true;
         } else if (strcmp(argv[i], "--rag") == 0) {
             do_rag = true;
@@ -641,6 +797,11 @@ int main(int argc, char **argv) {
 
         if (rules) niyah_rule_free(rules);
         niyah_free(m);
+        return 0;
+    }
+
+    if (do_audit_stdin) {
+        audit_stdin_mode();
         return 0;
     }
 

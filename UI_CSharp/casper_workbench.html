@@ -384,50 +384,34 @@
    Reasoning layer: niyah_hybrid.exe (SHA-256 + symbolic gates)
    ──────────────────────────────────────────────────────────────── */
 
-/* ── Casper Agent (Node.js local proxy on Azure VM) ───────────────
- * /health            — liveness check
- * /fetch?url=TARGET  — fetch + strip any URL, return clean text
- * /search?q=QUERY    — DDG search + fetch top results
- * Falls back to direct engine call if agent is unreachable.       */
+/* ── Casper Agent — NIYAH Engine v3 ───────────────────────────────
+ * POST /api/v1/niyah/ask  { query }
+ *   → { answer, citations:[{n,title,url}], confidence, tookMs }
+ * Falls back to engine-only if agent is unreachable.              */
 const AGENT = (window._agentUrl) || 'http://20.91.208.59';
 
-async function agentFetch(url){
+/**
+ * niyahAsk — full pipeline: DDG search → fetch pages → TF-IDF extract → cite
+ * Returns { answer, citations, confidence, tookMs, fromMemory } or null
+ */
+async function niyahAsk(q){
   try{
-    const r=await fetch(AGENT+'/fetch?url='+encodeURIComponent(url),
-      {signal:AbortSignal.timeout(25000)});
-    if(!r.ok)return null;
+    const r = await fetch(AGENT+'/api/v1/niyah/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q }),
+      signal: AbortSignal.timeout(45000),
+    });
+    if(!r.ok) return null;
     return await r.json();
-  }catch(e){return null;}
+  }catch(e){ return null; }
 }
 
-async function agentSearch(q){
-  /* Use DDG HTML search, pipe each result URL through the agent */
+async function agentHealthCheck(){
   try{
-    const ddg='https://html.duckduckgo.com/html/?q='+encodeURIComponent(q);
-    const r=await fetch(AGENT+'/fetch?url='+encodeURIComponent(ddg),
-      {signal:AbortSignal.timeout(20000)});
-    if(!r.ok)return [];
-    const d=await r.json();
-    /* parse hrefs from the DDG HTML text that agent returned */
-    const hrefs=[];
-    const re=/https?:\/\/[^\s"'<>]{10,200}/g;
-    let m;
-    while((m=re.exec(d.sample||''))!==null){
-      const u=m[0].replace(/&amp;/g,'&');
-      if(!u.includes('duckduckgo')&&!hrefs.includes(u))hrefs.push(u);
-      if(hrefs.length>=6)break;
-    }
-    return hrefs.map(u=>({url:u,title:u,description:''}));
-  }catch(e){return [];}
-}
-
-async function webSearch(q){
-  try{
-    /* Check agent is alive first */
-    const ping=await fetch(AGENT+'/health',{signal:AbortSignal.timeout(3000)});
-    if(!ping.ok)return [];
-  }catch(e){return [];}
-  return agentSearch(q);
+    const r = await fetch(AGENT+'/health', { signal: AbortSignal.timeout(3000) });
+    return r.ok;
+  }catch(e){ return false; }
 }
 
 (function(){
@@ -469,85 +453,108 @@ async function webSearch(q){
     );
 
     try{
-      /* 1. JS-side web search (Brave API, no C11 HTML parser) */
-      const webResults = await webSearch(q);
-      let context = '';
-      if(webResults.length>0){
-        context = webResults.slice(0,6).map((r,i)=>
-          '['+(i+1)+'] '+r.title+'\n'+(r.description||'')+'\n'+r.url
-        ).join('\n\n');
+      /* ── 1. Try NIYAH Engine (full pipeline: search → fetch → TF-IDF → cite) ── */
+      const agentAlive = await agentHealthCheck();
+      let niyahResult = null;
+      if(agentAlive){
+        loading.querySelector('.trace-head').innerHTML =
+          '<span class="trace-runner"></span>جارٍ البحث عبر NIYAH…';
+        niyahResult = await niyahAsk(q);
       }
 
-      /* 2. Send query + context to C11 engine for SHA-256 + symbolic gates */
-      if(!window.casper)throw new Error('engine-bridge-unavailable');
-      const queryWithCtx = webResults.length>0
-        ? q+'\n\n[WEB_CONTEXT]\n'+context
-        : q;
-
-      const raw  = await window.casper.Query(queryWithCtx);
-      const data = JSON.parse(raw);
-
-      /* Merge JS web results into data */
-      if(webResults.length>0 && !data.n_sources){
-        data._webResults = webResults;
-        data._context    = context;
-        data.confidence  = data.confidence||0.7;
-      }
       loading.remove();
 
-      if(data.error){
+      if(niyahResult && niyahResult.answer){
+        /* ── NIYAH returned a real answer with citations ── */
+        const conf = Math.round((niyahResult.confidence||0)*100);
+        const citations = niyahResult.citations || [];
+        const fromMem = niyahResult.fromMemory ? ' · من الذاكرة' : '';
+        const tookSec = niyahResult.tookMs ? ' · '+(niyahResult.tookMs/1000).toFixed(1)+'ث' : '';
+
+        /* Format answer — replace [n] refs with styled spans */
+        let answerHtml = escHtml(niyahResult.answer)
+          .replace(/\[(\d+)\]/g, '<sup class="mono" style="color:var(--neon);font-size:10px"> [$1]</sup>')
+          .replace(/\n/g,'<br>');
+
+        /* Build citation chips */
+        let chips = '';
+        if(citations.length > 0){
+          chips = '<div class="chiprow" style="margin-top:10px">';
+          citations.forEach(c=>{
+            chips += '<a class="chip" href="'+escHtml(c.url||'')+'" target="_blank" '+
+              'style="text-decoration:none">['+c.n+'] '+escHtml((c.title||c.url||'').substring(0,45))+'</a>';
+          });
+          chips += '</div>';
+        }
+
+        /* C11 proof badge */
+        const hashShort = niyahResult.chain_hash
+          ? niyahResult.chain_hash.substring(0,12)+'…' : null;
+        const proofBadge = niyahResult.proof_verified
+          ? '<span style="color:var(--neon);font-size:11px;margin-right:8px">✓ C11</span>'
+          : (hashShort ? '<span style="color:var(--ink-dim);font-size:11px;margin-right:8px">~ C11</span>' : '');
+        const hashSpan = hashShort
+          ? '<span class="trace-sub mono" title="SHA-256 chain hash">'+escHtml(hashShort)+'</span>' : '';
+        const khzSpan = niyahResult.khz_energy
+          ? '<span style="font-size:10px;color:var(--ink-dim);margin-right:6px">KHZ '+(Math.round(niyahResult.khz_energy*100))+'%</span>'
+          : '';
+
         appendMsg(
-          '<div class="msg-casper"><div class="p" style="color:var(--danger)">'+
-          'خطأ: '+escHtml(data.error)+'</div></div>'
-        );
-        return;
-      }
-
-      /* Build trace block */
-      let traceSteps='';
-      if(data.trace){
-        (data.trace||[]).forEach((s,i)=>{
-          const warn=s.kind==='warn'?' warn':'';
-          traceSteps+=
-            '<div class="tstep'+warn+'">'+
-            '<span class="tn">'+(String(i+1).padStart(2,'0'))+'</span>'+
-            '['+escHtml(s.kind)+'] '+escHtml(s.detail)+
-            '</div>';
-        });
-      }
-
-      /* Build sources chips — prefer JS web results */
-      let chips='';
-      const srcList = data._webResults||(data.sources||[]);
-      if(srcList.length>0){
-        chips='<div class="chiprow">';
-        srcList.slice(0,6).forEach(src=>{
-          const title=src.title?(src.title.substring(0,40)):'مصدر';
-          const url=src.url||src.url||'';
-          chips+='<a class="chip" href="'+escHtml(url)+'" target="_blank" '+
-            'style="text-decoration:none">'+escHtml(title)+'</a>';
-        });
-        chips+='</div>';
-      }
-
-      /* Main answer area */
-      const conf=Math.round((data.confidence||0)*100);
-      const answer=data._context||(data.context)||(data.output||'لم يتم العثور على نتائج.');
-
-      appendMsg(
-        '<div class="trace" data-toggle>'+
-          '<div class="trace-head">'+
-            '<span class="trace-runner"></span>'+
-            'تتبع الاستدلال · '+conf+'% ثقة'+
-            ((data.chain_hash)?'<span class="trace-sub mono">'+(data.chain_hash).substring(0,12)+'…</span>':'')+
+          '<div class="trace" data-toggle>'+
+            '<div class="trace-head">'+
+              '<span class="trace-runner"></span>'+
+              proofBadge+'NIYAH · '+conf+'% ثقة'+fromMem+tookSec+
+              khzSpan+hashSpan+
+            '</div>'+
           '</div>'+
-          '<div class="trace-body"><div class="trace-steps">'+traceSteps+'</div></div>'+
-        '</div>'+
-        '<div class="msg-casper">'+
-          '<div class="p">'+escHtml(answer.substring(0,800))+'</div>'+
-          chips+
-        '</div>'
-      );
+          '<div class="msg-casper">'+
+            '<div class="p">'+answerHtml+'</div>'+
+            chips+
+          '</div>'
+        );
+
+      } else {
+        /* ── Fallback: C11 engine only (no web) ── */
+        if(!window.casper) throw new Error('engine-bridge-unavailable');
+        const raw  = await window.casper.Query(q);
+        const data = JSON.parse(raw);
+
+        if(data.error){
+          appendMsg(
+            '<div class="msg-casper"><div class="p" style="color:var(--danger)">'+
+            'خطأ: '+escHtml(data.error)+'</div></div>'
+          );
+          return;
+        }
+
+        /* No web results — show engine output with notice */
+        const conf   = Math.round((data.confidence||0)*100);
+        const answer = data.output || data.context || 'لم يتم العثور على نتائج.';
+        const notice = agentAlive
+          ? '<div class="p" style="color:var(--copper);font-size:12px;margin-top:6px">⚠ البحث أعاد صفر نتائج — تأكد من اتصال الـ VM بالإنترنت</div>'
+          : '<div class="p" style="color:var(--ink-dim);font-size:12px;margin-top:6px">⚫ Agent غير متاح — نتيجة المحرك المحلي فقط</div>';
+
+        let traceSteps='';
+        (data.trace||[]).forEach((s,i)=>{
+          traceSteps+='<div class="tstep'+(s.kind==='warn'?' warn':'')+'">'+
+            '<span class="tn">'+(String(i+1).padStart(2,'0'))+'</span>'+
+            '['+escHtml(s.kind)+'] '+escHtml(s.detail)+'</div>';
+        });
+
+        appendMsg(
+          '<div class="trace" data-toggle>'+
+            '<div class="trace-head">'+
+              '<span class="trace-runner"></span>محرك محلي · '+conf+'% ثقة'+
+              (data.chain_hash?'<span class="trace-sub mono">'+data.chain_hash.substring(0,12)+'…</span>':'')+
+            '</div>'+
+            '<div class="trace-body"><div class="trace-steps">'+traceSteps+'</div></div>'+
+          '</div>'+
+          '<div class="msg-casper">'+
+            '<div class="p">'+escHtml(answer.substring(0,800))+'</div>'+
+            notice+
+          '</div>'
+        );
+      }
 
     }catch(err){
       loading.remove();
@@ -555,7 +562,7 @@ async function webSearch(q){
       appendMsg(
         '<div class="msg-casper"><div class="p" style="color:var(--danger)">'+
         (isNoBridge
-          ? 'تعذّر الاتصال بالمحرك. تأكد من تشغيل Casper.exe بشكل صحيح.'
+          ? 'تعذّر الاتصال بالمحرك. تأكد من تشغيل Casper.exe.'
           : 'خطأ: '+escHtml(err.message))+
         '</div></div>'
       );
