@@ -1,0 +1,17 @@
+{
+  "name": "casper-agent",
+  "version": "3.0.0",
+  "description": "Casper Agent + NIYAH Engine — sovereign search, no model weights",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
