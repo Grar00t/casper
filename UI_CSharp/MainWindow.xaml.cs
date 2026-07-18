@@ -11,7 +11,11 @@ namespace CasperUI;
 public partial class MainWindow : Window
 {
     // Path to the C11 engine — same directory as this exe
-    private static readonly string EngineDir = AppContext.BaseDirectory;
+    // Engine lives in app/ subfolder; fall back to exe directory for dev runs
+    private static readonly string EngineDir =
+        Directory.Exists(Path.Combine(AppContext.BaseDirectory, "app"))
+            ? Path.Combine(AppContext.BaseDirectory, "app")
+            : AppContext.BaseDirectory;
     private static readonly string EnginePath = Path.Combine(EngineDir, "niyah_hybrid.exe");
 
     public MainWindow()
@@ -25,7 +29,11 @@ public partial class MainWindow : Window
 
     private async void InitWebView()
     {
-        string dataDir = Path.Combine(Path.GetTempPath(), "CasperWebView2");
+        // Store WebView2 user data in %LOCALAPPDATA% so it works from
+        // Program Files and other protected directories (no write permission issues).
+        string dataDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "CasperApp", "webview2_data");
         Directory.CreateDirectory(dataDir);
 
         var env = await CoreWebView2Environment.CreateAsync(null, dataDir);
@@ -35,11 +43,15 @@ public partial class MainWindow : Window
         WebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
         WebView.CoreWebView2.Settings.IsZoomControlEnabled = false;
 
-        // Register C# → JS bridge
+        // Register C# host object — exposed to JS as window.casper
         WebView.CoreWebView2.AddHostObjectToScript("casperBridge", new CasperBridge(this));
 
-        // Load the HTML UI
-        string htmlPath = Path.Combine(AppContext.BaseDirectory, "casper_workbench.html");
+        // Look for HTML in app/ subfolder first, then fallback to exe directory
+        string appDir  = Path.Combine(AppContext.BaseDirectory, "app");
+        string htmlPath = File.Exists(Path.Combine(appDir, "casper_workbench.html"))
+            ? Path.Combine(appDir, "casper_workbench.html")
+            : Path.Combine(AppContext.BaseDirectory, "casper_workbench.html");
+
         if (File.Exists(htmlPath))
             WebView.CoreWebView2.Navigate(new Uri(htmlPath).AbsoluteUri);
         else

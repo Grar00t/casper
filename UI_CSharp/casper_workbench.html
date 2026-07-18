@@ -330,8 +330,8 @@
           <button class="mode-btn">تحقق فقط</button>
         </div>
         <div class="input-row">
-          <input type="text" placeholder="اسأل، أو ألصق رابط مستودع للفهرسة…">
-          <button class="run-btn">تشغيل</button>
+          <input id="query-input" type="text" placeholder="اسأل، أو ألصق رابط مستودع للفهرسة…">
+          <button id="run-btn" class="run-btn">تشغيل</button>
         </div>
       </div>
     </div>
@@ -379,6 +379,127 @@
   </div>
 
 <script>
+/* ── Casper Bridge ─────────────────────────────────────────────────
+   Sends query to niyah_hybrid.exe via the C# host object.
+   Falls back to a clear error message if the bridge is unavailable.
+   ──────────────────────────────────────────────────────────────── */
+(function(){
+  const input  = document.getElementById('query-input');
+  const btn    = document.getElementById('run-btn');
+  const stream = document.querySelector('.stream');
+
+  function escHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function appendMsg(html){
+    const div=document.createElement('div');
+    div.innerHTML=html;
+    stream.appendChild(div);
+    stream.scrollTop=stream.scrollHeight;
+    return div;
+  }
+
+  function setRunning(on){
+    btn.disabled=on;
+    btn.textContent=on?'جارٍ البحث…':'تشغيل';
+    btn.style.opacity=on?'0.6':'1';
+  }
+
+  async function sendQuery(){
+    const q=input.value.trim();
+    if(!q)return;
+    input.value='';
+    setRunning(true);
+
+    /* Show user message */
+    appendMsg('<div class="msg-user">'+escHtml(q)+'</div>');
+
+    /* Loading indicator */
+    const loading=appendMsg(
+      '<div class="trace"><div class="trace-head">'+
+      '<span class="trace-runner"></span>جارٍ البحث في الويب…</div></div>'
+    );
+
+    try{
+      /* window.casper is registered by CasperBridge.cs */
+      if(!window.casper)throw new Error('engine-bridge-unavailable');
+
+      const raw  = await window.casper.Query(q);
+      const data = JSON.parse(raw);
+      loading.remove();
+
+      if(data.error){
+        appendMsg(
+          '<div class="msg-casper"><div class="p" style="color:var(--danger)">'+
+          'خطأ: '+escHtml(data.error)+'</div></div>'
+        );
+        return;
+      }
+
+      /* Build trace block */
+      let traceSteps='';
+      if(data.trace){
+        (data.trace||[]).forEach((s,i)=>{
+          const warn=s.kind==='warn'?' warn':'';
+          traceSteps+=
+            '<div class="tstep'+warn+'">'+
+            '<span class="tn">'+(String(i+1).padStart(2,'0'))+'</span>'+
+            '['+escHtml(s.kind)+'] '+escHtml(s.detail)+
+            '</div>';
+        });
+      }
+
+      /* Build sources chips */
+      let chips='';
+      if(data.n_sources>0){
+        chips='<div class="chiprow">';
+        (data.sources||[]).forEach(src=>{
+          chips+='<span class="chip">'+escHtml(
+            src.title?(src.title.substring(0,40)):'مصدر'
+          )+'</span>';
+        });
+        chips+='</div>';
+      }
+
+      /* Main answer area */
+      const conf=Math.round((data.confidence||0)*100);
+      const answer=data.context||(data.output||'لم يتم العثور على نتائج.');
+
+      appendMsg(
+        '<div class="trace" data-toggle>'+
+          '<div class="trace-head">'+
+            '<span class="trace-runner"></span>'+
+            'تتبع الاستدلال · '+conf+'% ثقة'+
+            '<span class="trace-sub mono">'+data.chain_hash.substring(0,12)+'…</span>'+
+          '</div>'+
+          '<div class="trace-body"><div class="trace-steps">'+traceSteps+'</div></div>'+
+        '</div>'+
+        '<div class="msg-casper">'+
+          '<div class="p">'+escHtml(answer.substring(0,800))+'</div>'+
+          chips+
+        '</div>'
+      );
+
+    }catch(err){
+      loading.remove();
+      const isNoBridge=(err.message||'').includes('bridge-unavailable');
+      appendMsg(
+        '<div class="msg-casper"><div class="p" style="color:var(--danger)">'+
+        (isNoBridge
+          ? 'تعذّر الاتصال بالمحرك. تأكد من تشغيل Casper.exe بشكل صحيح.'
+          : 'خطأ: '+escHtml(err.message))+
+        '</div></div>'
+      );
+    }finally{
+      setRunning(false);
+    }
+  }
+
+  btn.addEventListener('click', sendQuery);
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter')sendQuery(); });
+}());
+
 document.querySelectorAll('.chip').forEach(chip=>{
   chip.addEventListener('click',()=>{
     const id=chip.getAttribute('data-target');
