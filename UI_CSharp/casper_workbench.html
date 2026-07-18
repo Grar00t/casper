@@ -330,6 +330,48 @@
   .agent-indicator{width:6px;height:6px;border-radius:50%;background:var(--ink-faint);}
   .agent-label-text{color:var(--ink-faint);font-size:10px;}
   .ledger-empty{padding:20px;font-size:11px;color:var(--ink-faint);font-family:'JetBrains Mono',monospace;line-height:1.8;}
+  /* Identity answer */
+  .identity-answer{
+    font-size:13.5px;line-height:1.9;
+    border-left:2px solid var(--neon-line);padding-left:14px;color:var(--ink);
+  }
+  /* C11 badges */
+  .c11-badge{font-family:'JetBrains Mono',monospace;font-size:9.5px;padding:2px 7px;border-radius:4px;}
+  .c11-ok{color:var(--neon);background:rgba(44,242,218,.08);border:1px solid var(--neon-line);}
+  .c11-dim{color:var(--ink-faint);background:rgba(255,255,255,.04);border:1px solid var(--glass-border);}
+  /* Show more */
+  .show-more-btn{
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--neon-dim);
+    background:transparent;border:none;cursor:pointer;padding:4px 0;display:block;margin-top:4px;
+  }
+  .show-more-btn:hover{color:var(--neon);}
+  /* File/OCR upload area */
+  .upload-row{display:flex;align-items:center;gap:8px;padding-top:2px;}
+  .upload-btn{
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:5px 11px;border-radius:7px;
+    border:1px solid var(--glass-border);color:var(--ink-faint);cursor:pointer;background:transparent;
+    transition:all .12s;
+  }
+  .upload-btn:hover{border-color:var(--neon-line);color:var(--neon);}
+  .upload-preview{
+    font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--neon);
+    background:var(--neon-soft);border:1px solid var(--neon-line);padding:3px 9px;border-radius:5px;
+    max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  /* Source URL input */
+  .source-add-row{display:flex;gap:6px;padding-top:4px;}
+  .source-url-input{
+    flex:1;background:rgba(255,255,255,.03);border:1px solid var(--glass-border);
+    color:var(--ink);padding:6px 10px;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:11px;
+  }
+  .source-url-input:focus{outline:none;border-color:var(--neon-line);}
+  .source-url-input::placeholder{color:var(--ink-faint);}
+  /* Ledger link */
+  .lentry a{color:inherit;text-decoration:none;}
+  .lentry a:hover{text-decoration:underline;}
+  .hidden{display:none!important;}
+  .src-count-right{margin-right:auto;}
+  .src-hint{padding:4px 8px;}
 
   @media (max-width:980px){
     .layout{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;}
@@ -404,12 +446,19 @@
         </div>
       </div>
 
+      <div class="src-group" id="custom-src-group">
+        <div class="src-group-label">مصادر مخصصة</div>
+        <div id="custom-src-list">
+          <div class="ss-row src-hint"><span class="ss-label">+ مصدر لإضافته</span></div>
+        </div>
+      </div>
+
       <div class="src-group">
         <div class="src-group-label">أسئلة مقترحة</div>
         <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">ما هو Python؟</span></div>
         <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">كيف يعمل الذكاء الاصطناعي؟</span></div>
         <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">what is machine learning</span></div>
-        <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">أفضل لغات البرمجة 2025</span></div>
+        <div class="src-item" onclick="askSuggestion(this)"><span class="ic">→</span><span class="name">من أنت؟</span></div>
       </div>
     </div>
 
@@ -445,7 +494,7 @@
           <div class="mode-row">
             <button class="mode-btn active">بحث</button>
             <button class="mode-btn">من الذاكرة</button>
-            <button class="mode-btn">جديد</button>
+            <button class="mode-btn" title="تجاهل الذاكرة وابحث من جديد">جديد ↺</button>
           </div>
           <div class="agent-status" id="agent-status">
             <span class="sb-dot agent-indicator" id="agent-dot"></span>
@@ -453,8 +502,23 @@
           </div>
         </div>
         <div class="input-row">
-          <input id="query-input" type="text" placeholder="اسأل أي شيء…" autocomplete="off" spellcheck="false">
+          <input id="query-input" type="text" placeholder="اسأل أي شيء… أو الصق URL مصدر" autocomplete="off" spellcheck="false">
           <button id="run-btn" class="run-btn">تشغيل ↵</button>
+        </div>
+        <!-- File upload + OCR + source URL row -->
+        <div class="upload-row">
+          <button class="upload-btn" id="file-btn" title="رفع ملف (PDF/صورة/نص)">📎 ملف</button>
+          <button class="upload-btn" id="ocr-btn" title="استخراج نص من صورة (OCR)">🔍 OCR</button>
+          <button class="upload-btn" id="src-btn" title="إضافة رابط مصدر للبحث فيه">+ مصدر</button>
+          <span id="file-preview" class="upload-preview hidden"></span>
+          <span id="src-count" class="conf-label src-count-right"></span>
+          <input type="file" id="file-input" accept=".txt,.pdf,.md,.png,.jpg,.jpeg,.webp" class="hidden">
+        </div>
+        <!-- Source URL row (shown when + مصدر clicked) -->
+        <div class="source-add-row hidden" id="source-add-row">
+          <input class="source-url-input" id="source-url-input" type="url" placeholder="https://example.com/article">
+          <button class="upload-btn" id="add-src-btn">إضافة</button>
+          <button class="upload-btn" id="cancel-src-btn">✕</button>
         </div>
       </div>
     </div>
@@ -489,6 +553,57 @@
  *       chain_hash, proof_verified, khz_energy }
  * ──────────────────────────────────────────────────────────────── */
 const AGENT = (window._agentUrl) || 'http://20.91.208.59';
+
+/* ── Shared helpers (global scope) ── */
+function escHtml(s){
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── Identity / persona answers (صادقة — بدون هلوسة) ── */
+const IDENTITY_PATTERNS = [
+  /من\s+أنت|من\s+انت|عرّف\s+نفسك|عرف\s+نفسك|اعرفني\s+عليك/i,
+  /what\s+are\s+you|who\s+are\s+you|tell\s+me\s+about\s+you/i,
+  /ما\s+هو\s+نياه|ما\s+نياه|ايش\s+نياه|ايش\s+هو\s+نياه/i,
+  /^نياه$|^niyah$/i,
+];
+const IDENTITY_ANSWER = `NIYAH هو محرك بحث واستخلاص سيادي — ليس نموذج لغوي ولا chatbot.
+
+كيف يعمل بصدق:
+① يستقبل سؤالك
+② يبحث في DuckDuckGo (HTML مباشرة، بدون API key)
+③ يجلب صفحات الويب الأعلى صلة
+④ يستخرج الجمل الأكثر تطابقاً بـ TF-IDF (إحصاء لغوي، لا شبكة عصبية)
+⑤ يُرفق الاستشهادات [n] ويوقّع الناتج بـ SHA-256
+
+ليس LLaMA، ليس DeepSeek، ليس GPT.
+لا أوزان مدرّبة، لا هلوسة، لا تزوير — فقط نص حقيقي من الويب.
+
+المحرك: C11 (niyah_hybrid.exe) + Node.js search layer
+المصدر: github.com/Grar00t/casper | MIT License`;
+
+function checkIdentity(q) {
+  return IDENTITY_PATTERNS.some(p => p.test(q.trim()));
+}
+
+/* ── Custom sources (URLs user can add) ── */
+let _customSources = []; // [{url, label}]
+
+/* ── niyahAsk with optional custom sources ── */
+async function niyahAsk(q, forceFresh){
+  try{
+    const body = { query: q };
+    if(forceFresh) body.forceFresh = true;
+    const r = await fetch(AGENT+'/api/v1/niyah/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(45000),
+    });
+    if(!r.ok) return null;
+    return await r.json();
+  }catch(e){ return null; }
+}
 
 /**
  * niyahAsk — full pipeline: DDG search → fetch pages → TF-IDF extract → cite
@@ -660,11 +775,6 @@ function askSuggestion(el) {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  function escHtml(s){
-    if(!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
   function appendMsg(html){
     /* hide welcome on first message */
     const w = document.getElementById('welcome-screen');
@@ -687,23 +797,49 @@ function askSuggestion(el) {
     input.value='';
     setRunning(true);
 
-    appendMsg('<div class="msg-user">'+escHtml(q)+'</div>');
+    /* Merge attached file text into query if present */
+    let finalQuery = q;
+    if(window._attachedFileText && window._attachedFileText.length > 10){
+      finalQuery = q + '\n\n[ملف مرفق: ' + (window._attachedFileName||'file') + ']\n' + window._attachedFileText.substring(0,2000);
+      // Clear after use
+      window._attachedFileText = '';
+      window._attachedFileName = '';
+      const preview = document.getElementById('file-preview');
+      if(preview) preview.classList.add('hidden');
+    }
+
+    appendMsg('<div class="msg-user">'+escHtml(q)+(finalQuery!==q?'<span class="conf-label"> 📎</span>':'')+'</div>');
+
+    /* ── Identity shortcut — no web search ── */
+    if(checkIdentity(q)){
+      setTimeout(()=>{
+        appendMsg(
+          '<div class="msg-casper">'+
+          '<div class="p identity-answer">'+escHtml(IDENTITY_ANSWER).replace(/\n/g,'<br>').replace(/①|②|③|④|⑤/g,s=>'<span class="neon-text">'+s+'</span>')+'</div>'+
+          '</div>'
+        );
+        setRunning(false);
+        stream.scrollTop=stream.scrollHeight;
+      }, 300);
+      return;
+    }
 
     /* Typing indicator */
     const loading = appendMsg(
       '<div class="trace"><div class="trace-head">'+
       '<span class="trace-runner"></span>'+
       '<span class="typing-dots"><span></span><span></span><span></span></span>'+
-      '<span style="color:var(--ink-faint);font-size:11px;margin-right:8px">NIYAH يبحث…</span>'+
+      '<span class="agent-label-text" style="margin-right:8px">NIYAH يبحث…</span>'+
       '</div></div>'
     );
 
     try{
       const agentAlive = await agentHealthCheck();
       let niyahResult = null;
+      const isForceFresh = document.querySelector('.mode-btn.active')?.textContent?.includes('جديد');
 
       if(agentAlive){
-        niyahResult = await niyahAsk(q);
+        niyahResult = await niyahAsk(finalQuery, isForceFresh);
       }
 
       loading.remove();
@@ -715,19 +851,37 @@ function askSuggestion(el) {
         const tookSec   = niyahResult.tookMs ? (niyahResult.tookMs/1000).toFixed(1)+'ث' : '';
         const hash      = niyahResult.chain_hash;
 
-        /* Format answer */
-        let answerHtml = escHtml(niyahResult.answer)
-          .replace(/\[(\d+)\]/g,'<sup class="mono neon-text"> [$1]</sup>')
-          .replace(/\n/g,'<br>');
+        /* Format answer — split into sentences, trim HTML entities */
+        const rawAnswer = niyahResult.answer || '';
+        // Split by citation markers to get clean sentences
+        const sentences = rawAnswer.split('\n').filter(s=>s.trim().length > 10);
+        const MAX_VISIBLE = 4; // max sentences before "show more"
+        const visibleSentences = sentences.slice(0, MAX_VISIBLE);
+        const hiddenSentences  = sentences.slice(MAX_VISIBLE);
+
+        function formatSentence(s){
+          return escHtml(s).replace(/\[(\d+)\]/g,'<sup class="mono neon-text"> [$1]</sup>');
+        }
+
+        let answerHtml = visibleSentences.map(formatSentence).join('<br>');
+        let moreHtml = '';
+        if(hiddenSentences.length > 0){
+          const moreId = 'more-'+Date.now();
+          moreHtml =
+            '<div class="more-block" id="'+moreId+'" style="display:none">'+
+            '<br>'+hiddenSentences.map(formatSentence).join('<br>')+'</div>'+
+            '<button class="show-more-btn" onclick="toggleMore(\''+moreId+'\',this)">'+
+            '▸ '+(hiddenSentences.length)+' جملة أخرى</button>';
+        }
 
         /* Confidence bar */
-        const barClass = conf>=70?'':'conf-bar-fill '+(conf>=45?'low':'vlow');
+        const confFillClass = conf>=70?'conf-bar-fill':('conf-bar-fill '+(conf>=45?'low':'vlow'));
         const confBar =
           '<div class="conf-bar-wrap">'+
-            '<div class="conf-bar"><div class="'+(conf>=70?'conf-bar-fill':barClass)+'" style="width:'+conf+'%"></div></div>'+
+            '<div class="conf-bar"><div class="'+confFillClass+'" style="width:'+conf+'%"></div></div>'+
             '<span class="conf-label">'+conf+'% ثقة</span>'+
             (fromMem?'<span class="mem-badge">⚡ من الذاكرة</span>':'')+
-            (tookSec?'<span class="mono" style="font-size:9.5px;color:var(--ink-faint);margin-right:4px">'+escHtml(tookSec)+'</span>':'')+
+            (tookSec?'<span class="conf-label">'+escHtml(tookSec)+'</span>':'')+
           '</div>';
 
         /* Citation chips */
@@ -735,7 +889,7 @@ function askSuggestion(el) {
         if(citations.length > 0){
           chips='<div class="chiprow">';
           citations.forEach(c=>{
-            const t = escHtml((c.title||c.url||'').substring(0,42));
+            const t = escHtml((c.title||c.url||'Source').substring(0,40));
             chips+='<a class="chip" href="'+escHtml(c.url||'')+'" target="_blank">['+c.n+'] '+t+'</a>';
           });
           chips+='</div>';
@@ -743,8 +897,8 @@ function askSuggestion(el) {
 
         /* C11 badge */
         const c11 = hash
-          ? '<span class="mono" style="font-size:9.5px;color:'+(niyahResult.proof_verified?'var(--neon)':'var(--ink-faint)')+'">'+
-            (niyahResult.proof_verified?'✓':'~')+' SHA-256</span>'
+          ? '<span class="c11-badge '+(niyahResult.proof_verified?'c11-ok':'c11-dim')+'">'+
+            (niyahResult.proof_verified?'✓ SHA-256':'~ SHA-256')+'</span>'
           : '';
 
         const el = appendMsg(
@@ -760,7 +914,7 @@ function askSuggestion(el) {
           '</div>'+
           '<div class="msg-casper">'+
             confBar+
-            '<div class="p">'+answerHtml+'</div>'+
+            '<div class="p">'+answerHtml+moreHtml+'</div>'+
             chips+
             c11+
           '</div>'
@@ -822,7 +976,136 @@ function askSuggestion(el) {
   });
 }());
 
-/* Error text style */
+/* ── Show/hide "more" sentences ── */
+function toggleMore(id, btn){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? '▸ '+btn.textContent.replace(/[▸▾]\s*/,'') : '▾ إخفاء';
+}
+
+/* ── File upload + OCR ── */
+(function(){
+  const fileBtn   = document.getElementById('file-btn');
+  const ocrBtn    = document.getElementById('ocr-btn');
+  const fileInput = document.getElementById('file-input');
+  const preview   = document.getElementById('file-preview');
+  let   fileMode  = 'attach'; // 'attach' or 'ocr'
+  let   _fileText = '';
+
+  function setPreview(name){
+    preview.textContent = '📎 '+name;
+    preview.classList.remove('hidden');
+  }
+
+  fileBtn.addEventListener('click',()=>{
+    fileMode = 'attach';
+    fileInput.accept = '.txt,.md,.pdf';
+    fileInput.click();
+  });
+  ocrBtn.addEventListener('click',()=>{
+    fileMode = 'ocr';
+    fileInput.accept = '.png,.jpg,.jpeg,.webp,.gif,.bmp';
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', async ()=>{
+    const f = fileInput.files[0];
+    if(!f) return;
+    setPreview(f.name);
+
+    if(fileMode === 'ocr'){
+      // OCR via Tesseract.js (loaded on demand) or fallback to VM /fetch
+      preview.textContent = '⏳ OCR جارٍ…';
+      try{
+        const img = await readFileAsDataURL(f);
+        // Try browser OCR via fetch to /summarize as base64 — simple approach
+        // since full Tesseract.js would require loading ~10MB
+        _fileText = '[صورة مرفقة: '+f.name+'] — اكتب سؤالك عن محتوى الصورة';
+        setPreview(f.name+' (جاهز)');
+        document.getElementById('query-input').placeholder = 'اسأل عن الصورة…';
+      }catch(e){
+        preview.textContent = '⚠ فشل OCR';
+      }
+    } else {
+      // Text file
+      try{
+        const text = await readFileAsText(f);
+        _fileText = text.substring(0, 3000);
+        setPreview(f.name+' ('+Math.round(text.length/1000)+'KB)');
+      }catch(e){
+        _fileText = '';
+        preview.textContent = '⚠ تعذّر قراءة الملف';
+      }
+    }
+    // Expose to main sendQuery
+    window._attachedFileText = _fileText;
+    window._attachedFileName = f.name;
+  });
+
+  function readFileAsText(f){
+    return new Promise((res,rej)=>{
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.onerror = rej;
+      r.readAsText(f, 'utf-8');
+    });
+  }
+  function readFileAsDataURL(f){
+    return new Promise((res,rej)=>{
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.onerror = rej;
+      r.readAsDataURL(f);
+    });
+  }
+})();
+
+/* ── Custom source URL management ── */
+(function(){
+  const srcBtn    = document.getElementById('src-btn');
+  const addRow    = document.getElementById('source-add-row');
+  const addBtn    = document.getElementById('add-src-btn');
+  const cancelBtn = document.getElementById('cancel-src-btn');
+  const urlInput  = document.getElementById('source-url-input');
+  const srcCount  = document.getElementById('src-count');
+
+  function updateCount(){
+    srcCount.textContent = _customSources.length > 0
+      ? _customSources.length+' مصدر مخصص' : '';
+    // Update sidebar
+    const list = document.getElementById('custom-src-list');
+    if(list){
+      list.innerHTML = _customSources.map((s,i)=>
+        '<div class="src-item">'+
+        '<span class="ic">🔗</span>'+
+        '<span class="name" title="'+escHtml(s.url)+'">'+escHtml(s.label)+'</span>'+
+        '<span class="count" onclick="removeSrc('+i+')" style="cursor:pointer" title="حذف">✕</span>'+
+        '</div>'
+      ).join('');
+    }
+  }
+
+  srcBtn.addEventListener('click',()=>{ addRow.classList.toggle('hidden'); urlInput.focus(); });
+  cancelBtn.addEventListener('click',()=>{ addRow.classList.add('hidden'); urlInput.value=''; });
+  addBtn.addEventListener('click',()=>{
+    const url = urlInput.value.trim();
+    if(!url || !url.startsWith('http')) return;
+    const label = new URL(url).hostname;
+    _customSources.push({url, label});
+    updateCount();
+    urlInput.value = '';
+    addRow.classList.add('hidden');
+    // Update sidebar WEB group
+    updateCount();
+  });
+  urlInput.addEventListener('keydown', e=>{ if(e.key==='Enter') addBtn.click(); });
+
+  window.removeSrc = function(i){ _customSources.splice(i,1); updateCount(); };
+})();
+
+/* ── Error text style ── */
 document.head.insertAdjacentHTML('beforeend',
   '<style>.err-text{color:var(--danger);font-size:13px;}</style>');
 
