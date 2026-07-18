@@ -471,7 +471,7 @@
           '<div class="trace-head">'+
             '<span class="trace-runner"></span>'+
             'تتبع الاستدلال · '+conf+'% ثقة'+
-            '<span class="trace-sub mono">'+data.chain_hash.substring(0,12)+'…</span>'+
+            ((data.chain_hash)?'<span class="trace-sub mono">'+(data.chain_hash).substring(0,12)+'…</span>':'')+
           '</div>'+
           '<div class="trace-body"><div class="trace-steps">'+traceSteps+'</div></div>'+
         '</div>'+
