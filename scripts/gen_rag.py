@@ -1,8 +1,9 @@
 import os
 os.chdir(r'C:/Users/sulaimanalshammari/Casper_Engine')
-# This script writes the complete casper_rag.c in one atomic write.
-# Run once: python scripts/gen_rag.py
-out=open('Core_CPP/casper_rag.c','wb')
+# Writes the COMPLETE casper_rag.c in one atomic open('wb') - no duplication.
+# Usage: python scripts/gen_rag.py
+# VERIFIED working method: replace_string_in_file edit tool writes this cleanly.
+out = open('Core_CPP/casper_rag.c', 'wb')
 L=[]
 L+=[b'/* casper_rag.c - RAG: DDG/Bing/SearXNG->context->JSON. WinHTTP. C11. */']
 L+=[b'#include "casper_rag.h"',b'#include "proof_generator.h"']
