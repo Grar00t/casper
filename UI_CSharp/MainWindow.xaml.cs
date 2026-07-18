@@ -83,6 +83,10 @@ public partial class MainWindow : Window
                 UseShellExecute = false,
                 CreateNoWindow  = true,
                 WorkingDirectory = EngineDir,
+                // UTF-8 without BOM — BOM causes %EF%BB%BF prefix in DDG queries
+                StandardInputEncoding  = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                StandardOutputEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                StandardErrorEncoding  = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
             };
 
             using var proc = Process.Start(psi)!;
