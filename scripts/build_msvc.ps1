@@ -96,7 +96,7 @@ if (-not $clInPath) {
     $scriptPath = $MyInvocation.MyCommand.Path
     $archArg = "-Arch $Arch"
     $cfgArg = "-Config $Config"
-    $inner = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $archArg $cfgArg"
+    $inner = "pwsh -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $archArg $cfgArg"
     & cmd /c "`"$vsDevCmd`" -arch=$Arch -no_logo && $inner"
     exit $LASTEXITCODE
 }
