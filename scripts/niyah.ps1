@@ -33,8 +33,8 @@ function Invoke-Build {
     & powershell -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\build_msvc.ps1") -Config Release
 }
 
-function Ensure-Build {
-    if (-not (Test-Path (Join-Path $RepoRoot "Core_CPP\niyah.exe"))) {
+function Assert-Built {
+    if (-not (Test-Path (Join-Path $RepoRoot "Core_CPP\niyah_hybrid.exe"))) {
         Invoke-Build
     }
 }
@@ -51,21 +51,21 @@ function Invoke-Corpus {
 
 function Invoke-Train {
     Write-Host "[niyah] train..."
-    Ensure-Build
+    Assert-Built
     $trainer = Join-Path $RepoRoot "niyah_train.exe"
     & $trainer $DataPath $Epochs $Lr $MinLr
 }
 
 function Invoke-Smoke {
     Write-Host "[niyah] smoke..."
-    Ensure-Build
+    Assert-Built
     $smoke = Join-Path $RepoRoot "Core_CPP\niyah_hybrid.exe"
     & $smoke --smoke
 }
 
 function Invoke-Bench {
     Write-Host "[niyah] bench..."
-    Ensure-Build
+    Assert-Built
     $bench = Join-Path $RepoRoot "Core_CPP\bench_niyah.exe"
     if (-not (Test-Path $bench)) {
         Write-Host "[niyah] building benchmark binary..."
@@ -87,7 +87,7 @@ function Invoke-Save {
 
 function Invoke-Run {
     Write-Host "[niyah] run..."
-    Ensure-Build
+    Assert-Built
     $hybrid = Join-Path $RepoRoot "Core_CPP\niyah_hybrid.exe"
     if (-not (Test-Path $hybrid)) {
         Write-Host "[niyah] building hybrid binary..."
