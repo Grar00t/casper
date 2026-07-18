@@ -102,7 +102,8 @@ if (-not $clInPath) {
 }
 
 $niyahSrc = @("$Root\Core_CPP\niyah_core.c", "$Root\Core_CPP\niyah_main.c")
-$trainerSrc = @("$Root\Core_CPP\trainer.cpp")
+# trainer.cpp / trainer_real.cpp / trainer_real_fix.cpp were fake stubs and have been removed.
+# The real Adam trainer is niyah_train.c → niyah_train.exe.
 $niyahTrainSrc = @("$Root\Core_CPP\niyah_train.c", "$Root\Core_CPP\niyah_core.c", "$Root\tokenizer.c")
 $hybridSrc = @(
     "$Root\Core_CPP\niyah_hybrid_main.c",
@@ -117,7 +118,6 @@ $hybridSrc = @(
 $benchSrc = @("$Root\Core_CPP\bench_niyah.c", "$Root\Core_CPP\niyah_core.c")
 
 Invoke-ClBuild -Sources $niyahSrc -Out "$Root\Core_CPP\niyah.exe" -ExtraFlags @('/std:c17')
-Invoke-ClBuild -Sources $trainerSrc -Out "$Root\Core_CPP\trainer.exe" -ExtraFlags @('/std:c++17')
 Invoke-ClBuild -Sources $niyahTrainSrc -Out "$Root\niyah_train.exe" -ExtraFlags @('/std:c17')
 Invoke-ClBuild -Sources $hybridSrc -Out "$Root\Core_CPP\niyah_hybrid.exe" -ExtraFlags @('/std:c17')
 Invoke-ClBuild -Sources $benchSrc -Out "$Root\Core_CPP\bench_niyah.exe" -ExtraFlags @('/std:c17')
@@ -125,7 +125,6 @@ Invoke-ClBuild -Sources $benchSrc -Out "$Root\Core_CPP\bench_niyah.exe" -ExtraFl
 Write-Host "`n[build_msvc] Artifact checksums (SHA256):"
 foreach ($artifact in @(
     "$Root\Core_CPP\niyah.exe",
-    "$Root\Core_CPP\trainer.exe",
     "$Root\niyah_train.exe",
     "$Root\Core_CPP\niyah_hybrid.exe",
     "$Root\Core_CPP\bench_niyah.exe"

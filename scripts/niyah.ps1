@@ -94,8 +94,20 @@ function Invoke-Run {
         & powershell -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\build_msvc.ps1") -Config Release
     }
 
+    # Prefer the parameter-supplied model; fall back to the standard trained output.
+    $resolvedModel = $Model
+    if (-not (Test-Path $resolvedModel)) {
+        $fallback = Join-Path $RepoRoot "niyah_trained.bin"
+        if (Test-Path $fallback) {
+            $resolvedModel = $fallback
+            Write-Host "[niyah] model '$Model' not found; using '$resolvedModel'"
+        } else {
+            Write-Host "[niyah] WARNING: no model file found. Run 'niyah.ps1 train' first."
+        }
+    }
+
     $inputText = @($Prompt, "quit") -join [Environment]::NewLine
-    $inputText | & $hybrid --model $Model --interactive
+    $inputText | & $hybrid --model $resolvedModel --interactive
 }
 
 switch ($Action) {

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateRange(1,20)]
     [int]$Scale = 1
 )

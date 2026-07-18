@@ -37,18 +37,72 @@ static void add_token(const char *s) {
 }
 
 void tokenizer_init(void) {
-    add_token("<BOS>");
-    add_token("<EOS>");
-    add_token("<PAD>");
-    add_token("<UNK>");
+    /* IDs 0-3: specials */
+    add_token("<BOS>");   /* 0 */
+    add_token("<EOS>");   /* 1 */
+    add_token("<PAD>");   /* 2 */
+    add_token("<UNK>");   /* 3 */
+
+    /* IDs 4-13: digits */
     for (int i = 0; i < 10; i++) {
         char buf[4];
         sprintf(buf, "%d", i);
         add_token(buf);
     }
-    add_token("("); add_token(")"); add_token("{"); add_token("}");
-    add_token(";"); add_token("="); add_token("+"); add_token("-");
-    add_token("*"); add_token("/"); add_token("#"); add_token(".");
+
+    /* IDs 14-37: printable ASCII punctuation / operators (every non-alpha non-digit) */
+    const char *puncts = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+    for (const char *p = puncts; *p; p++) {
+        char buf[3] = {*p, '\0', '\0'};
+        add_token(buf);
+    }
+
+    /* IDs 38-63: lowercase single letters */
+    for (char c = 'a'; c <= 'z'; c++) {
+        char buf[2] = {c, '\0'};
+        add_token(buf);
+    }
+
+    /* IDs 64-89: uppercase single letters */
+    for (char c = 'A'; c <= 'Z'; c++) {
+        char buf[2] = {c, '\0'};
+        add_token(buf);
+    }
+
+    /* IDs 90+: common English and domain words for better decode quality.
+     * These cover the sovereign_knowledge training corpus vocabulary. */
+    const char *words[] = {
+        /* function / structure words */
+        "the","a","an","and","or","is","in","of","to","for","with","on",
+        "at","by","from","that","this","it","are","was","be","as","not",
+        "but","have","has","had","we","i","you","they","he","she","can",
+        "will","would","do","does","did","if","when","then","so","all",
+        "no","up","out","one","two","three","four","five","six","seven",
+        "eight","nine","ten","than","more","less","very","also","only",
+        /* technical / domain words */
+        "model","data","train","training","layer","layers","weight","weights",
+        "token","tokens","embed","embedding","head","heads","attention","output",
+        "input","loss","gradient","optimizer","matrix","vector","kernel","cpu",
+        "gpu","memory","float","int","size","context","vocab","local","zero",
+        "code","file","build","run","test","hash","proof","rule","query","fact",
+        "function","class","struct","type","return","void","static","const",
+        "malloc","calloc","free","pointer","buffer","stack","heap","pool",
+        "forward","backward","sample","generate","decode","encode","norm",
+        "softmax","relu","silu","gelu","linear","bias","scale","sum","dot",
+        "compute","algorithm","system","engine","core","base","key","value",
+        "arabic","quran","bismillah","sovereign","inference","symbolic","logic",
+        "constraint","solver","rational","arithmetic","sha","cryptographic",
+        /* Arabic transliterations that appear in comments/data */
+        "niyah","casper","khwarizmi","adam","rope","swiglu","rmsnorm","gqa",
+        /* numbers as words */
+        "zero","one","two","three","four","five","six","seven","eight","nine",
+        "ten","hundred","thousand","million","billion",
+        NULL
+    };
+    for (int i = 0; words[i]; i++) {
+        if (vocab_size < MAX_VOCAB - 1)
+            add_token(words[i]);
+    }
 }
 
 uint32_t tokenizer_encode(const char *text, uint32_t *tokens, uint32_t max_len) {
