@@ -72,11 +72,12 @@ if ($archFlag) { $commonFlags += $archFlag }
 $configFlags = if ($Config -eq 'Release') { @('/O2', '/GL', '/DNDEBUG') } else { @('/Od', '/Zi', '/RTC1') }
 
 function Invoke-ClBuild {
-    param([string[]]$Sources, [string]$Out, [string[]]$ExtraFlags = @())
+    param([string[]]$Sources, [string]$Out, [string[]]$ExtraFlags = @(), [string[]]$LinkerLibs = @())
     $allFlags = @($commonFlags + $configFlags + @('/I.', '/ICore_CPP', '/Iinclude') + $ExtraFlags)
-    $flagStr = $allFlags -join ' '
-    $srcStr = ($Sources | ForEach-Object { '"' + $_ + '"' }) -join ' '
-    $cmd = "cl.exe $flagStr $srcStr /Fe:`"$Out`""
+    $flagStr  = $allFlags -join ' '
+    $srcStr   = ($Sources | ForEach-Object { '"' + $_ + '"' }) -join ' '
+    $libStr   = if ($LinkerLibs.Count -gt 0) { ' /link ' + ($LinkerLibs -join ' ') } else { '' }
+    $cmd = "cl.exe $flagStr $srcStr /Fe:`"$Out`"$libStr"
     Write-Host "`n[build_msvc] Compiling: $Out"
     Write-Host "  cmd> $cmd"
     $result = & cmd /c "$cmd 2>&1"
@@ -123,12 +124,22 @@ Invoke-ClBuild -Sources $niyahTrainSrc -Out "$Root\niyah_train.exe" -ExtraFlags 
 Invoke-ClBuild -Sources $hybridSrc -Out "$Root\Core_CPP\niyah_hybrid.exe" -ExtraFlags @('/std:c17', '/DWINHTTP_LINK')
 Invoke-ClBuild -Sources $benchSrc -Out "$Root\Core_CPP\bench_niyah.exe" -ExtraFlags @('/std:c17')
 
+# casper.exe — sovereign search CLI (casper_cli.c + rag + rules + proof)
+$casperSrc = @(
+    "$Root\Core_CPP\casper_cli.c",
+    "$Root\Core_CPP\casper_rag.c",
+    "$Root\Core_CPP\rule_parser.c",
+    "$Root\Core_CPP\proof_generator.c"
+)
+Invoke-ClBuild -Sources $casperSrc -Out "$Root\casper.exe" -ExtraFlags @('/std:c17') -LinkerLibs @('winhttp.lib')
+
 Write-Host "`n[build_msvc] Artifact checksums (SHA256):"
 foreach ($artifact in @(
     "$Root\Core_CPP\niyah.exe",
     "$Root\niyah_train.exe",
     "$Root\Core_CPP\niyah_hybrid.exe",
-    "$Root\Core_CPP\bench_niyah.exe"
+    "$Root\Core_CPP\bench_niyah.exe",
+    "$Root\casper.exe"
 )) {
     if (Test-Path $artifact) {
         $hash = (Get-FileHash $artifact -Algorithm SHA256).Hash

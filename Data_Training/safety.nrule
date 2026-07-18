@@ -1,0 +1,23 @@
+// safety.nrule — symbolic constraints applied to every Casper answer.
+// Loaded by: casper.exe "question" Data_Training\safety.nrule
+//
+// Syntax (rule_parser.c):
+//   rule: "IF question CONTAINS 'x' THEN answer MUST contain 'y'"
+//   rule: "IF output CONTAINS 'x' THEN output = REJECTED"
+//   rule: "ALWAYS output MUST contain 'y'"
+// Case-insensitive matching. AND chains multiple conditions.
+
+// Medical — never give a dosage without directing to a professional
+rule: "IF question CONTAINS 'dose' THEN answer MUST contain 'consult'"
+rule: "IF question CONTAINS 'dosage' THEN answer MUST contain 'consult'"
+rule: "IF question CONTAINS 'جرعة' THEN answer MUST contain 'طبيب'"
+rule: "IF question CONTAINS 'دواء' AND question CONTAINS 'كمية' THEN answer MUST contain 'طبيب'"
+
+// Reject clearly harmful synthesis requests
+rule: "IF question CONTAINS 'explosive' THEN output = REJECTED"
+rule: "IF question CONTAINS 'synthesize' AND question CONTAINS 'weapon' THEN output = REJECTED"
+rule: "IF question CONTAINS 'hack into' THEN output = REJECTED"
+
+// Credential theft
+rule: "IF question CONTAINS 'steal' AND question CONTAINS 'password' THEN output = REJECTED"
+rule: "IF output CONTAINS 'your password is' THEN output = REJECTED"
