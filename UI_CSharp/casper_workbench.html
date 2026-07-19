@@ -1,791 +1,307 @@
 
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NIYAH</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"><style>
-/* ═══════════════ DARK THEME (default) ═══════════════ */
-:root {
-  --bg: #0F1117;
-  --surface: #1A1D27;
-  --surface2: #232635;
-  --border: rgba(255,255,255,.08);
-  --border-strong: rgba(255,255,255,.15);
-  --neon: #7C3AED;
-  --neon2: #A78BFA;
-  --accent: #06B6D4;
-  --accent2: #67E8F9;
-  --green: #10B981;
-  --amber: #F59E0B;
-  --red: #EF4444;
-  --text: #F8FAFC;
-  --text2: #94A3B8;
-  --text3: #475569;
-  --mono: 'JetBrains Mono', monospace;
-  --sans: 'Inter', 'Tajawal', sans-serif;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --shadow: 0 4px 24px rgba(0,0,0,.4);
-}
-/* ═══════════════ LIGHT THEME ═══════════════ */
-[data-theme="light"] {
-  --bg: #F1F5F9;
-  --surface: #FFFFFF;
-  --surface2: #F8FAFC;
-  --border: rgba(0,0,0,.08);
-  --border-strong: rgba(0,0,0,.18);
-  --neon: #7C3AED;
-  --neon2: #6D28D9;
-  --accent: #0891B2;
-  --accent2: #0E7490;
-  --green: #059669;
-  --amber: #D97706;
-  --red: #DC2626;
-  --text: #0F172A;
-  --text2: #475569;
-  --text3: #94A3B8;
-  --shadow: 0 4px 24px rgba(0,0,0,.10);
-}
-/* ═══════════════ RESET ═══════════════ */
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NIYAH</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0e27;--card:#131740;--card2:#1a2050;--border:rgba(139,92,246,.15);--glow:rgba(139,92,246,.08);--purple:#8B5CF6;--purple2:#A78BFA;--cyan:#22D3EE;--green:#34D399;--amber:#FBBF24;--red:#F87171;--text:#F1F5F9;--text2:#A1AECE;--text3:#5B6B8A;--sans:'Inter','Tajawal',sans-serif;--mono:'JetBrains Mono',monospace;--r:14px;--r2:10px}
+[data-theme=light]{--bg:#F8FAFF;--card:#FFFFFF;--card2:#F1F5FF;--border:rgba(99,102,241,.15);--glow:rgba(99,102,241,.06);--purple:#7C3AED;--purple2:#6D28D9;--cyan:#0891B2;--green:#059669;--amber:#D97706;--red:#DC2626;--text:#1E293B;--text2:#64748B;--text3:#94A3B8}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;font-family:var(--sans);background:var(--bg);color:var(--text);font-size:15px}
-::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px}
-::selection{background:rgba(124,58,237,.25);color:var(--text)}
-.mono{font-family:var(--mono)}
-/* ═══════════════ LAYOUT ═══════════════ */
-.app-shell{height:100vh;display:flex;flex-direction:column}
-.titlebar{
-  height:40px;display:flex;align-items:center;padding:0 16px;gap:10px;
-  background:var(--surface);border-bottom:1px solid var(--border);
-  flex-shrink:0;-webkit-app-region:drag;direction:ltr
-}
-.traffic-lights{display:flex;gap:6px;-webkit-app-region:no-drag}
-.tl{width:12px;height:12px;border-radius:50%;cursor:pointer;transition:filter .15s}
-.tl:hover{filter:brightness(1.3)}
-.tl-close{background:#FF5F57}
-.tl-min{background:#FEBC2E}
-.tl-max{background:#28C840}
-.title-text{flex:1;text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--text2);pointer-events:none;letter-spacing:.5px}
-.title-badge{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px}
-.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0}
-@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,.4)}50%{opacity:.7;box-shadow:0 0 0 5px rgba(16,185,129,0)}}
-/* ═══════════════ NAV BAR ═══════════════ */
-.navbar{
-  display:flex;align-items:center;padding:0 16px;height:44px;
-  background:var(--surface);border-bottom:1px solid var(--border);
-  gap:4px;flex-shrink:0
-}
-.nav-tab{
-  display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--radius-sm);
-  font-size:12.5px;font-family:var(--mono);color:var(--text2);cursor:pointer;
-  transition:all .15s;border:none;background:transparent
-}
-.nav-tab:hover{background:var(--surface2);color:var(--text)}
-.nav-tab.active{background:var(--neon);color:#fff;font-weight:500}
-.nav-spacer{flex:1}
-.nav-action{
-  display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:var(--radius-sm);
-  font-size:11px;font-family:var(--mono);color:var(--text2);cursor:pointer;
-  border:1px solid var(--border);background:transparent;transition:all .15s
-}
-.nav-action:hover{border-color:var(--border-strong);color:var(--text)}
-/* ═══════════════ STATUS BAR ═══════════════ */
-.statusbar{
-  display:flex;align-items:center;padding:0 16px;height:26px;gap:14px;
-  background:var(--surface);border-bottom:1px solid var(--border);
-  font-family:var(--mono);font-size:10.5px;color:var(--text3);flex-shrink:0;direction:ltr
-}
-.sb-item{display:flex;align-items:center;gap:5px}
-.sb-dot{width:6px;height:6px;border-radius:50%}
-.sb-dot.ok{background:var(--green)}
-.sb-dot.warn{background:var(--amber)}
-.sb-dot.off{background:var(--red)}
-.sb-right{margin-left:auto;display:flex;gap:8px;align-items:center}
-/* ═══════════════ MAIN CONTENT ═══════════════ */
-.content{flex:1;display:grid;grid-template-columns:220px 1fr 280px;overflow:hidden;min-height:0}
-/* ═══════════════ SIDEBAR ═══════════════ */
-.sidebar{
-  background:var(--surface);border-inline-end:1px solid var(--border);
-  overflow-y:auto;display:flex;flex-direction:column;gap:0
-}
-.sidebar-block{padding:14px 14px 10px;border-bottom:1px solid var(--border)}
-.sidebar-label{font-family:var(--mono);font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px}
-/* Engine card */
-.engine-card{
-  background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(6,182,212,.08));
-  border:1px solid rgba(124,58,237,.25);border-radius:var(--radius);padding:12px
-}
-.engine-name{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--neon2);margin-bottom:4px}
-.engine-desc{font-size:11.5px;color:var(--text2);line-height:1.55}
-.engine-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
-.engine-tag{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(124,58,237,.12);color:var(--neon2);border:1px solid rgba(124,58,237,.2)}
-/* Stats */
-.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.stat-card{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px}
-.stat-val{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--accent);line-height:1}
-.stat-label{font-size:10px;color:var(--text3);margin-top:3px}
-/* Suggestions */
-.suggestion{
-  display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);
-  cursor:pointer;font-size:12px;color:var(--text2);transition:all .15s
-}
-.suggestion:hover{background:var(--surface2);color:var(--text)}
-.suggestion-icon{font-size:10px;color:var(--text3)}
-/* ═══════════════ WORKBENCH ═══════════════ */
-.workbench{display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
-.stream{
-  flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px;
-  background:var(--bg)
-}
+html,body{height:100%;overflow:hidden;font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14.5px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+::selection{background:rgba(139,92,246,.2)}
+body{display:flex;flex-direction:column}
+/* Titlebar */
+.titlebar{height:38px;display:flex;align-items:center;padding:0 14px;gap:8px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0;-webkit-app-region:drag;direction:ltr}
+.tl-dots{display:flex;gap:6px;-webkit-app-region:no-drag}.dot{width:11px;height:11px;border-radius:50%;cursor:pointer;transition:.15s}.dot:hover{filter:brightness(1.3)}.dot-r{background:#FF5F57}.dot-y{background:#FEBC2E}.dot-g{background:#28C840}
+.tl-title{flex:1;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text3);pointer-events:none}
+.tl-live{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--green)}.tl-live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:glow 2s infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.4)}50%{box-shadow:0 0 0 4px rgba(52,211,153,0)}}
+/* Nav */
+.nav{display:flex;align-items:center;padding:6px 14px;gap:6px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0}
+.nav-btn{font-family:var(--mono);font-size:11px;padding:5px 12px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:.15s}.nav-btn:hover{background:var(--glow);color:var(--text);border-color:var(--purple)}.nav-btn.on{background:var(--purple);color:#fff;border-color:var(--purple)}
+.nav-space{flex:1}
+/* Layout */
+.layout{flex:1;display:grid;grid-template-columns:200px 1fr 260px;overflow:hidden;min-height:0}
+/* Sidebar */
+.side{background:var(--card);border-inline-end:1px solid var(--border);overflow-y:auto;padding:12px}
+.side-label{font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin:10px 0 6px}
+.ncard{background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(34,211,238,.08));border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.ncard-name{font-family:var(--mono);font-size:13px;color:var(--purple2);font-weight:500}.ncard-desc{font-size:11px;color:var(--text2);margin-top:4px;line-height:1.6}
+.ncard-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.ntag{font-family:var(--mono);font-size:8.5px;padding:2px 7px;border-radius:4px;background:rgba(139,92,246,.1);color:var(--purple2);border:1px solid rgba(139,92,246,.2)}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}.scard{background:var(--card2);border-radius:var(--r2);padding:8px 10px}.sval{font-family:var(--mono);font-size:17px;font-weight:600;color:var(--cyan)}.slbl{font-size:9px;color:var(--text3);margin-top:2px}
+.sug{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:var(--r2);cursor:pointer;font-size:11.5px;color:var(--text2);transition:.12s}.sug:hover{background:var(--glow);color:var(--text)}.sug-a{font-size:9px;color:var(--text3)}
+/* Main */
+.main{display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+.stream{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px}
 /* Welcome */
-.welcome{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:28px;text-align:center;padding:40px;min-height:300px
-}
-.welcome-logo{
-  font-family:var(--mono);font-size:52px;font-weight:700;letter-spacing:4px;
-  background:linear-gradient(135deg,var(--neon),var(--accent));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text
-}
-.welcome-sub{font-size:14px;color:var(--text2);max-width:380px;line-height:1.7}
-.welcome-how{
-  font-family:var(--mono);font-size:11px;color:var(--text2);
-  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  padding:14px 18px;text-align:left;direction:ltr;line-height:1.85;max-width:480px
-}
-.welcome-pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:500px}
-.pill{
-  font-size:12.5px;padding:8px 16px;border-radius:20px;cursor:pointer;
-  border:1px solid var(--border);color:var(--text2);background:var(--surface);
-  transition:all .18s
-}
-.pill:hover{border-color:var(--neon);color:var(--neon);background:rgba(124,58,237,.08)}
+.welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;text-align:center;padding:30px}
+.w-logo{font-family:var(--mono);font-size:48px;font-weight:700;background:linear-gradient(135deg,var(--purple),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:3px}
+.w-sub{font-size:13px;color:var(--text2);max-width:360px;line-height:1.7}
+.w-how{font-family:var(--mono);font-size:10.5px;color:var(--text3);background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:left;direction:ltr;line-height:1.9;max-width:440px}
+.w-pills{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;max-width:440px}
+.pill{font-size:12px;padding:8px 15px;border-radius:20px;cursor:pointer;border:1px solid var(--border);color:var(--text2);background:var(--card);transition:.18s}.pill:hover{border-color:var(--purple);color:var(--purple);background:var(--glow);box-shadow:0 0 16px rgba(139,92,246,.15)}
 /* Messages */
-.msg-user{
-  align-self:flex-end;max-width:72%;background:var(--neon);color:#fff;
-  border-radius:18px 18px 4px 18px;padding:13px 18px;font-size:14px;line-height:1.85;
-  box-shadow:0 2px 12px rgba(124,58,237,.3)
-}
-.msg-niyah{display:flex;flex-direction:column;gap:12px;max-width:92%}
-.answer-card{
-  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  padding:18px 20px;box-shadow:var(--shadow)
-}
-.answer-text{font-size:14px;line-height:2.0;color:var(--text)}
-.answer-text sup{color:var(--neon2);font-family:var(--mono);font-size:9px}
-/* Confidence bar */
-.conf-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;direction:ltr}
-.conf-bar{width:80px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
-.conf-fill{height:100%;border-radius:2px;transition:width .5s}
-.conf-fill.hi{background:var(--green)}
-.conf-fill.mid{background:var(--amber)}
-.conf-fill.lo{background:var(--red)}
-.conf-pct{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text2)}
-.mem-tag{font-family:var(--mono);font-size:9.5px;padding:2px 8px;border-radius:4px;background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25)}
+.msg-u{align-self:flex-end;max-width:72%;background:linear-gradient(135deg,var(--purple),#6D28D9);color:#fff;border-radius:16px 16px 4px 16px;padding:12px 16px;font-size:13.5px;line-height:1.85;box-shadow:0 4px 16px rgba(139,92,246,.3)}
+.msg-n{display:flex;flex-direction:column;gap:10px;max-width:92%}
+.ans-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;box-shadow:0 2px 12px rgba(0,0,0,.1)}
+.ans-text{font-size:13.5px;line-height:2;color:var(--text)}.ans-text sup{color:var(--purple2);font-family:var(--mono);font-size:9px}
+/* Conf bar */
+.conf-r{display:flex;align-items:center;gap:8px;margin-bottom:10px;direction:ltr}
+.conf-b{width:80px;height:4px;background:var(--card2);border-radius:2px;overflow:hidden}.conf-f{height:100%;border-radius:2px;transition:width .5s}.conf-f.hi{background:var(--green)}.conf-f.mid{background:var(--amber)}.conf-f.lo{background:var(--red)}
+.conf-p{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text2)}
+.mem-t{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(251,191,36,.1);color:var(--amber);border:1px solid rgba(251,191,36,.2)}
 /* Citations */
-.cit-row{display:flex;flex-wrap:wrap;gap:6px;direction:ltr;margin-top:4px}
-.cit{
-  display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10.5px;
-  padding:4px 11px;border-radius:20px;border:1px solid var(--border);color:var(--text2);
-  text-decoration:none;background:var(--surface2);transition:all .15s
-}
-.cit:hover{border-color:var(--neon);color:var(--neon);background:rgba(124,58,237,.08)}
-/* Show more */
-.show-more{
-  font-family:var(--mono);font-size:10.5px;color:var(--neon2);background:none;
-  border:none;cursor:pointer;padding:4px 0;margin-top:2px;display:block
-}
-/* Trace block */
-.trace-block{
-  background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
-  overflow:hidden;margin-top:4px
-}
-.trace-toggle{
-  display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;
-  font-family:var(--mono);font-size:11px;color:var(--text2);-webkit-user-select:none;user-select:none;
-  transition:background .15s
-}
-.trace-toggle:hover{background:var(--surface)}
-.trace-toggle .chevron{color:var(--text3);transition:transform .15s;font-size:10px}
-.trace-block.open .chevron{transform:rotate(90deg)}
-.trace-body{display:none;padding:8px 14px 12px;border-top:1px solid var(--border)}
-.trace-block.open .trace-body{display:block}
-.trace-step{display:grid;grid-template-columns:120px 48px 1fr;gap:6px;padding:4px 0;font-family:var(--mono);font-size:11px;color:var(--text2);direction:ltr;border-bottom:1px solid var(--border);align-items:start}
-.trace-step:last-child{border-bottom:none}
-.trace-step-name{color:var(--accent);font-weight:500}
-.trace-step-ms{color:var(--text3)}
-.trace-step-sub{font-size:9.5px;color:var(--text3);padding-left:120px;margin-top:1px;direction:ltr}
+.cits{display:flex;flex-wrap:wrap;gap:5px;direction:ltr;margin-top:6px}
+.cit{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:16px;border:1px solid var(--border);color:var(--text2);text-decoration:none;background:var(--card2);transition:.15s}
+.cit:hover{border-color:var(--purple);color:var(--purple);background:var(--glow)}
+.show-m{font-family:var(--mono);font-size:10px;color:var(--purple2);background:none;border:none;cursor:pointer;padding:3px 0;display:block;margin-top:2px}.show-m:hover{color:var(--purple)}
+/* Trace */
+.trace-b{background:var(--card2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-top:4px}
+.trace-t{display:flex;align-items:center;gap:6px;padding:8px 12px;cursor:pointer;font-family:var(--mono);font-size:10.5px;color:var(--text2);-webkit-user-select:none;user-select:none;transition:.12s}.trace-t:hover{background:var(--card)}
+.trace-t .chv{color:var(--text3);font-size:9px;transition:transform .15s}.trace-b.open .chv{transform:rotate(90deg)}
+.trace-bd{display:none;padding:8px 12px;border-top:1px solid var(--border)}.trace-b.open .trace-bd{display:block}
+.tr-s{display:grid;grid-template-columns:110px 44px 1fr;gap:4px;padding:3px 0;font-family:var(--mono);font-size:10.5px;color:var(--text2);direction:ltr;border-bottom:1px solid var(--border)}.tr-s:last-child{border-bottom:none}
+.tr-sn{color:var(--cyan);font-weight:500}.tr-sm{color:var(--text3)}
+.tr-sd{font-size:9px;color:var(--text3);padding-left:110px;margin-top:1px;direction:ltr}
 /* Identity */
-.identity-answer{
-  background:var(--surface);border:1px solid rgba(124,58,237,.2);border-radius:var(--radius);
-  padding:18px 20px;font-size:13.5px;line-height:1.9;color:var(--text);white-space:pre-line
-}
-/* Composer */
-.composer{
-  padding:14px 20px 18px;background:var(--surface);border-top:1px solid var(--border);
-  display:flex;flex-direction:column;gap:10px
-}
-.composer-row1{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.mode-group{display:flex;gap:4px}
-.mode-btn{
-  font-family:var(--mono);font-size:11px;padding:5px 13px;border-radius:var(--radius-sm);
-  border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s
-}
-.mode-btn.active{background:rgba(124,58,237,.12);border-color:var(--neon);color:var(--neon);font-weight:500}
-.mode-btn:hover:not(.active){background:var(--surface2);color:var(--text)}
-.agent-status{font-family:var(--mono);font-size:10.5px;display:flex;align-items:center;gap:5px;color:var(--text3)}
-.composer-row2{display:flex;gap:10px;align-items:center}
-.query-input{
-  flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);
-  padding:11px 16px;font-family:var(--sans);font-size:14px;color:var(--text);
-  transition:border-color .15s
-}
-.query-input:focus{outline:none;border-color:var(--neon)}
-.query-input::placeholder{color:var(--text3)}
-.send-btn{
-  background:var(--neon);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius);
-  font-weight:600;cursor:pointer;font-size:13.5px;white-space:nowrap;font-family:var(--sans);
-  box-shadow:0 2px 12px rgba(124,58,237,.35);transition:all .15s
-}
-.send-btn:hover{filter:brightness(1.1);box-shadow:0 4px 18px rgba(124,58,237,.5)}
-.send-btn:disabled{opacity:.45;box-shadow:none;cursor:not-allowed}
-.composer-row3{display:flex;gap:6px;align-items:center}
-.extra-btn{
-  font-family:var(--mono);font-size:10.5px;padding:4px 10px;border-radius:var(--radius-sm);
-  border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s
-}
-.extra-btn:hover{border-color:var(--border-strong);color:var(--text)}
-.file-tag{font-family:var(--mono);font-size:10px;color:var(--green);background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);padding:3px 9px;border-radius:5px}
-/* ═══════════════ LEDGER ═══════════════ */
-.ledger{background:var(--surface);border-inline-start:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-.ledger-header{padding:12px 16px 8px;font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border)}
-.ledger-kpis{display:flex;border-bottom:1px solid var(--border)}
-.kpi{flex:1;padding:12px 10px;text-align:center;border-right:1px solid var(--border)}
-.kpi:last-child{border-right:none}
-.kpi-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent)}
-.kpi-label{font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:2px;text-transform:uppercase}
-.ledger-list{flex:1;overflow-y:auto}
-.lentry{padding:10px 14px;border-bottom:1px solid var(--border);direction:ltr;transition:background .12s}
-.lentry:hover{background:var(--surface2)}
-.lentry-kind{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--neon2);margin-bottom:3px}
-.lentry-desc{font-size:11px;color:var(--text2);line-height:1.5}
-.lentry-sub{font-family:var(--mono);font-size:9.5px;color:var(--text3);margin-top:2px;word-break:break-all}
-.lentry-meta{display:flex;justify-content:space-between;margin-top:5px}
-.lentry-ms{font-family:var(--mono);font-size:9.5px;color:var(--text3)}
-.lentry-check{color:var(--green);font-size:11px}
-.ledger-empty{padding:24px 16px;font-family:var(--mono);font-size:11px;color:var(--text3);line-height:1.8;text-align:center}
-.ledger-footer{padding:8px 14px;border-top:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text3);display:flex;justify-content:space-between}
-/* ═══════════════ TERMINAL ═══════════════ */
-.term-panel{
-  display:none;position:fixed;bottom:0;left:0;right:0;height:42%;
-  background:#0D0D0D;border-top:2px solid var(--neon);z-index:200;
-  flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.5)
-}
-.term-header{
-  display:flex;align-items:center;padding:6px 14px;gap:10px;
-  background:rgba(0,0,0,.6);font-family:var(--mono);font-size:11px
-}
-.term-title{color:var(--neon2)}
-.term-status{color:var(--text3)}
-.term-close{margin-left:auto;background:transparent;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0 4px;line-height:1}
-/* Typing indicator */
-.typing{display:flex;align-items:center;gap:6px;padding:4px 0;font-family:var(--mono);font-size:11px;color:var(--text3)}
-.tdot{width:5px;height:5px;border-radius:50%;background:var(--neon2);animation:td .8s infinite}
-.tdot:nth-child(2){animation-delay:.2s}
-.tdot:nth-child(3){animation-delay:.4s}
+.id-ans{background:var(--card);border:1px solid rgba(139,92,246,.2);border-radius:var(--r);padding:16px 18px;font-size:13px;line-height:1.9;white-space:pre-line}
+/* Typing */
+.typing{display:flex;gap:5px;align-items:center;padding:6px 0}.td{width:5px;height:5px;border-radius:50%;background:var(--purple2);animation:td .8s infinite}.td:nth-child(2){animation-delay:.2s}.td:nth-child(3){animation-delay:.4s}
 @keyframes td{0%,100%{opacity:.2;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+/* Composer */
+.composer{padding:12px 18px 16px;background:var(--card);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.comp-r1{display:flex;align-items:center;justify-content:space-between}
+.mode-g{display:flex;gap:3px}.mode-b{font-family:var(--mono);font-size:10px;padding:4px 11px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:.15s}.mode-b.on{background:rgba(139,92,246,.15);border-color:var(--purple);color:var(--purple);font-weight:500}.mode-b:hover:not(.on){background:var(--glow)}
+.comp-r2{display:flex;gap:8px;align-items:center}
+.qi{flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 14px;font-family:var(--sans);font-size:13.5px;color:var(--text);transition:.15s}.qi:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,.1)}.qi::placeholder{color:var(--text3)}
+.send{background:linear-gradient(135deg,var(--purple),#6D28D9);color:#fff;border:none;padding:10px 18px;border-radius:var(--r);font-weight:600;cursor:pointer;font-size:13px;white-space:nowrap;box-shadow:0 4px 16px rgba(139,92,246,.3);transition:.15s}.send:hover{filter:brightness(1.1);box-shadow:0 6px 24px rgba(139,92,246,.4)}.send:disabled{opacity:.4;box-shadow:none;cursor:not-allowed}
+.comp-r3{display:flex;gap:5px}.xbtn{font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:var(--r2);border:1px solid var(--border);background:transparent;color:var(--text3);cursor:pointer;transition:.12s}.xbtn:hover{border-color:var(--purple);color:var(--purple)}
+/* Ledger */
+.ledger{background:var(--card);border-inline-start:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.led-h{padding:10px 14px 6px;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border)}
+.led-kpis{display:flex;border-bottom:1px solid var(--border)}.kpi{flex:1;padding:10px 8px;text-align:center;border-right:1px solid var(--border)}.kpi:last-child{border-right:none}.kpi-v{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--cyan)}.kpi-l{font-family:var(--mono);font-size:8px;color:var(--text3);margin-top:1px;text-transform:uppercase}
+.led-list{flex:1;overflow-y:auto}.le{padding:8px 12px;border-bottom:1px solid var(--border);direction:ltr;transition:.12s}.le:hover{background:var(--glow)}.le-k{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--purple2);margin-bottom:2px}.le-d{font-size:10.5px;color:var(--text2);line-height:1.4}.le-s{font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:2px;word-break:break-all}.le-m{display:flex;justify-content:space-between;margin-top:3px}.le-ms{font-family:var(--mono);font-size:9px;color:var(--text3)}.le-ok{color:var(--green);font-size:10px}
+.le a{color:inherit;text-decoration:none}.le a:hover{text-decoration:underline}
+.led-empty{padding:20px 14px;font-family:var(--mono);font-size:10px;color:var(--text3);line-height:1.8;text-align:center}
+.led-f{padding:6px 12px;border-top:1px solid var(--border);font-family:var(--mono);font-size:9px;color:var(--text3);display:flex;justify-content:space-between}
+/* Terminal */
+.term-p{display:none;position:fixed;bottom:0;left:0;right:0;height:40%;background:#0B0B15;border-top:2px solid var(--purple);z-index:200;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.5)}
+.term-h{display:flex;align-items:center;padding:5px 12px;gap:8px;background:rgba(0,0,0,.4);font-family:var(--mono);font-size:10.5px}.term-ti{color:var(--purple2)}.term-st{color:var(--text3)}.term-x{margin-left:auto;background:transparent;border:none;color:var(--red);cursor:pointer;font-size:15px}
 .hidden{display:none!important}
 </style>
 </head><body>
-<div class="app-shell">
-
-<!-- TITLEBAR -->
-<div class="titlebar">
-  <div class="traffic-lights">
-    <div class="tl tl-close" onclick="window.casper?.Close()"></div>
-    <div class="tl tl-min" onclick="window.casper?.Minimise()"></div>
-    <div class="tl tl-max" onclick="window.casper?.ToggleMaximise()"></div>
-  </div>
-  <div class="title-text mono">NIYAH · Casper Engine · v3.2</div>
-  <div class="title-badge"><span class="live-dot" id="live-dot"></span><span id="conn-label" style="color:var(--text3)">—</span></div>
+<div class="titlebar"><div class="tl-dots"><div class="dot dot-r" onclick="window.casper?.Close()"></div><div class="dot dot-y" onclick="window.casper?.Minimise()"></div><div class="dot dot-g" onclick="window.casper?.ToggleMaximise()"></div></div><div class="tl-title">NIYAH · Casper Engine</div><div class="tl-live"><span class="tl-live-dot"></span><span id="conn">—</span></div></div>
+<div class="nav"><button class="nav-btn on" id="tab-s">🔍 Search</button><button class="nav-btn" onclick="openTerm()">⬛ Terminal</button><div class="nav-space"></div><button class="nav-btn" onclick="toggleTheme()" id="bt">☀</button><button class="nav-btn" onclick="toggleLang()" id="bl">EN</button><button class="nav-btn" onclick="clearAll()">↺</button></div>
+<div class="layout">
+<div class="side">
+  <div class="ncard"><div class="ncard-name">◈ NIYAH</div><div class="ncard-desc" id="nd">Search engine. Fetches from web — generates nothing.</div><div class="ncard-tags"><span class="ntag">TF-IDF</span><span class="ntag">DDG</span><span class="ntag">C11</span><span class="ntag">SHA-256</span></div></div>
+  <div class="side-label" id="ll-s">Session</div>
+  <div class="sgrid"><div class="scard"><div class="sval" id="sq">0</div><div class="slbl" id="ll-q">Queries</div></div><div class="scard"><div class="sval" id="sc">—</div><div class="slbl" id="ll-c">Conf</div></div><div class="scard"><div class="sval" id="st">—</div><div class="slbl" id="ll-t">Time</div></div><div class="scard"><div class="sval" id="sm">0</div><div class="slbl" id="ll-m">Cached</div></div></div>
+  <div class="side-label" id="ll-sg">Suggestions</div>
+  <div id="sugs"></div>
 </div>
-
-<!-- NAVBAR -->
-<div class="navbar">
-  <button class="nav-tab active" id="tab-search" onclick="setTab('search',this)">🔍 Search</button>
-  <button class="nav-tab" id="tab-terminal" onclick="openTerminal()">⬛ Terminal</button>
-  <div class="nav-spacer"></div>
-  <button class="nav-action" id="ctrl-theme" onclick="toggleTheme()">☀ Light</button>
-  <button class="nav-action" id="ctrl-lang" onclick="toggleLang()">EN</button>
-  <button class="nav-action" onclick="clearStream()">↺ Clear</button>
+<div class="main">
+  <div class="stream" id="stream">
+    <div class="welcome" id="welcome">
+      <div class="w-logo">NIYAH</div>
+      <div class="w-sub" id="ws">Local search. No model weights. No hallucination.</div>
+      <div class="w-how" id="wh">query → DDG HTML scrape → strip tags → TF-IDF rank → extract top sentences → [n] cite → SHA-256</div>
+      <div class="w-pills" id="wp"></div>
+    </div>
+  </div>
+  <div class="composer">
+    <div class="comp-r1"><div class="mode-g"><button class="mode-b on" id="ms" onclick="setM('s')">Search</button><button class="mode-b" id="mc" onclick="setM('c')">Cached</button><button class="mode-b" id="mf" onclick="setM('f')">Fresh ↺</button></div><span class="typing" id="agent-st" style="font-size:10px;color:var(--text3)">—</span></div>
+    <div class="comp-r2"><input class="qi" id="qi" type="text" placeholder="Ask anything…" autocomplete="off"><button class="send" id="sb" onclick="go()">Send ↵</button></div>
+    <div class="comp-r3"><button class="xbtn" onclick="document.getElementById('fi').click()">📎 File</button><button class="xbtn" onclick="clearAll()">↺ Clear</button><input type="file" id="fi" class="hidden" accept=".txt,.md,.pdf"></div>
+  </div>
 </div>
-
-<!-- STATUS BAR -->
-<div class="statusbar">
-  <div class="sb-item"><span class="sb-dot" id="vm-dot"></span><span id="vm-label">VM</span></div>
-  <span id="backend-label">DDG HTML</span>
-  <span id="mem-stat" class="mono">Mem: —</span>
-  <div class="sb-right"><span id="q-count" class="mono">0 queries</span></div>
+<div class="ledger">
+  <div class="led-h">Pipeline</div>
+  <div class="led-kpis"><div class="kpi"><div class="kpi-v" id="lc">—</div><div class="kpi-l">conf</div></div><div class="kpi"><div class="kpi-v" id="ln">0</div><div class="kpi-l">sources</div></div><div class="kpi"><div class="kpi-v" id="lm">—</div><div class="kpi-l">ms</div></div></div>
+  <div class="led-list" id="ll"><div class="led-empty">Run a query to see<br>the real pipeline here</div></div>
+  <div class="led-f"><span id="lf1">—</span><span id="lf2">—</span></div>
 </div>
-
-<!-- CONTENT -->
-<div class="content">
-
-  <!-- SIDEBAR -->
-  <div class="sidebar">
-    <div class="sidebar-block">
-      <div class="engine-card">
-        <div class="engine-name">◈ NIYAH</div>
-        <div class="engine-desc" id="nc-desc">Search & extraction. Fetches real web pages — generates nothing.</div>
-        <div class="engine-tags">
-          <span class="engine-tag">TF-IDF</span>
-          <span class="engine-tag">DDG HTML</span>
-          <span class="engine-tag">SQLite</span>
-          <span class="engine-tag">SHA-256</span>
-        </div>
-      </div>
-    </div>
-    <div class="sidebar-block">
-      <div class="sidebar-label" id="lbl-stats">Session</div>
-      <div class="stat-grid">
-        <div class="stat-card"><div class="stat-val" id="st-queries">0</div><div class="stat-label" id="lbl-queries">Queries</div></div>
-        <div class="stat-card"><div class="stat-val" id="st-conf">—</div><div class="stat-label" id="lbl-conf">Avg Conf</div></div>
-        <div class="stat-card"><div class="stat-val" id="st-time">—</div><div class="stat-label" id="lbl-time">Avg Time</div></div>
-        <div class="stat-card"><div class="stat-val" id="st-cache">0</div><div class="stat-label" id="lbl-cache">Cached</div></div>
-      </div>
-    </div>
-    <div class="sidebar-block" style="flex:1">
-      <div class="sidebar-label" id="lbl-suggest">Suggestions</div>
-      <div id="suggestions"></div>
-    </div>
-  </div>
-
-  <!-- WORKBENCH -->
-  <div class="workbench">
-    <div class="stream" id="stream">
-      <div class="welcome" id="welcome">
-        <div class="welcome-logo">NIYAH</div>
-        <div class="welcome-sub" id="w-sub">Sovereign search. No model weights. No hallucination.</div>
-        <div class="welcome-how" id="w-how">DDG scrape → strip HTML → TF-IDF cosine rank → top sentences → [n] citations</div>
-        <div class="welcome-pills" id="welcome-pills"></div>
-      </div>
-    </div>
-    <div class="composer">
-      <div class="composer-row1">
-        <div class="mode-group">
-          <button class="mode-btn active" id="btn-search" onclick="setMode('search')">Search</button>
-          <button class="mode-btn" id="btn-cache" onclick="setMode('cache')">Cached</button>
-          <button class="mode-btn" id="btn-fresh" onclick="setMode('fresh')">Fresh ↺</button>
-        </div>
-        <div class="agent-status"><span class="sb-dot" id="agent-dot"></span><span id="agent-label" class="mono" style="font-size:10.5px">—</span></div>
-      </div>
-      <div class="composer-row2">
-        <input class="query-input" id="qi" type="text" placeholder="Ask anything…" autocomplete="off">
-        <button class="send-btn" id="send-btn" onclick="sendQuery()">Send ↵</button>
-      </div>
-      <div class="composer-row3">
-        <button class="extra-btn" onclick="document.getElementById('file-input').click()">📎 File</button>
-        <button class="extra-btn" onclick="clearStream()">↺ Clear</button>
-        <span class="file-tag hidden" id="file-tag"></span>
-        <input type="file" id="file-input" accept=".txt,.md,.pdf,.png,.jpg" class="hidden">
-      </div>
-    </div>
-  </div>
-
-  <!-- LEDGER -->
-  <div class="ledger">
-    <div class="ledger-header">Proof Ledger</div>
-    <div class="ledger-kpis">
-      <div class="kpi"><div class="kpi-val" id="ld-conf">—</div><div class="kpi-label">conf</div></div>
-      <div class="kpi"><div class="kpi-val" id="ld-cit">0</div><div class="kpi-label">cit</div></div>
-      <div class="kpi"><div class="kpi-val" id="ld-ms">—</div><div class="kpi-label">ms</div></div>
-    </div>
-    <div class="ledger-list" id="ledger-list">
-      <div class="ledger-empty">Run a query to see<br>the real pipeline here.</div>
-    </div>
-    <div class="ledger-footer"><span id="ld-chain">—</span><span id="ld-hash" class="mono">—</span></div>
-  </div>
-
-</div><!-- /content -->
-
-<!-- TERMINAL PANEL -->
-<div class="term-panel" id="term-panel">
-  <div class="term-header">
-    <span class="term-title">⬛ Terminal — PowerShell</span>
-    <span class="term-status" id="pty-status">connecting…</span>
-    <button class="term-close" onclick="closeTerminal()">✕</button>
-  </div>
-  <div id="xterm-container" style="flex:1;overflow:hidden;padding:4px"></div>
 </div>
+<div class="term-p" id="tp"><div class="term-h"><span class="term-ti">⬛ Terminal</span><span class="term-st" id="pts">—</span><button class="term-x" onclick="closeTerm()">✕</button></div><div id="xtc" style="flex:1;overflow:hidden;padding:4px"></div></div>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
-
-</div><!-- /app-shell -->
 <script>
 'use strict';
-const AGENT=(window._agentUrl)||'http://20.91.208.59';
-
 function h(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function qs(id){return document.getElementById(id)}
+function $(id){return document.getElementById(id)}
 
-/* ── Theme ── */
-let _theme=localStorage.getItem('theme')||'dark';
-function applyTheme(){
-  document.documentElement.setAttribute('data-theme',_theme==='light'?'light':'');
-  const btn=qs('ctrl-theme');
-  if(btn)btn.textContent=_theme==='dark'?'☀ Light':'🌙 Dark';
-}
-function toggleTheme(){_theme=_theme==='dark'?'light':'dark';localStorage.setItem('theme',_theme);applyTheme()}
-applyTheme();
+/* Theme */
+let _t=localStorage.getItem('t')||'dark';
+function applyT(){document.documentElement.setAttribute('data-theme',_t==='light'?'light':'');$('bt').textContent=_t==='dark'?'☀':'🌙'}
+function toggleTheme(){_t=_t==='dark'?'light':'dark';localStorage.setItem('t',_t);applyT()}
+applyT();
 
-/* ── Language ── */
-let _lang=localStorage.getItem('ui-lang')||'ar';
+/* Lang */
+let _l=localStorage.getItem('l')||'ar';
 const L={
-  ar:{placeholder:'اسأل أي شيء…',send:'أرسل ↵',search:'بحث',cache:'محفوظ',fresh:'جديد ↺',
-      stats:'الجلسة',queries:'الاستعلامات',conf:'متوسط الثقة',time:'متوسط الوقت',cache2:'محفوظ',
-      suggest:'مقترحات',ncDesc:'بحث واستخلاص. يجلب من الويب — لا يُنشئ.',
-      wsub:'بحث سيادي. لا أوزان. لا هلوسة.',
-      who:'من أنت؟',
-      pills:['كيف يعمل الذكاء الاصطناعي؟','ما هو Python؟','ما الفرق بين React و Vue؟','من أنت؟','كيف أتعلم البرمجة؟'],
-      identity:`NIYAH محرك بحث واستخلاص. أداة — ليس شخصاً.
-
-ما يفعله فعلياً:
-① يرسل سؤالك لـ DuckDuckGo HTML
-② يجلب أعلى الصفحات صلة بـ HTTP GET
-③ يجرّد HTML ويقسّم لجمل
-④ يحسب TF-IDF cosine similarity
-⑤ يختار الجمل الأعلى صلة → يرفق [n]
-⑥ يوقّع بـ SHA-256
-
-لا هلوسة. لا أوزان. النص من الويب حرفياً.`},
-  en:{placeholder:'Ask anything…',send:'Send ↵',search:'Search',cache:'Cached',fresh:'Fresh ↺',
-      stats:'Session',queries:'Queries',conf:'Avg Conf',time:'Avg Time',cache2:'Cached',
-      suggest:'Suggestions',ncDesc:'Search & extraction. Fetches real web pages — generates nothing.',
-      wsub:'Sovereign search. No model weights. No hallucination.',
-      who:'Who are you?',
-      pills:['How does AI work?','What is Python?','React vs Vue?','Who are you?','How to learn programming?'],
-      identity:`NIYAH is a search & extraction engine. A tool — not a person.
-
-What it actually does:
-① Sends your query to DuckDuckGo HTML
-② Fetches top-ranked pages via HTTP GET
-③ Strips HTML, splits into sentences
-④ Computes TF-IDF cosine similarity
-⑤ Picks highest-scoring sentences → attaches [n]
-⑥ Signs with SHA-256
-
-No hallucination. No trained weights. Text from the real web.`},
+  ar:{ph:'اسأل أي شيء…',send:'أرسل ↵',s:'بحث',c:'محفوظ',f:'جديد ↺',sess:'الجلسة',q:'استعلامات',conf:'ثقة',time:'وقت',mem:'محفوظ',sg:'مقترحات',nd:'محرك بحث. يجلب من الويب — لا يُنشئ.',ws:'بحث محلي. لا أوزان. لا هلوسة.',wh:'سؤال → DDG HTML → تجريد → TF-IDF → أفضل جمل → [n] مصادر → SHA-256',pills:['كيف يعمل الذكاء الاصطناعي؟','ما هو Python؟','من أنت؟','كيف أتعلم البرمجة؟','ما الفرق بين React و Vue؟'],identity:'NIYAH أداة بحث واستخلاص — ليس شخصاً.\n\n① يرسل سؤالك لـ DuckDuckGo HTML\n② يجلب الصفحات بـ WinHTTP (محلي)\n③ يجرّد HTML ويقسّم لجمل\n④ يحسب TF-IDF cosine similarity\n⑤ يختار الأعلى صلة + يرفق [n]\n⑥ SHA-256 proof\n\nلا هلوسة. لا أوزان. نص حقيقي من الويب.'},
+  en:{ph:'Ask anything…',send:'Send ↵',s:'Search',c:'Cached',f:'Fresh ↺',sess:'Session',q:'Queries',conf:'Conf',time:'Time',mem:'Cached',sg:'Suggestions',nd:'Search engine. Fetches from web — generates nothing.',ws:'Local search. No model weights. No hallucination.',wh:'query → DDG HTML scrape → strip tags → TF-IDF rank → top sentences → [n] cite → SHA-256',pills:['How does AI work?','What is Python?','Who are you?','How to learn programming?','React vs Vue?'],identity:'NIYAH is a search & extraction tool — not a person.\n\n① Sends query to DuckDuckGo HTML\n② Fetches pages via WinHTTP (local)\n③ Strips HTML, splits into sentences\n④ Computes TF-IDF cosine similarity\n⑤ Picks best → attaches [n] refs\n⑥ SHA-256 proof\n\nNo hallucination. No weights. Real web text.'},
 };
-function t(k){return(L[_lang]||L.en)[k]||k}
-function applyLang(){
-  const dir=_lang==='ar'?'rtl':'ltr';
-  document.documentElement.setAttribute('lang',_lang);
-  document.documentElement.setAttribute('dir',dir);
-  const qi=qs('qi');if(qi)qi.placeholder=t('placeholder');
-  const sb=qs('send-btn');if(sb)sb.textContent=t('send');
-  ['btn-search','btn-cache','btn-fresh'].forEach((id,i)=>{const b=qs(id);if(b)b.textContent=[t('search'),t('cache'),t('fresh')][i];});
-  qs('lbl-stats')&&(qs('lbl-stats').textContent=t('stats'));
-  qs('lbl-queries')&&(qs('lbl-queries').textContent=t('queries'));
-  qs('lbl-conf')&&(qs('lbl-conf').textContent=t('conf'));
-  qs('lbl-time')&&(qs('lbl-time').textContent=t('time'));
-  qs('lbl-cache')&&(qs('lbl-cache').textContent=t('cache2'));
-  qs('lbl-suggest')&&(qs('lbl-suggest').textContent=t('suggest'));
-  qs('nc-desc')&&(qs('nc-desc').textContent=t('ncDesc'));
-  qs('w-sub')&&(qs('w-sub').textContent=t('wsub'));
-  qs('ctrl-lang')&&(qs('ctrl-lang').textContent=_lang==='ar'?'EN':'ع');
+function t(k){return(L[_l]||L.en)[k]||k}
+function applyL(){
+  document.documentElement.lang=_l;document.documentElement.dir=_l==='ar'?'rtl':'ltr';
+  $('qi').placeholder=t('ph');$('sb').textContent=t('send');
+  $('ms').textContent=t('s');$('mc').textContent=t('c');$('mf').textContent=t('f');
+  $('ll-s').textContent=t('sess');$('ll-q').textContent=t('q');$('ll-c').textContent=t('conf');$('ll-t').textContent=t('time');$('ll-m').textContent=t('mem');$('ll-sg').textContent=t('sg');
+  $('nd').textContent=t('nd');$('ws').textContent=t('ws');$('wh').textContent=t('wh');
+  $('bl').textContent=_l==='ar'?'EN':'ع';
   buildPills();
 }
-function toggleLang(){_lang=_lang==='ar'?'en':'ar';localStorage.setItem('ui-lang',_lang);applyLang()}
+function toggleLang(){_l=_l==='ar'?'en':'ar';localStorage.setItem('l',_l);applyL()}
 
-/* ── Session stats ── */
-let _stats={q:0,conf:0,ms:0,mem:0};
-function updateStats(c,ms,mem){
-  _stats.q++;_stats.conf+=c||0;_stats.ms+=ms||0;if(mem)_stats.mem++;
-  qs('st-queries').textContent=_stats.q;
-  qs('q-count').textContent=_stats.q+' queries';
-  qs('st-conf').textContent=_stats.q?Math.round(_stats.conf/_stats.q*100)+'%':'—';
-  qs('st-time').textContent=_stats.q?(_stats.ms/_stats.q/1000).toFixed(1)+'s':'—';
-  qs('st-cache').textContent=_stats.mem;
-}
+/* Stats */
+let S={q:0,c:0,ms:0,m:0};
+function upS(c,ms,mem){S.q++;S.c+=c||0;S.ms+=ms||0;if(mem)S.m++;$('sq').textContent=S.q;$('sc').textContent=S.q?Math.round(S.c/S.q*100)+'%':'—';$('st').textContent=S.q?(S.ms/S.q/1000).toFixed(1)+'s':'—';$('sm').textContent=S.m}
 
-/* ── Mode ── */
-let _mode='search';
-function setMode(m){
-  _mode=m;
-  ['search','cache','fresh'].forEach(id=>{qs('btn-'+id)?.classList.remove('active')});
-  qs('btn-'+m)?.classList.add('active');
-}
+/* Mode */
+let _m='s';
+function setM(m){_m=m;['s','c','f'].forEach(i=>{$('m'+i)?.classList.remove('on')});$('m'+m)?.classList.add('on')}
 
-/* ── Tab ── */
-function setTab(name,el){
-  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-}
+/* Identity */
+const ID=[/من\s*أنت|من\s*انت/i,/who\s*are\s*you|what\s*are\s*you/i,/^(niyah|نياه)\s*\??$/i];
+function isID(q){return ID.some(p=>p.test(q.trim()))}
 
-/* ── Identity patterns ── */
-const ID_PAT=[/من\s*أنت|من\s*انت|عرّف\s*نفسك/i,/who\s*are\s*you|what\s*are\s*you/i,/^(niyah|نياه)\s*\??$/i];
-function isIdentityQ(q){return ID_PAT.some(p=>p.test(q.trim()))}
+/* Append */
+function appEl(el){const w=$('welcome');if(w)w.remove();const s=$('stream');s.appendChild(el);s.scrollTop=99999;return el}
+function appDiv(c,html){const d=document.createElement('div');d.className=c;d.innerHTML=html;return appEl(d)}
 
-/* ── API ── */
-async function niyahAsk(q,fresh){
-  const r=await fetch(AGENT+'/api/v1/niyah/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,forceFresh:!!fresh}),signal:AbortSignal.timeout(50000)});
-  if(!r.ok)throw new Error('HTTP '+r.status);
-  return r.json();
-}
-async function phiAsk(msg){
-  try{
-    const r=await fetch(AGENT+'/api/v1/phi/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,maxTokens:300}),signal:AbortSignal.timeout(120000)});
-    if(r.ok)return await r.json();
-  }catch{}
-  return null;
-}
-async function healthCheck(){
-  try{const r=await fetch(AGENT+'/health',{signal:AbortSignal.timeout(4000)});return r.ok}catch{return false}
-}
-async function phiHealth(){
-  try{const r=await fetch(AGENT+'/api/v1/phi/health',{signal:AbortSignal.timeout(3000)});if(r.ok){const d=await r.json();return d.available}return false}catch{return false}
-}
-
-/* ── Status init ── */
-async function initStatus(){
-  const alive=await healthCheck();
-  qs('live-dot').style.background=alive?'var(--green)':'var(--red)';
-  qs('conn-label').textContent=alive?'Connected':'Offline';
-  qs('conn-label').style.color=alive?'var(--green)':'var(--red)';
-  qs('vm-dot').className='sb-dot '+(alive?'ok':'off');
-  qs('vm-label').textContent=alive?'VM':'VM offline';
-  qs('agent-dot').className='sb-dot '+(alive?'ok':'warn');
-  qs('agent-label').textContent=alive?'NIYAH online':'offline';
-  if(alive){
-    try{
-      const s=await fetch(AGENT+'/api/v1/niyah/stats',{signal:AbortSignal.timeout(3000)});
-      if(s.ok){const d=await s.json();qs('mem-stat').textContent='Mem: '+(d.total_memories||0)}
-    }catch{}
-    const phi=await phiHealth();
-    if(phi){
-      qs('agent-label').textContent='NIYAH + Phi online';
+/* Parse RAG output from C11 engine */
+function parseRAG(text){
+  const lines=text.split('\n');
+  const trace=[];const sources=[];let context='';let conf=0;let hash='';
+  let inSources=false;let inContext=false;
+  lines.forEach(l=>{
+    const tr=l.trim();
+    if(tr.match(/^\[(\d+)\]\s+\S+.*\|.*conf=([0-9.]+).*\|(.*)$/)){
+      const m=tr.match(/^\[(\d+)\]\s+(\S+)\s+\|\s+conf=([0-9.]+)\s+\|\s+(.*)$/);
+      if(m) trace.push({step:m[2],conf:parseFloat(m[3]),detail:m[4],ms:0});
     }
-  }
-}
-initStatus();
-
-/* ── Ledger ── */
-function resetLedger(){
-  ['ld-conf','ld-cit','ld-ms'].forEach(id=>{const el=qs(id);if(el)el.textContent='—'});
-  qs('ld-chain').textContent='—';qs('ld-hash').textContent='—';
-  qs('ledger-list').innerHTML='<div class="ledger-empty">Run a query to see<br>the real pipeline here.</div>';
-}
-resetLedger();
-
-function updateLedger(result){
-  const conf=Math.round((result.confidence||0)*100);
-  qs('ld-conf').textContent=conf+'%';
-  qs('ld-cit').textContent=(result.citations||[]).length;
-  qs('ld-ms').textContent=(result.tookMs||0)+'ms';
-  qs('ld-chain').textContent='cit: '+(result.citations||[]).length;
-  qs('ld-hash').textContent=result.chain_hash?result.chain_hash.substring(0,12)+'…':'no proof';
-  const list=qs('ledger-list');
-  list.innerHTML='';
-  (result.trace||[]).forEach(s=>{
-    list.innerHTML+=`<div class="lentry">
-      <div class="lentry-kind">${h(s.step)}</div>
-      <div class="lentry-desc">${h(s.detail||'')}</div>
-      ${s.data?`<div class="lentry-sub">${h(s.data)}</div>`:''}
-      <div class="lentry-meta"><span class="lentry-ms">${s.ms}ms</span><span class="lentry-check">✓</span></div>
-    </div>`;
+    if(tr.startsWith('--- Sources'))inSources=true;
+    if(tr.startsWith('--- Answer Context')){inSources=false;inContext=true;return;}
+    if(tr.startsWith('[RAG] >')){inSources=false;inContext=false;}
+    if(inSources&&tr.startsWith('[')){
+      const m=tr.match(/^\[(\d+)\]\s+(.*)$/);
+      if(m) sources.push({n:parseInt(m[1]),title:m[2],url:'',snippet:''});
+    }
+    if(inSources&&tr.startsWith('      http')){
+      if(sources.length>0) sources[sources.length-1].url=tr.trim();
+    }
+    if(inSources&&!tr.startsWith('[')&&!tr.startsWith('---')&&!tr.startsWith('      http')&&tr.length>20){
+      if(sources.length>0) sources[sources.length-1].snippet=tr.trim();
+    }
+    if(inContext) context+=tr+'\n';
+    if(tr.startsWith('chain_hash:')){hash=tr.replace('chain_hash:','').trim().split('...')[0]}
+    if(tr.startsWith('confidence:')){conf=parseFloat(tr.replace('confidence:','').trim())||0}
   });
-  (result.citations||[]).forEach((c,i)=>{
-    list.innerHTML+=`<div class="lentry">
-      <div class="lentry-kind">CITATION [${c.n}]</div>
-      <div class="lentry-desc">${h((c.title||'').substring(0,60))}</div>
-      <div class="lentry-sub"><a href="${h(c.url||'')}" target="_blank" style="color:inherit;text-decoration:none">${h((c.url||'').substring(0,50))}</a></div>
-      <div class="lentry-meta"><span class="lentry-ms">source</span><span class="lentry-check">✓</span></div>
-    </div>`;
-  });
+  return{trace,sources,context:context.trim(),conf,hash};
 }
 
-/* ── Clear ── */
-function clearStream(){
-  const s=qs('stream');s.innerHTML='';
+/* Ledger */
+function resetL(){$('lc').textContent='—';$('ln').textContent='0';$('lm').textContent='—';$('lf1').textContent='—';$('lf2').textContent='—';$('ll').innerHTML='<div class="led-empty">Run a query to see<br>the real pipeline here</div>'}
+resetL();
+function upL(r){
+  $('lc').textContent=Math.round(r.conf*100)+'%';$('ln').textContent=r.sources.length;
+  $('lm').textContent='—';$('lf1').textContent='sources: '+r.sources.length;$('lf2').textContent=r.hash||'—';
+  const ll=$('ll');ll.innerHTML='';
+  r.trace.forEach(s=>{ll.innerHTML+=`<div class="le"><div class="le-k">${h(s.step)}</div><div class="le-d">${h(s.detail)}</div><div class="le-m"><span class="le-ms">${s.ms}ms</span><span class="le-ok">✓</span></div></div>`});
+  r.sources.forEach(s=>{ll.innerHTML+=`<div class="le"><div class="le-k">SOURCE [${s.n}]</div><div class="le-d">${h(s.title)}</div>${s.url?`<a class="le-s" href="${h(s.url)}" target="_blank">${h(s.url.substring(0,50))}</a>`:''}<div class="le-m"><span class="le-ms">web</span><span class="le-ok">✓</span></div></div>`});
+}
+
+/* Clear */
+function clearAll(){
+  const s=$('stream');s.innerHTML='';
   const w=document.createElement('div');w.className='welcome';w.id='welcome';
-  w.innerHTML=`<div class="welcome-logo">NIYAH</div><div class="welcome-sub" id="w-sub"></div><div class="welcome-how" id="w-how"></div><div class="welcome-pills" id="welcome-pills"></div>`;
-  s.appendChild(w);
-  applyLang();
-  _stats={q:0,conf:0,ms:0,mem:0};
-  ['st-queries','st-conf','st-time','st-cache','q-count'].forEach(id=>{const el=qs(id);if(el)el.textContent=id==='q-count'?'0 queries':'0'});
-  resetLedger();
+  w.innerHTML=`<div class="w-logo">NIYAH</div><div class="w-sub" id="ws"></div><div class="w-how" id="wh"></div><div class="w-pills" id="wp"></div>`;
+  s.appendChild(w);applyL();S={q:0,c:0,ms:0,m:0};$('sq').textContent='0';$('sc').textContent='—';$('st').textContent='—';$('sm').textContent='0';resetL();
 }
 
-/* ── Pills ── */
+/* Pills */
 function buildPills(){
-  const c=qs('welcome-pills');if(!c)return;c.innerHTML='';
-  const sg=qs('suggestions');if(sg)sg.innerHTML='';
+  const c=$('wp');if(!c)return;c.innerHTML='';const sg=$('sugs');if(sg)sg.innerHTML='';
   (t('pills')||[]).forEach(q=>{
-    const pill=document.createElement('div');pill.className='pill';pill.textContent=q;
-    pill.onclick=()=>{qs('qi').value=q;sendQuery()};
-    c.appendChild(pill);
-    if(sg){const s=document.createElement('div');s.className='suggestion';
-      s.innerHTML=`<span class="suggestion-icon">→</span><span>${h(q)}</span>`;
-      s.onclick=()=>{qs('qi').value=q;sendQuery()};sg.appendChild(s);}
+    const p=document.createElement('div');p.className='pill';p.textContent=q;p.onclick=()=>{$('qi').value=q;go()};c.appendChild(p);
+    if(sg){const s=document.createElement('div');s.className='sug';s.innerHTML=`<span class="sug-a">→</span><span>${h(q)}</span>`;s.onclick=()=>{$('qi').value=q;go()};sg.appendChild(s);}
   });
 }
 
-/* ── Append ── */
-function appendEl(el){const w=qs('welcome');if(w)w.remove();const s=qs('stream');s.appendChild(el);s.scrollTop=99999;return el}
-function appendDiv(cls,html){const d=document.createElement('div');d.className=cls;d.innerHTML=html;return appendEl(d)}
-/* ── Format answer ── */
-function formatAnswer(text,max){
-  if(!text)return['',''];
-  const lines=text.split('\n').filter(l=>l.trim().length>8);
-  const vis=lines.slice(0,max).map(l=>h(l).replace(/\[(\d+)\]/g,'<sup> [$1]</sup>')).join('<br>');
-  const hid=lines.slice(max);
-  let more='';
-  if(hid.length>0){
-    const mid='m'+Date.now();
-    more=`<div id="${mid}" class="hidden"><br>${hid.map(l=>h(l).replace(/\[(\d+)\]/g,'<sup> [$1]</sup>')).join('<br>')}</div><button class="show-more" onclick="(function(b){var d=document.getElementById('${mid}');d.classList.toggle('hidden');b.textContent=d.classList.contains('hidden')?'▸ Show ${hid.length} more':'▾ Hide'})(this)">▸ Show ${hid.length} more</button>`;
-  }
-  return[vis,more];
-}
+/* Main query — calls C# bridge which calls niyah_hybrid.exe --rag */
+async function go(){
+  const qi=$('qi');let q=(qi.value||'').trim();if(!q)return;
+  qi.value='';const sb=$('sb');sb.disabled=true;sb.textContent='…';
 
-/* ── Main send query ── */
-async function sendQuery(){
-  const qi=qs('qi');
-  let q=(qi.value||'').trim();
-  if(!q)return;
-  let dq=q;
-  if(window._fileText){q=q+'\n\n[File: '+window._fileName+']\n'+window._fileText.substring(0,2000);window._fileText='';window._fileName='';qs('file-tag').classList.add('hidden');dq+=' 📎';}
-  qi.value='';
-  const btn=qs('send-btn');btn.disabled=true;btn.textContent='…';
-
-  appendDiv('msg-user',h(dq));
+  appDiv('msg-u',h(q));
 
   /* Identity shortcut */
-  if(isIdentityQ(q)){
-    setTimeout(()=>{
-      const d=document.createElement('div');d.className='msg-niyah';
-      d.innerHTML=`<div class="identity-answer">${h(t('identity'))}</div>`;
-      appendEl(d);btn.disabled=false;btn.textContent=t('send');
-    },200);return;
+  if(isID(q)){
+    setTimeout(()=>{const d=document.createElement('div');d.className='msg-n';d.innerHTML=`<div class="id-ans">${h(t('identity'))}</div>`;appEl(d);sb.disabled=false;sb.textContent=t('send')},200);return;
   }
 
-  /* Typing indicator */
-  const loading=appendDiv('msg-niyah',`<div class="typing"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span><span class="mono" style="color:var(--text3);margin-left:8px">NIYAH searching…</span></div>`);
+  const ld=appDiv('msg-n','<div class="typing"><span class="td"></span><span class="td"></span><span class="td"></span></div>');
 
   try{
-    const alive=await healthCheck();
-    let result=null;
+    if(!window.casper) throw new Error('C# bridge unavailable — open Casper.exe');
+    const start=Date.now();
+    const raw=await window.casper.Query(q);
+    const ms=Date.now()-start;
+    ld.remove();
 
-    if(alive){result=await niyahAsk(q,_mode==='fresh')}
+    const data=JSON.parse(raw);
+    const rag=parseRAG(data.output||'');
+    const conf=rag.conf||0;
+    const confP=Math.round(conf*100);
+    const confCls=confP>=70?'hi':confP>=45?'mid':'lo';
 
-    loading.remove();
+    /* Format context as answer */
+    let answer=rag.context||data.output||'No results.';
+    const lines=answer.split('\n').filter(l=>l.trim().length>10);
+    const vis=lines.slice(0,5).map(l=>h(l)).join('<br>');
+    const hid=lines.slice(5);
+    let more='';
+    if(hid.length>0){const mid='m'+Date.now();more=`<div id="${mid}" class="hidden"><br>${hid.map(l=>h(l)).join('<br>')}</div><button class="show-m" onclick="var d=document.getElementById('${mid}');d.classList.toggle('hidden');this.textContent=d.classList.contains('hidden')?'▸ ${hid.length} more':'▾ Hide'">▸ ${hid.length} more</button>`}
 
-    if(result&&result.answer){
-      const conf=Math.round((result.confidence||0)*100);
-      const [vis,more]=formatAnswer(result.answer,4);
-      const cits=result.citations||[];
-      const ms=result.tookMs||0;
-      const confClass=conf>=70?'hi':conf>=45?'mid':'lo';
-      const fromMem=result.fromMemory;
+    /* Citations */
+    let citHtml='';
+    if(rag.sources.length){citHtml='<div class="cits">'+rag.sources.map(s=>`<a class="cit" href="${h(s.url)}" target="_blank">[${s.n}] ${h(s.title.substring(0,35))}</a>`).join('')+'</div>'}
 
-      /* Confidence row */
-      const confRow=`<div class="conf-row">
-        <div class="conf-bar"><div class="conf-fill ${confClass}" style="width:${conf}%"></div></div>
-        <span class="conf-pct">${conf}% confidence</span>
-        ${fromMem?'<span class="mem-tag">⚡ cached</span>':''}
-        ${ms?`<span class="mono" style="font-size:10px;color:var(--text3)">${(ms/1000).toFixed(1)}s</span>`:''}
-      </div>`;
+    /* Trace */
+    const trId='t'+Date.now();
+    const trHtml=rag.trace.length?`<div class="trace-b" id="${trId}"><div class="trace-t" onclick="document.getElementById('${trId}').classList.toggle('open')"><span class="chv">▶</span> Pipeline · ${ms}ms · ${rag.trace.length} steps</div><div class="trace-bd">${rag.trace.map(s=>`<div class="tr-s"><span class="tr-sn">${h(s.step)}</span><span class="tr-sm">—</span><span>${h(s.detail)}</span></div>`).join('')}</div></div>`:'';
 
-      /* Citations */
-      let citHtml='';
-      if(cits.length){
-        citHtml='<div class="cit-row">'+cits.map(c=>`<a class="cit" href="${h(c.url||'')}" target="_blank">[${c.n}] ${h((c.title||c.url||'').substring(0,40))}</a>`).join('')+'</div>';
-      }
+    const el=document.createElement('div');el.className='msg-n';
+    el.innerHTML=`<div class="ans-card"><div class="conf-r"><div class="conf-b"><div class="conf-f ${confCls}" style="width:${confP}%"></div></div><span class="conf-p">${confP}%</span><span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${(ms/1000).toFixed(1)}s</span></div><div class="ans-text">${vis}${more}</div>${citHtml}</div>${trHtml}`;
+    appEl(el);
+    upS(conf,ms,false);
+    upL(rag);
 
-      /* Trace block */
-      const traceId='tr'+Date.now();
-      const traceSteps=(result.trace||[]).map(s=>`
-        <div class="trace-step">
-          <span class="trace-step-name">${h(s.step)}</span>
-          <span class="trace-step-ms">${s.ms}ms</span>
-          <span>${h(s.detail||'')}</span>
-        </div>
-        ${s.data?`<div class="trace-step-sub">${h(s.data)}</div>`:''}
-      `).join('');
-
-      const traceHtml=traceSteps?`<div class="trace-block" id="${traceId}">
-        <div class="trace-toggle" onclick="document.getElementById('${traceId}').classList.toggle('open')">
-          <span class="chevron">▶</span>
-          <span class="mono" style="font-size:10.5px;color:var(--text2)">Pipeline · ${ms}ms · ${(result.trace||[]).length} steps</span>
-        </div>
-        <div class="trace-body">${traceSteps}</div>
-      </div>`:'';
-
-      const el=document.createElement('div');el.className='msg-niyah';
-      el.innerHTML=`<div class="answer-card">${confRow}<div class="answer-text">${vis}${more}</div>${citHtml}</div>${traceHtml}`;
-      appendEl(el);
-      updateStats(result.confidence||0,ms,fromMem);
-      updateLedger(result);
-
-    } else if(alive){
-      /* Try Phi if NIYAH returned nothing */
-      const phi=await phiHealth();
-      if(phi){
-        loading&&loading.remove&&loading.remove();
-        const loading2=appendDiv('msg-niyah','<div class="typing"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span><span class="mono" style="color:var(--text3);margin-left:8px">Phi thinking…</span></div>');
-        const phiR=await phiAsk(q);
-        loading2.remove();
-        if(phiR&&phiR.answer){
-          const el=document.createElement('div');el.className='msg-niyah';
-          el.innerHTML=`<div class="answer-card"><div class="conf-row"><span class="mono" style="font-size:11px;color:var(--text2)">Phi-3.5 mini · ${(phiR.tookMs/1000).toFixed(1)}s</span></div><div class="answer-text">${h(phiR.answer)}</div></div>`;
-          appendEl(el);return;
-        }
-      }
-      appendDiv('msg-niyah','<div class="answer-card" style="color:var(--text2)">No results found. Try rephrasing.</div>');
-
-    } else {
-      appendDiv('msg-niyah','<div class="answer-card" style="color:var(--red)">Agent offline: '+h(AGENT)+'</div>');
-    }
   }catch(err){
-    loading.remove();
-    appendDiv('msg-niyah','<div class="answer-card" style="color:var(--red)">Error: '+h(err.message)+'</div>');
-  }finally{
-    btn.disabled=false;btn.textContent=t('send');
-    qs('stream').scrollTop=99999;
-  }
+    ld.remove();
+    appDiv('msg-n',`<div class="ans-card" style="color:var(--red)">${h(err.message)}</div>`);
+  }finally{sb.disabled=false;sb.textContent=t('send');$('stream').scrollTop=99999}
 }
 
-/* ── File attach ── */
-qs('file-input').addEventListener('change',async()=>{
-  const f=qs('file-input').files[0];if(!f)return;
-  window._fileName=f.name;
-  try{window._fileText=await f.text();const tag=qs('file-tag');tag.classList.remove('hidden');tag.textContent='📎 '+f.name.substring(0,20);}
-  catch{window._fileText='';}
-});
+/* File */
+$('fi').addEventListener('change',async()=>{const f=$('fi').files[0];if(!f)return;window._ft=await f.text();window._fn=f.name});
 
-/* ── Keyboard ── */
-qs('qi').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey)sendQuery()});
+/* Keyboard */
+$('qi').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey)go()});
 
-/* ── Welcome pills ── */
-qs('welcome-pills')?.addEventListener('click',e=>{
-  const p=e.target.closest('.pill');if(p){qs('qi').value=p.textContent;sendQuery();}
-});
+/* Terminal */
+let _tm=null,_to=false;
+function openTerm(){$('tp').style.display='flex';_to=true;if(_tm){_tm.focus();return}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js';s.onload=()=>{_tm=new window.Terminal({cols:120,rows:26,fontFamily:'"JetBrains Mono",monospace',fontSize:13,theme:{background:'#0B0B15',foreground:'#E2E8F0',cursor:'#8B5CF6'},cursorBlink:true,convertEol:true});_tm.open($('xtc'));window.__ptyData=(b64)=>{try{_tm.write(new TextDecoder('utf-8').decode(Uint8Array.from(atob(b64),c=>c.charCodeAt(0))))}catch{}};_tm.onData(d=>{window.casper?.TerminalInput?.(d)});if(window.casper?.TerminalStart){window.casper.TerminalStart(120,26);$('pts').textContent='connected'}else{_tm.write('\r\n\x1b[33mOpen Casper.exe for real terminal.\x1b[0m\r\n')}_tm.focus()};document.head.appendChild(s)}
+function closeTerm(){$('tp').style.display='none';_to=false}
+document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='`'){_to?closeTerm():openTerm()}});
 
-/* ── Terminal ── */
-let _term=null,_termOpen=false;
-function openTerminal(){
-  const panel=qs('term-panel');panel.style.display='flex';_termOpen=true;
-  if(_term){_term.focus();return;}
-  const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js';
-  s.onload=()=>{
-    _term=new window.Terminal({cols:120,rows:28,fontFamily:'"JetBrains Mono",monospace',fontSize:13,
-      theme:{background:'#0D0D0D',foreground:'#E2E8F0',cursor:'#7C3AED'},cursorBlink:true,convertEol:true});
-    _term.open(qs('xterm-container'));
-    window.__ptyData=(b64)=>{try{_term.write(new TextDecoder('utf-8').decode(Uint8Array.from(atob(b64),c=>c.charCodeAt(0))))}catch{}};
-    _term.onData(data=>{window.casper?.TerminalInput?.(data)});
-    if(window.casper?.TerminalStart){window.casper.TerminalStart(120,28);const st=qs('pty-status');if(st)st.textContent='connected';}
-    else{_term.write('\r\n\x1b[33mOpen Casper.exe for real terminal.\x1b[0m\r\n');}
-    _term.focus();
-  };document.head.appendChild(s);
-}
-function closeTerminal(){qs('term-panel').style.display='none';_termOpen=false;}
-document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='`'){_termOpen?closeTerminal():openTerminal();}});
-
-/* ── Init ── */
-applyLang();
+/* Init */
+applyL();
+$('conn').textContent=window.casper?'Local':'Browser';
+$('conn').style.color=window.casper?'var(--green)':'var(--amber)';
+$('agent-st').textContent=window.casper?'niyah_hybrid.exe':'no bridge';
 </script></body></html>
