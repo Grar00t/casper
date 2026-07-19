@@ -93,7 +93,62 @@ static void strip_tags(const char *h,char *o,size_t max){
 static int parse_ddg(const char *html,RagResult *res,int max){
     int n=0;const char *p=html;
     while(n<max){
-        const char *h=strstr(p,"result__a\" href=\"");if(!h)break;h+=17;
+        /* Try multiple patterns — DDG changes HTML structure often */
+        const char *h=NULL;
+        /* Pattern 1: class="result__a" href="URL" */
+        h=strstr(p,"result__a\" href=\"");
+        if(h){h+=17;}
+        else{
+            /* Pattern 2: href="/l/?uddg=ENCODED_URL" (redirect links) */
+            h=strstr(p,"/l/?uddg=");
+            if(h){
+                h+=9; /* skip /l/?uddg= */
+                /* URL-decode the target URL */
+                const char *he2=strstr(h,"&");
+                if(!he2) he2=strchr(h,34); /* quote */
+                if(!he2){p=h+1;continue;}
+                size_t el=(size_t)(he2-h);
+                if(el>=RAG_URL_MAX)el=RAG_URL_MAX-1;
+                /* Simple URL decode */
+                char enc[RAG_URL_MAX];memcpy(enc,h,el);enc[el]=0;
+                char *dst=res[n].url;size_t di=0;
+                for(size_t i=0;i<el&&di<RAG_URL_MAX-1;i++){
+                    if(enc[i]=='%'&&i+2<el){
+                        char hx[3]={enc[i+1],enc[i+2],0};
+                        dst[di++]=(char)strtol(hx,NULL,16);i+=2;
+                    }else{dst[di++]=enc[i];}}
+                dst[di]=0;
+                /* Find the link text for title */
+                const char *ts2=strchr(he2,62);
+                if(ts2){ts2++;
+                    const char *te2=strstr(ts2,"</a>");
+                    if(te2){char raw2[RAG_TITLE_MAX*2];
+                        size_t tl2=(size_t)(te2-ts2);
+                        if(tl2>=sizeof(raw2))tl2=sizeof(raw2)-1;
+                        memcpy(raw2,ts2,tl2);raw2[tl2]=0;
+                        strip_tags(raw2,res[n].title,RAG_TITLE_MAX);
+                        p=te2+4;
+                    }else{res[n].title[0]=0;p=he2+1;}}
+                else{res[n].title[0]=0;p=he2+1;}
+                /* Find snippet */
+                const char *sn2=strstr(p,"result__snippet");
+                if(sn2){const char *s0=strchr(sn2,62);
+                    if(s0){s0++;const char *s1=strstr(s0,"</");
+                        if(s1){char rs2[RAG_SNIPPET_MAX*2];
+                            size_t sl2=(size_t)(s1-s0);
+                            if(sl2>=sizeof(rs2))sl2=sizeof(rs2)-1;
+                            memcpy(rs2,s0,sl2);rs2[sl2]=0;
+                            strip_tags(rs2,res[n].snippet,RAG_SNIPPET_MAX);
+                            p=s1;}}}
+                else{res[n].snippet[0]=0;}
+                /* Only count if URL is real */
+                if(res[n].url[0]&&strncmp(res[n].url,"http",4)==0)n++;
+                continue;
+            }
+            /* Pattern 3: no more results */
+            break;
+        }
+        /* Pattern 1 continues here */
         const char *he=strchr(h,34);if(!he)break;
         size_t ul=(size_t)(he-h);if(ul>=RAG_URL_MAX)ul=RAG_URL_MAX-1;
         memcpy(res[n].url,h,ul);res[n].url[ul]=0;
@@ -105,6 +160,7 @@ static int parse_ddg(const char *html,RagResult *res,int max){
         const char *sn=strstr(te,"result__snippet");
         if(sn){const char *s0=strchr(sn,62);
             if(s0){s0++;const char *s1=strstr(s0,"</a>");
+                if(!s1)s1=strstr(s0,"</");
                 if(s1){char rs[RAG_SNIPPET_MAX*2];size_t sl=(size_t)(s1-s0);
                     if(sl>=sizeof(rs))sl=sizeof(rs)-1;
                     memcpy(rs,s0,sl);rs[sl]=0;
