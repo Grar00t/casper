@@ -232,59 +232,148 @@ function buildPills(){
   });
 }
 
-/* Main query — calls C# bridge which calls niyah_hybrid.exe --rag */
-async function go(){
-  const qi=$('qi');let q=(qi.value||'').trim();if(!q)return;
-  qi.value='';const sb=$('sb');sb.disabled=true;sb.textContent='…';
+/* API base — auto-detect: C# bridge vs browser direct */
+const API = window.casper ? null : (localStorage.getItem('api') || 'http://20.91.208.59');
 
-  appDiv('msg-u',h(q));
+/* Query via Node.js API (browser mode) */
+async function apiAsk(query, mode) {
+  const forceFresh = _m === 'f';
+  const endpoint = mode === 'search-only' ? '/api/v1/niyah/ask' : '/api/v1/ask';
+  const body = mode === 'search-only'
+    ? { query, forceFresh }
+    : { query, mode: mode || 'hybrid', forceFresh };
+  const res = await fetch(`${API}${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || err.details || `Server error ${res.status}`);
+  }
+  return res.json();
+}
 
-  /* Identity shortcut */
-  if(isID(q)){
-    setTimeout(()=>{const d=document.createElement('div');d.className='msg-n';d.innerHTML=`<div class="id-ans">${h(t('identity'))}</div>`;appEl(d);sb.disabled=false;sb.textContent=t('send')},200);return;
+/* Render API response (from Node.js server) */
+function renderAPI(data, ms) {
+  const conf = data.confidence || 0;
+  const confP = Math.round(conf * 100);
+  const confCls = confP >= 70 ? 'hi' : confP >= 45 ? 'mid' : 'lo';
+
+  /* Answer */
+  const answer = data.answer || 'No results.';
+  const lines = answer.split('\n').filter(l => l.trim().length > 5);
+  const vis = lines.slice(0, 8).map(l => h(l)).join('<br>');
+  const hid = lines.slice(8);
+  let more = '';
+  if (hid.length > 0) {
+    const mid = 'm' + Date.now();
+    more = `<div id="${mid}" class="hidden"><br>${hid.map(l => h(l)).join('<br>')}</div><button class="show-m" onclick="var d=document.getElementById('${mid}');d.classList.toggle('hidden');this.textContent=d.classList.contains('hidden')?'▸ ${hid.length} more':'▾ Hide'">▸ ${hid.length} more</button>`;
   }
 
-  const ld=appDiv('msg-n','<div class="typing"><span class="td"></span><span class="td"></span><span class="td"></span></div>');
+  /* Mode badge */
+  const modeLabel = data.mode === 'hybrid' ? '🧠 AI + Search' : data.mode === 'llm-only' ? '🧠 AI' : '🔍 Search';
+  const modeBadge = `<span style="font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:4px;background:${data.llm ? 'rgba(139,92,246,.15)' : 'rgba(34,211,238,.15)'};color:${data.llm ? 'var(--purple2)' : 'var(--cyan)'};border:1px solid ${data.llm ? 'rgba(139,92,246,.25)' : 'rgba(34,211,238,.25)'}">${modeLabel}</span>`;
 
-  try{
-    if(!window.casper) throw new Error('C# bridge unavailable — open Casper.exe');
-    const start=Date.now();
-    const raw=await window.casper.Query(q);
-    const ms=Date.now()-start;
+  /* Memory badge */
+  const memBadge = data.fromMemory ? `<span class="mem-t">⚡ cached</span>` : '';
+
+  /* Citations */
+  let citHtml = '';
+  if (data.citations?.length) {
+    citHtml = '<div class="cits">' + data.citations.map(c =>
+      `<a class="cit" href="${h(c.url)}" target="_blank">[${c.n}] ${h((c.title || '').substring(0, 40))}</a>`
+    ).join('') + '</div>';
+  }
+
+  /* Trace */
+  let trHtml = '';
+  if (data.trace?.length) {
+    const trId = 't' + Date.now();
+    trHtml = `<div class="trace-b" id="${trId}"><div class="trace-t" onclick="document.getElementById('${trId}').classList.toggle('open')"><span class="chv">▶</span> Pipeline · ${ms}ms · ${data.trace.length} steps</div><div class="trace-bd">${data.trace.map(s => `<div class="tr-s"><span class="tr-sn">${h(s.step)}</span><span class="tr-sm">${s.ms || 0}ms</span><span>${h(s.detail || s.data || '')}</span></div>`).join('')}</div></div>`;
+  }
+
+  const el = document.createElement('div');
+  el.className = 'msg-n';
+  el.innerHTML = `<div class="ans-card"><div class="conf-r"><div class="conf-b"><div class="conf-f ${confCls}" style="width:${confP}%"></div></div><span class="conf-p">${confP}%</span>${modeBadge}${memBadge}<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${(ms / 1000).toFixed(1)}s</span></div><div class="ans-text">${vis}${more}</div>${citHtml}</div>${trHtml}`;
+  return el;
+}
+
+/* Render C11 bridge response (Casper.exe mode) */
+function renderBridge(raw, ms) {
+  const data = JSON.parse(raw);
+  const rag = parseRAG(data.output || '');
+  const conf = rag.conf || 0;
+  const confP = Math.round(conf * 100);
+  const confCls = confP >= 70 ? 'hi' : confP >= 45 ? 'mid' : 'lo';
+
+  let answer = rag.context || data.output || 'No results.';
+  const lines = answer.split('\n').filter(l => l.trim().length > 10);
+  const vis = lines.slice(0, 5).map(l => h(l)).join('<br>');
+  const hid = lines.slice(5);
+  let more = '';
+  if (hid.length > 0) { const mid = 'm' + Date.now(); more = `<div id="${mid}" class="hidden"><br>${hid.map(l => h(l)).join('<br>')}</div><button class="show-m" onclick="var d=document.getElementById('${mid}');d.classList.toggle('hidden');this.textContent=d.classList.contains('hidden')?'▸ ${hid.length} more':'▾ Hide'">▸ ${hid.length} more</button>`; }
+
+  let citHtml = '';
+  if (rag.sources.length) { citHtml = '<div class="cits">' + rag.sources.map(s => `<a class="cit" href="${h(s.url)}" target="_blank">[${s.n}] ${h(s.title.substring(0, 35))}</a>`).join('') + '</div>'; }
+
+  const trId = 't' + Date.now();
+  const trHtml = rag.trace.length ? `<div class="trace-b" id="${trId}"><div class="trace-t" onclick="document.getElementById('${trId}').classList.toggle('open')"><span class="chv">▶</span> Pipeline · ${ms}ms · ${rag.trace.length} steps</div><div class="trace-bd">${rag.trace.map(s => `<div class="tr-s"><span class="tr-sn">${h(s.step)}</span><span class="tr-sm">—</span><span>${h(s.detail)}</span></div>`).join('')}</div></div>` : '';
+
+  const el = document.createElement('div'); el.className = 'msg-n';
+  el.innerHTML = `<div class="ans-card"><div class="conf-r"><div class="conf-b"><div class="conf-f ${confCls}" style="width:${confP}%"></div></div><span class="conf-p">${confP}%</span><span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${(ms / 1000).toFixed(1)}s</span></div><div class="ans-text">${vis}${more}</div>${citHtml}</div>${trHtml}`;
+  return { el, conf, rag };
+}
+
+/* Main query — works in BOTH browser mode and C# bridge mode */
+async function go() {
+  const qi = $('qi'); let q = (qi.value || '').trim(); if (!q) return;
+  qi.value = ''; const sb = $('sb'); sb.disabled = true; sb.textContent = '…';
+
+  appDiv('msg-u', h(q));
+
+  /* Identity shortcut */
+  if (isID(q)) {
+    setTimeout(() => { const d = document.createElement('div'); d.className = 'msg-n'; d.innerHTML = `<div class="id-ans">${h(t('identity'))}</div>`; appEl(d); sb.disabled = false; sb.textContent = t('send') }, 200); return;
+  }
+
+  const ld = appDiv('msg-n', '<div class="typing"><span class="td"></span><span class="td"></span><span class="td"></span></div>');
+
+  try {
+    const start = Date.now();
+
+    if (window.casper) {
+      /* C# bridge mode (Casper.exe desktop) */
+      const raw = await window.casper.Query(q);
+      const ms = Date.now() - start;
+      ld.remove();
+      const { el, conf, rag } = renderBridge(raw, ms);
+      appEl(el);
+      upS(conf, ms, false);
+      upL(rag);
+    } else {
+      /* Browser mode → Node.js API */
+      const mode = _m === 'c' ? 'search-only' : 'hybrid';
+      const data = await apiAsk(q, mode);
+      const ms = Date.now() - start;
+      ld.remove();
+      const el = renderAPI(data, ms);
+      appEl(el);
+      upS(data.confidence || 0, data.tookMs || ms, data.fromMemory);
+      /* Update ledger */
+      const rag = {
+        conf: data.confidence || 0,
+        hash: data.chain_hash || data.mode || '',
+        sources: (data.citations || []).map((c, i) => ({ n: c.n || i + 1, title: c.title || '', url: c.url || '' })),
+        trace: (data.trace || []).map(s => ({ step: s.step, detail: s.detail || s.data || '', ms: s.ms || 0 })),
+      };
+      upL(rag);
+    }
+  } catch (err) {
     ld.remove();
-
-    const data=JSON.parse(raw);
-    const rag=parseRAG(data.output||'');
-    const conf=rag.conf||0;
-    const confP=Math.round(conf*100);
-    const confCls=confP>=70?'hi':confP>=45?'mid':'lo';
-
-    /* Format context as answer */
-    let answer=rag.context||data.output||'No results.';
-    const lines=answer.split('\n').filter(l=>l.trim().length>10);
-    const vis=lines.slice(0,5).map(l=>h(l)).join('<br>');
-    const hid=lines.slice(5);
-    let more='';
-    if(hid.length>0){const mid='m'+Date.now();more=`<div id="${mid}" class="hidden"><br>${hid.map(l=>h(l)).join('<br>')}</div><button class="show-m" onclick="var d=document.getElementById('${mid}');d.classList.toggle('hidden');this.textContent=d.classList.contains('hidden')?'▸ ${hid.length} more':'▾ Hide'">▸ ${hid.length} more</button>`}
-
-    /* Citations */
-    let citHtml='';
-    if(rag.sources.length){citHtml='<div class="cits">'+rag.sources.map(s=>`<a class="cit" href="${h(s.url)}" target="_blank">[${s.n}] ${h(s.title.substring(0,35))}</a>`).join('')+'</div>'}
-
-    /* Trace */
-    const trId='t'+Date.now();
-    const trHtml=rag.trace.length?`<div class="trace-b" id="${trId}"><div class="trace-t" onclick="document.getElementById('${trId}').classList.toggle('open')"><span class="chv">▶</span> Pipeline · ${ms}ms · ${rag.trace.length} steps</div><div class="trace-bd">${rag.trace.map(s=>`<div class="tr-s"><span class="tr-sn">${h(s.step)}</span><span class="tr-sm">—</span><span>${h(s.detail)}</span></div>`).join('')}</div></div>`:'';
-
-    const el=document.createElement('div');el.className='msg-n';
-    el.innerHTML=`<div class="ans-card"><div class="conf-r"><div class="conf-b"><div class="conf-f ${confCls}" style="width:${confP}%"></div></div><span class="conf-p">${confP}%</span><span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${(ms/1000).toFixed(1)}s</span></div><div class="ans-text">${vis}${more}</div>${citHtml}</div>${trHtml}`;
-    appEl(el);
-    upS(conf,ms,false);
-    upL(rag);
-
-  }catch(err){
-    ld.remove();
-    appDiv('msg-n',`<div class="ans-card" style="color:var(--red)">${h(err.message)}</div>`);
-  }finally{sb.disabled=false;sb.textContent=t('send');$('stream').scrollTop=99999}
+    appDiv('msg-n', `<div class="ans-card" style="color:var(--red)">${h(err.message)}</div>`);
+  } finally { sb.disabled = false; sb.textContent = t('send'); $('stream').scrollTop = 99999 }
 }
 
 /* File */
@@ -301,7 +390,29 @@ document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='`'){_to?closeTerm
 
 /* Init */
 applyL();
-$('conn').textContent=window.casper?'Local':'Browser';
-$('conn').style.color=window.casper?'var(--green)':'var(--amber)';
-$('agent-st').textContent=window.casper?'niyah_hybrid.exe':'no bridge';
+
+async function initConn() {
+  if (window.casper) {
+    $('conn').textContent = 'Local';
+    $('conn').style.color = 'var(--green)';
+    $('agent-st').textContent = 'niyah_hybrid.exe';
+    return;
+  }
+  $('conn').textContent = 'connecting…';
+  $('conn').style.color = 'var(--amber)';
+  try {
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    if (d.ok) {
+      $('conn').textContent = d.llm?.available ? `AI Online` : 'Search Only';
+      $('conn').style.color = 'var(--green)';
+      $('agent-st').textContent = d.llm?.model ? d.llm.model.split('/').pop() : 'NIYAH v3';
+    }
+  } catch {
+    $('conn').textContent = 'offline';
+    $('conn').style.color = 'var(--red)';
+    $('agent-st').textContent = 'no server';
+  }
+}
+initConn();
 </script></body></html>

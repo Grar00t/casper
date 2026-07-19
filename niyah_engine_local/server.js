@@ -15,7 +15,8 @@
 
 const express = require('express');
 const niyahRouter = require('./routes/niyah');
-const { phiChat, phiHealthCheck, phiImproveAnswer } = require('./lib/phiEngine');
+const { phiChat, phiHealthCheck, phiModelInfo, phiImproveAnswer } = require('./lib/phiEngine');
+const { NiyahEngine } = require('./lib/niyahEngine');
 
 const app = express();
 
@@ -36,8 +37,16 @@ app.use((req, res, next) => {
 
 // ── Legacy endpoints (used by casper_workbench.html) ─────────────────────────
 
-app.get('/health', (req, res) => {
-  res.json({ ok: true, service: 'casper-agent', engine: 'niyah-v3', time: new Date().toISOString() });
+app.get('/health', async (req, res) => {
+  const llmAlive = await phiHealthCheck();
+  const llmInfo = llmAlive ? await phiModelInfo() : null;
+  res.json({
+    ok: true,
+    service: 'casper-agent',
+    engine: 'niyah-v3',
+    llm: { available: llmAlive, model: llmInfo?.id || null },
+    time: new Date().toISOString(),
+  });
 });
 
 app.get('/fetch', async (req, res) => {
@@ -97,68 +106,97 @@ app.post('/api/v1/phi/chat', async (req, res) => {
   res.json(result);
 });
 
-// ── Hybrid: NIYAH search + Phi synthesis ──────────────────────────────────────
+// ── Shared NIYAH engine instance (for hybrid endpoint) ──────────────────────
+const _hybridEngine = new NiyahEngine({
+  searxngBaseUrl: process.env.SEARXNG_BASE_URL,
+  braveApiKey: process.env.BRAVE_API_KEY,
+  memoryDbPath: process.env.NIYAH_MEMORY_DB || undefined,
+});
+
+// ── Hybrid: NIYAH search + LLM synthesis ─────────────────────────────────────
 app.post('/api/v1/ask', async (req, res) => {
-  const { query, mode } = req.body || {};
-  if (!query) return res.status(400).json({ error: 'query required' });
+  const { query, mode, forceFresh } = req.body || {};
+  if (!query || typeof query !== 'string') return res.status(400).json({ error: 'query required' });
+  const start = Date.now();
 
-  // Always search with NIYAH first
-  let niyahResult = null;
   try {
-    const nr = await fetch(`http://localhost:${process.env.PORT || 3000}/api/v1/niyah/ask`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }), signal: AbortSignal.timeout(40000),
-    });
-    if (nr.ok) niyahResult = await nr.json();
-  } catch (_) {}
+    // Step 1: NIYAH web search (DDG → TF-IDF → extract → cite)
+    let niyahResult = null;
+    if (mode !== 'llm-only') {
+      try {
+        niyahResult = await _hybridEngine.ask(query, { forceFresh: Boolean(forceFresh) });
+      } catch (err) {
+        console.error('[hybrid] NIYAH search failed:', err.message);
+      }
+    }
 
-  const phiAlive = await phiHealthCheck();
+    // Step 2: Check LLM availability
+    const llmAlive = await phiHealthCheck();
 
-  // If Phi available and mode=hybrid, improve the answer
-  if (phiAlive && niyahResult?.answer && mode !== 'search-only') {
-    const improved = await phiImproveAnswer(query, niyahResult.answer);
-    if (improved) {
+    // Step 3: If LLM available + we have search context → synthesize
+    if (llmAlive && niyahResult?.answer && niyahResult.confidence > 0 && mode !== 'search-only') {
+      const improved = await phiImproveAnswer(query, niyahResult.answer, niyahResult.citations || []);
+      if (improved) {
+        return res.json({
+          answer: improved,
+          citations: niyahResult.citations || [],
+          confidence: niyahResult.confidence,
+          fromMemory: niyahResult.fromMemory || false,
+          tookMs: Date.now() - start,
+          trace: niyahResult.trace || [],
+          mode: 'hybrid',
+          llm: true,
+        });
+      }
+    }
+
+    // Step 4: Fallback — LLM direct answer (no search context)
+    if (llmAlive && (!niyahResult || !niyahResult.answer || niyahResult.confidence === 0)) {
+      const phiResult = await phiChat(query);
+      if (phiResult?.answer) {
+        return res.json({
+          answer: phiResult.answer,
+          citations: [],
+          confidence: 0.5,
+          fromMemory: false,
+          tookMs: Date.now() - start,
+          trace: niyahResult?.trace || [],
+          mode: 'llm-only',
+          llm: true,
+          llmTokens: phiResult.tokens,
+        });
+      }
+    }
+
+    // Step 5: Search-only fallback (LLM unavailable)
+    if (niyahResult) {
       return res.json({
-        answer: improved,
-        citations: niyahResult.citations || [],
-        confidence: niyahResult.confidence,
-        tookMs: niyahResult.tookMs,
-        mode: 'hybrid',
-        sources: { niyah: true, phi: true },
+        ...niyahResult,
+        tookMs: Date.now() - start,
+        mode: 'search-only',
+        llm: false,
       });
     }
-  }
 
-  // Fallback: Phi direct if NIYAH failed
-  if (phiAlive && (!niyahResult || !niyahResult.answer)) {
-    const phiResult = await phiChat(query);
-    if (phiResult) {
-      return res.json({
-        answer: phiResult.answer,
-        citations: [],
-        confidence: 0.6,
-        tookMs: phiResult.tookMs,
-        mode: 'phi-only',
-        sources: { niyah: false, phi: true },
-      });
-    }
+    // Nothing worked
+    res.status(503).json({ error: 'Search and LLM both unavailable', tookMs: Date.now() - start });
+  } catch (err) {
+    console.error('[hybrid] error:', err);
+    res.status(500).json({ error: err.message, tookMs: Date.now() - start });
   }
-
-  // Return NIYAH result as-is
-  if (niyahResult) return res.json({ ...niyahResult, mode: 'search-only', sources: { niyah: true, phi: false } });
-  res.status(503).json({ error: 'Both NIYAH and Phi unavailable' });
 });
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 app.get('/', (req, res) => res.json({
   service: 'Casper Agent + NIYAH Engine',
-  version: '3.0',
+  version: '4.0',
   endpoints: {
     health: 'GET /health',
-    fetch: 'GET /fetch?url=TARGET',
-    summarize: 'GET /summarize?text=TEXT&query=Q&n=3',
-    ask: 'POST /api/v1/niyah/ask  { "query": "..." }',
-    niyahHealth: 'GET /api/v1/niyah/health',
+    ask_hybrid: 'POST /api/v1/ask { "query": "...", "mode": "hybrid|search-only|llm-only" }',
+    ask_search: 'POST /api/v1/niyah/ask { "query": "..." }',
+    phi_chat: 'POST /api/v1/phi/chat { "message": "..." }',
+    phi_health: 'GET /api/v1/phi/health',
+    niyah_health: 'GET /api/v1/niyah/health',
     stats: 'GET /api/v1/niyah/stats',
   },
 }));

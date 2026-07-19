@@ -73,13 +73,16 @@ class SearchProvider {
 
     const patterns = [
       /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g,
+      /<a[^>]+href="([^"]+)"[^>]+class="result__a"[^>]*>([\s\S]*?)<\/a>/g,
       /<a[^>]+rel="nofollow"[^>]+class="result__url"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g,
       /<a[^>]+href="\/l\/\?uddg=([^"]+)"[^>]*>([\s\S]*?)<\/a>/g,
+      /<a[^>]+class="[^"]*result-link[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g,
     ];
     const snippetPatterns = [
       /<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g,
       /<td[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/td>/g,
       /<div[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/div>/g,
+      /<span[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/span>/g,
     ];
 
     const strip = (s) => s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
@@ -124,7 +127,12 @@ class SearchProvider {
 
   async fetchPageText(pageUrl) {
     const res = await this._fetchWithTimeout(pageUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (NIYAH sovereign search client)' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
+      },
+      redirect: 'follow',
     });
     if (!res.ok) throw new Error(`fetchPageText HTTP ${res.status} for ${pageUrl}`);
     const contentType = res.headers.get('content-type') || '';
