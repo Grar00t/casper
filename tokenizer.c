@@ -332,6 +332,42 @@ char *tokenizer_decode(const uint32_t *tokens, uint32_t n)
     return out;
 }
 
+int tokenizer_token_allowed_for_generation(uint32_t token)
+{
+    uint32_t presentation_base;
+
+    if (!initialized) tokenizer_init();
+    if (token >= vocab_size) return 0;
+    if (token == TOK_EOS) return 1;
+    if (token == TOK_BOS || token == TOK_PAD || token == TOK_UNK) return 0;
+
+    /*
+     * IDs 668..1499 correspond to Arabic Presentation Forms-A/B. They are
+     * compatibility glyphs, not the normal base Arabic text we want the
+     * language model to emit. Keep their historical ids for file/tokenizer
+     * compatibility, but never sample them during ordinary text generation.
+     */
+    presentation_base = char_base
+                      + (0x06FFu - 0x0600u + 1u)
+                      + (0x077Fu - 0x0750u + 1u)
+                      + (0x08FFu - 0x08A0u + 1u);
+    if (token >= presentation_base && token < byte_base) return 0;
+
+    /*
+     * Byte fallback is required for lossless encode/decode. Unconstrained
+     * autoregressive sampling, however, can emit isolated UTF-8 continuation
+     * bytes or NUL/control bytes. Allow only readable ASCII plus common line
+     * whitespace here. Arabic uses the direct base-script ids above.
+     */
+    if (token >= byte_base && token < byte_base + TOK_BYTE_COUNT) {
+        const uint32_t b = token - byte_base;
+        if (b == 0x09u || b == 0x0Au || b == 0x0Du) return 1;
+        return b >= 0x20u && b <= 0x7Eu;
+    }
+
+    return 1;
+}
+
 void tokenizer_free_string(char *s)
 {
     free(s);
@@ -379,9 +415,24 @@ int main(void)
         tokenizer_free_string(rt);
     }
 
+    if (tokenizer_token_allowed_for_generation(TOK_BOS)
+        || tokenizer_token_allowed_for_generation(TOK_PAD)
+        || tokenizer_token_allowed_for_generation(TOK_UNK)
+        || tokenizer_token_allowed_for_generation(668u)
+        || tokenizer_token_allowed_for_generation(1499u)
+        || tokenizer_token_allowed_for_generation(1500u)
+        || tokenizer_token_allowed_for_generation(1500u + 0x80u)
+        || !tokenizer_token_allowed_for_generation(TOK_EOS)
+        || !tokenizer_token_allowed_for_generation(268u)
+        || !tokenizer_token_allowed_for_generation(1500u + 0x20u)
+        || !tokenizer_token_allowed_for_generation(1500u + 0x0Au)) {
+        (void)fprintf(stderr, "generation-token policy self-check failed\n");
+        ++failures;
+    }
+
     tokenizer_free();
     if (failures != 0) {
-        (void)printf("FAIL: %d tokenizer round-trip case(s)\n", failures);
+        (void)printf("FAIL: %d tokenizer case(s)\n", failures);
         return 1;
     }
     (void)printf("PASS: tokenizer UTF-8 round trips are exact\n");
