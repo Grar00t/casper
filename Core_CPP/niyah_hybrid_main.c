@@ -57,6 +57,9 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
                             NiyahSampler *sampler,
                             uint8_t proof_out[32])
 {
+    static const char sft_prefix[] = "Instruction:\n";
+    static const char sft_suffix[] = "\nResponse:\n";
+
     if (!m || !prompt || !sampler || m->cfg.vocab_size == 0u || m->cfg.ctx_len == 0u) return NULL;
 
     tokenizer_init();
@@ -79,7 +82,30 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
         return NULL;
     }
 
-    uint32_t prompt_len = tokenizer_encode(prompt, prompt_tokens, ctx);
+    const size_t prefix_len = sizeof(sft_prefix) - 1u;
+    const size_t suffix_len = sizeof(sft_suffix) - 1u;
+    const size_t raw_len = strlen(prompt);
+    if (raw_len > SIZE_MAX - prefix_len - suffix_len - 1u) {
+        free(prompt_tokens);
+        free(out_tokens);
+        tokenizer_free();
+        return NULL;
+    }
+    const size_t sft_len = prefix_len + raw_len + suffix_len;
+    char *sft_prompt = (char *)malloc(sft_len + 1u);
+    if (!sft_prompt) {
+        free(prompt_tokens);
+        free(out_tokens);
+        tokenizer_free();
+        return NULL;
+    }
+    memcpy(sft_prompt, sft_prefix, prefix_len);
+    memcpy(sft_prompt + prefix_len, prompt, raw_len);
+    memcpy(sft_prompt + prefix_len + raw_len, sft_suffix, suffix_len);
+    sft_prompt[sft_len] = '\0';
+
+    uint32_t prompt_len = tokenizer_encode(sft_prompt, prompt_tokens, ctx);
+    free(sft_prompt);
     if (prompt_len > 0u && prompt_tokens[prompt_len - 1u] == TOK_EOS) {
         --prompt_len;
     }
