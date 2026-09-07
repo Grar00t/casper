@@ -1,95 +1,89 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("build", "corpus", "train", "smoke", "bench", "save", "run", "all")]
-    [string]$Action = "all",
+    [ValidateSet("build", "corpus", "train", "smoke", "bench", "run", "all")]
+    [string]$Action = "build",
     [Parameter(Position = 1)] [string]$DataPath = "Data_Training/sovereign_knowledge.txt",
     [Parameter(Position = 2)] [int]$Epochs = 3,
     [Parameter(Position = 3)] [double]$Lr = 0.001,
     [double]$MinLr = 0.0001,
-    [string]$Prompt = "bismillah",
-    [int]$Tokens = 64,
-    [string]$Model = "niyah_tiny.bin",
-    [string]$Size = "tiny",
-    [int]$Steps = 200,
-    [double]$Temp = 0.8,
-    [double]$TopP = 0.9,
-    [int]$Seed = 42
+    [string]$Prompt = "hello",
+    [string]$Model = "niyah_trained.bin"
 )
 
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 $RepoRoot = (Get-Location).Path
 
-function Assert-ProcessSuccess([string]$Name, [int]$ExitCode) {
-    if ($ExitCode -ne 0) { throw "[niyah] $Name failed (exit $ExitCode)." }
+function Assert-Exit([string]$Name) {
+    if ($LASTEXITCODE -ne 0) { throw "[niyah] $Name failed with exit code $LASTEXITCODE" }
+}
+
+function Resolve-BuildArtifact([string]$Name) {
+    $candidates = @(
+        (Join-Path $RepoRoot "build\$Name"),
+        (Join-Path $RepoRoot "build\$Name.exe")
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate -PathType Leaf) { return $candidate }
+    }
+    return $null
 }
 
 function Invoke-Build {
-    $script = Join-Path $RepoRoot "scripts\build_gcc.sh"
-    if (-not (Test-Path $script)) { throw "[niyah] GCC build script missing: $script" }
-    if (-not (Get-Command bash -ErrorAction SilentlyContinue)) { throw "[niyah] bash is required for the native build path." }
-    & bash $script --release
-    Assert-ProcessSuccess "build" $LASTEXITCODE
+    $script = Join-Path $RepoRoot "scripts\build.sh"
+    if (-not (Test-Path $script)) { throw "[niyah] build script missing: $script" }
+    if (-not (Get-Command bash -ErrorAction SilentlyContinue)) { throw "[niyah] bash is required" }
+    & bash $script --release --arch generic
+    Assert-Exit "build"
 }
 
-function Require-Binaries {
-    $hybrid = Join-Path $RepoRoot "Core_CPP\niyah_hybrid.exe"
-    if (-not (Test-Path $hybrid)) { Invoke-Build }
-    if (-not (Test-Path $hybrid)) { throw "[niyah] required artifact missing: $hybrid" }
+function Require-Artifact([string]$Name) {
+    $artifact = Resolve-BuildArtifact $Name
+    if (-not $artifact) {
+        Invoke-Build
+        $artifact = Resolve-BuildArtifact $Name
+    }
+    if (-not $artifact) { throw "[niyah] build artifact missing: $Name" }
+    return $artifact
 }
 
 function Invoke-Corpus {
-    $corpusScript = Join-Path $RepoRoot "scripts\build_corpus.ps1"
-    if (Test-Path $corpusScript) {
-        & powershell -ExecutionPolicy Bypass -File $corpusScript
-        Assert-ProcessSuccess "corpus" $LASTEXITCODE
-    }
+    & (Join-Path $PSScriptRoot "build_corpus.ps1")
+    Assert-Exit "corpus"
 }
 
 function Invoke-Train {
-    Require-Binaries
-    $trainer = Join-Path $RepoRoot "Core_CPP\trainer"
-    if (-not (Test-Path $trainer)) { Invoke-Build }
-    if (-not (Test-Path $trainer)) { throw "[niyah] trainer artifact missing: $trainer" }
-    & $trainer
-    Assert-ProcessSuccess "train" $LASTEXITCODE
+    $trainer = Require-Artifact "trainer"
+    if (-not (Test-Path $DataPath -PathType Leaf)) { throw "[niyah] data file missing: $DataPath" }
+    & $trainer $DataPath $Epochs $Lr $MinLr
+    Assert-Exit "train"
 }
 
 function Invoke-Smoke {
-    Require-Binaries
-    $smoke = Join-Path $RepoRoot "Core_CPP\niyah"
-    if (-not (Test-Path $smoke)) { throw "[niyah] smoke executable missing: $smoke" }
-    & $smoke
-    Assert-ProcessSuccess "smoke" $LASTEXITCODE
+    $hybrid = Require-Artifact "niyah_hybrid"
+    & $hybrid --smoke
+    Assert-Exit "smoke"
 }
 
 function Invoke-Bench {
-    Require-Binaries
-    $bench = Join-Path $RepoRoot "Core_CPP\bench_niyah.exe"
-    if (-not (Test-Path $bench)) { throw "[niyah] benchmark executable missing: $bench" }
+    $bench = Require-Artifact "bench_niyah"
     & $bench
-    Assert-ProcessSuccess "bench" $LASTEXITCODE
+    Assert-Exit "bench"
 }
 
-function Invoke-Save { Invoke-Train }
-
 function Invoke-Run {
-    Require-Binaries
-    $hybrid = Join-Path $RepoRoot "Core_CPP\niyah_hybrid.exe"
-    if (-not (Test-Path $hybrid)) { throw "[niyah] hybrid executable missing: $hybrid" }
-    if (-not (Test-Path $Model)) { throw "[niyah] model missing: $Model" }
-    $inputText = @($Prompt, "quit") -join [Environment]::NewLine
-    $inputText | & $hybrid --model $Model --interactive
-    Assert-ProcessSuccess "run" $LASTEXITCODE
+    $hybrid = Require-Artifact "niyah_hybrid"
+    if (-not (Test-Path $Model -PathType Leaf)) { throw "[niyah] model missing: $Model" }
+    @($Prompt, "quit") | & $hybrid --model $Model
+    Assert-Exit "run"
 }
 
 switch ($Action) {
-    "build" { Invoke-Build }
+    "build"  { Invoke-Build }
     "corpus" { Invoke-Corpus }
-    "train" { Invoke-Train }
-    "smoke" { Invoke-Smoke }
-    "bench" { Invoke-Bench }
-    "save" { Invoke-Save }
-    "run" { Invoke-Run }
-    "all" { Invoke-Build; Invoke-Train; Invoke-Smoke }
+    "train"  { Invoke-Train }
+    "smoke"  { Invoke-Smoke }
+    "bench"  { Invoke-Bench }
+    "run"    { Invoke-Run }
+    "all"    { Invoke-Build; Invoke-Smoke }
 }
