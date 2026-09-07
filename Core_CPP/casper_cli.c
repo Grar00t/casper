@@ -20,6 +20,13 @@ static void configure_utf8_console(void) {
 #endif
 }
 
+static size_t bounded_strlen(const char *s, size_t max) {
+    size_t n = 0u;
+    if (!s) return 0u;
+    while (n < max && s[n] != '\0') ++n;
+    return n;
+}
+
 static void json_str(FILE *fp, const char *s) {
     fputc('"', fp);
     if (s) {
@@ -113,8 +120,8 @@ static void rehash_result(RagResult *r) {
     size_t n;
 
     if (!r) return;
-    ul = strnlen(r->url, sizeof(r->url));
-    sl = strnlen(r->snippet, sizeof(r->snippet));
+    ul = bounded_strlen(r->url, sizeof(r->url));
+    sl = bounded_strlen(r->snippet, sizeof(r->snippet));
     if (ul >= RAG_URL_MAX || sl >= RAG_SNIPPET_MAX) {
         memset(r->sha256, 0, sizeof(r->sha256));
         return;
@@ -253,7 +260,11 @@ int main(int argc,char **argv){
     const char *query=argv[1];
     const char *rules_path=argc>=3?argv[2]:NULL;
     RagCtx *ctx=casper_rag_query(query,pick_backend(),rules_path);
-    if(!ctx){printf("{\"error\":\"rag allocation failure\"}\n");return 2;}
+    if(!ctx){
+        printf("{\"query\":");json_str(stdout,query);
+        printf(",\"answer\":\"\",\"error\":\"rag allocation failure\",\"relevance_score\":0.000,\"confidence\":0.000,\"confidence_kind\":\"top_lexical_relevance\",\"mean_relevance\":0.000,\"elapsed_ms\":0,\"violated\":false,\"rejected\":false,\"proof\":null,\"proof_file\":null,\"n_sources\":0,\"sources\":[]}\n");
+        return 2;
+    }
     if(ctx->n_results<=0){
         printf("{\n  \"query\":");json_str(stdout,query);
         printf(",\n  \"answer\":\"\",\n  \"error\":\"no results - offline or no match\",\n  \"relevance_score\":0.000,\n  \"confidence\":0.000,\n  \"confidence_kind\":\"top_lexical_relevance\",\n  \"mean_relevance\":0.000,\n  \"elapsed_ms\":%u,\n  \"violated\":false,\n  \"rejected\":false,\n  \"proof\":null,\n  \"proof_file\":null,\n  \"n_sources\":0,\n  \"sources\":[]\n}\n",ctx->elapsed_ms);
