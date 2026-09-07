@@ -29,6 +29,15 @@ uint32_t tokenizer_vocab_size(void);
 uint32_t tokenizer_encode(const char *text, uint32_t *tokens, uint32_t max_len);
 char *tokenizer_decode(const uint32_t *tokens, uint32_t n);
 void tokenizer_free_string(char *s);
+
+/*
+ * Generation policy only; encode/decode remains lossless for arbitrary UTF-8.
+ * EOS is allowed. BOS/PAD/UNK, Arabic presentation-form compatibility glyphs,
+ * control bytes, and raw non-ASCII byte fallback ids are not sampled by the
+ * text generator. Arabic base-script tokens and printable ASCII remain valid.
+ */
+int tokenizer_token_allowed_for_generation(uint32_t token);
+
 void tokenizer_free(void);
 
 #ifdef __cplusplus
