@@ -2,14 +2,6 @@
 #
 # scripts/build.sh - single build entry point for the Casper/NIYAH C sources.
 #
-# Replaces the two divergent scripts that used to exist:
-#   Core_CPP/build_gcc.sh  had -std=c11 and -I include, but only built niyah
-#                          and looked for bench_niyah.c in a bench/ directory
-#                          that does not exist in this repository.
-#   scripts/build_gcc.sh   built every target, but with no -std=, no -I, and
-#                          wrote artifacts straight into Core_CPP/, which is
-#                          how compiled binaries kept landing in git.
-#
 # Usage:
 #   bash scripts/build.sh                 # release
 #   bash scripts/build.sh --debug         # -O0 -g3, ASan+UBSan when available
@@ -45,13 +37,12 @@ while [[ $# -gt 0 ]]; do
         --lint)     RUN_LINT=1 ;;
         --smoke)    RUN_SMOKE=1 ;;
         --bench)    RUN_BENCH=1 ;;
-        -h|--help)  sed -n '3,24p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        -h|--help)  sed -n '3,12p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *)          echo "[build] unknown flag: $1" >&2; exit 2 ;;
     esac
     shift
 done
 
-# ---- compiler -------------------------------------------------------------
 if [[ -n "$CC_OVERRIDE" ]]; then
     CC="$CC_OVERRIDE"
 elif [[ -n "${CC:-}" ]]; then
@@ -66,21 +57,18 @@ else
 fi
 command -v "$CC" >/dev/null 2>&1 || { echo "[build] compiler unavailable: $CC" >&2; exit 1; }
 
-# ---- architecture ---------------------------------------------------------
 if [[ -n "$FORCE_ARCH" ]]; then
     ARCH="$FORCE_ARCH"
 else
     case "$(uname -m)" in
-        x86_64)       ARCH="x86_64" ;;
+        x86_64)        ARCH="x86_64" ;;
         aarch64|arm64) ARCH="arm64" ;;
-        *)            ARCH="generic" ;;
+        *)             ARCH="generic" ;;
     esac
 fi
 
 case "$ARCH" in
     x86_64)
-        # -march=native makes the binary unusable on older CPUs. Use
-        # --arch generic for anything you intend to distribute.
         if echo "" | "$CC" -x c -mavx2 -mfma -E - >/dev/null 2>&1; then
             ARCH_FLAGS="-mavx2 -mfma -march=native"
             ARCH_NAME="x86_64 AVX2+FMA (native)"
@@ -94,7 +82,6 @@ case "$ARCH" in
     *)       echo "[build] unsupported arch: $ARCH" >&2; exit 2 ;;
 esac
 
-# ---- flags ---------------------------------------------------------------
 STD="-std=c11"
 WARN="-Wall -Wextra -Werror -Wstrict-prototypes -Wmissing-prototypes"
 WARN="$WARN -Wcast-align -Wwrite-strings -Wshadow -pedantic"
@@ -106,9 +93,6 @@ if [[ "$CONFIG" == "release" ]]; then
 else
     OPT="-O0 -g3 -DDEBUG"
     LDFLAGS="-lm"
-    # The old probe compiled AND linked an empty translation unit, so it
-    # always failed on "undefined reference to main" and ASan was never
-    # enabled. Compile only (-c) to test flag support.
     if echo 'int main(void){return 0;}' \
          | "$CC" -fsanitize=address,undefined -x c -c - -o /dev/null >/dev/null 2>&1; then
         SAN="-fsanitize=address,undefined -fno-omit-frame-pointer"
@@ -131,7 +115,6 @@ echo "============================================="
 
 mkdir -p "$BUILD"
 
-# ---- cppcheck gate -------------------------------------------------------
 if [[ "$RUN_LINT" == "1" ]]; then
     command -v cppcheck >/dev/null 2>&1 || {
         echo "[build] cppcheck not found - apt install cppcheck" >&2; exit 1; }
@@ -145,7 +128,8 @@ if [[ "$RUN_LINT" == "1" ]]; then
         -I "$INCLUDE" -I "$CORE" \
         "$ROOT/tokenizer.c" \
         "$CORE/niyah_core.c"      "$CORE/niyah_main.c" \
-        "$CORE/niyah_train.c"     "$CORE/niyah_hybrid_main.c" \
+        "$CORE/niyah_train.c"     "$CORE/niyah_train_full.c" \
+        "$CORE/niyah_hybrid_main.c" \
         "$CORE/casper_cli.c"      "$CORE/casper_rag.c" \
         "$CORE/rule_parser.c"     "$CORE/proof_generator.c" \
         "$CORE/constraint_solver.c" "$CORE/hybrid_reasoner.c" \
@@ -153,7 +137,6 @@ if [[ "$RUN_LINT" == "1" ]]; then
     echo "   cppcheck: clean"
 fi
 
-# ---- build ---------------------------------------------------------------
 build_target() {
     local out="$BUILD/$1"; shift
     printf '%-16s' "$(basename "$out")"
@@ -166,10 +149,11 @@ build_target() {
 echo "-- compile ----------------------------------"
 
 build_target niyah \
-    "$CORE/niyah_core.c" "$CORE/niyah_main.c"
+    "$CORE/niyah_core.c" "$CORE/niyah_train_full.c" "$CORE/niyah_main.c"
 
 build_target trainer \
-    "$CORE/niyah_train.c" "$CORE/niyah_core.c" "$ROOT/tokenizer.c"
+    "$CORE/niyah_train.c" "$CORE/niyah_train_full.c" \
+    "$CORE/niyah_core.c" "$ROOT/tokenizer.c"
 
 build_target niyah_hybrid \
     "$CORE/niyah_hybrid_main.c" "$CORE/niyah_core.c" \
@@ -177,9 +161,6 @@ build_target niyah_hybrid \
     "$CORE/rule_parser.c" "$CORE/proof_generator.c" \
     "$CORE/khz_q_svd.c" "$CORE/casper_rag.c" "$ROOT/tokenizer.c"
 
-# casper_cli.c includes casper_rag.h, rule_parser.h and proof_generator.h
-# only, and calls no tokenizer function, so tokenizer.c is deliberately not
-# linked here.
 build_target casper \
     "$CORE/casper_cli.c" "$CORE/casper_rag.c" "$CORE/rule_parser.c" \
     "$CORE/proof_generator.c" "$CORE/khz_q_svd.c"
@@ -188,14 +169,12 @@ if [[ -f "$CORE/bench_niyah.c" ]]; then
     build_target bench_niyah "$CORE/bench_niyah.c" "$CORE/niyah_core.c"
 fi
 
-# Tokenizer round-trip test: fails the build if any character decodes to '?'.
 printf '%-16s' "tokenizer_test"
 # shellcheck disable=SC2086
 "$CC" $CFLAGS -DTOKENIZER_TEST "$ROOT/tokenizer.c" -o "$BUILD/tokenizer_test" $LDFLAGS
 printf '  ok\n'
 "$BUILD/tokenizer_test"
 
-# ---- optional runs -------------------------------------------------------
 if [[ "$RUN_SMOKE" == "1" ]]; then
     echo "-- smoke ------------------------------------"
     "$BUILD/niyah"
@@ -207,7 +186,6 @@ if [[ "$RUN_BENCH" == "1" && -x "$BUILD/bench_niyah" ]]; then
     "$BUILD/bench_niyah"
 fi
 
-# ---- manifest ------------------------------------------------------------
 echo "-- artifacts --------------------------------"
 for art in "$BUILD/niyah" "$BUILD/trainer" "$BUILD/niyah_hybrid" "$BUILD/casper"; do
     [[ -s "$art" ]] || { echo "[build] required artifact missing: $art" >&2; exit 1; }
