@@ -1,0 +1,73 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - 'audit/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  c-and-node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install C lint dependency
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: Build and smoke-test C11 targets
+        run: bash scripts/build.sh --arch generic --lint --smoke
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: niyah_engine_local/package-lock.json
+
+      - name: Install Node dependencies
+        working-directory: niyah_engine_local
+        run: npm ci --ignore-scripts
+
+      - name: Check Node syntax
+        working-directory: niyah_engine_local
+        run: |
+          node --check server.js
+          node --check routes/niyah.js
+          for f in lib/*.js; do node --check "$f"; done
+
+      - name: Check URL filtering primitives
+        working-directory: niyah_engine_local
+        run: |
+          node - <<'NODE'
+          const assert = require('node:assert/strict');
+          const { isBlockedIp } = require('./lib/searchProvider');
+          assert.equal(isBlockedIp('127.0.0.1'), true);
+          assert.equal(isBlockedIp('10.0.0.1'), true);
+          assert.equal(isBlockedIp('169.254.169.254'), true);
+          assert.equal(isBlockedIp('192.168.1.1'), true);
+          assert.equal(isBlockedIp('::1'), true);
+          assert.equal(isBlockedIp('fc00::1'), true);
+          assert.equal(isBlockedIp('8.8.8.8'), false);
+          NODE
+
+      - name: Check C11 audit bridge
+        run: |
+          printf '%s' '{"prompt":"hello","text":"plain text","rules":""}' \
+            | ./build/niyah_hybrid --audit-stdin \
+            | grep -E '"audit_passed":true.*"integrity_sha256":"[0-9a-f]{64}"'
+
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Build desktop shell
+        run: dotnet build UI_CSharp/CasperUI.csproj -c Release --nologo
