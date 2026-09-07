@@ -1,15 +1,13 @@
 #include "niyah_core.h"
+#include "tokenizer.h"
+
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 #include <time.h>
-#include <stdint.h>
-#include <stdbool.h>
-
-void tokenizer_init(void);
-uint32_t tokenizer_encode(const char *text, uint32_t *tokens, uint32_t max_len);
-void tokenizer_free(void);
 
 static FILE *open_training_data_path(const char *path) {
     if (path && path[0]) {
@@ -55,21 +53,24 @@ static float cosine_lr(float base, float min_lr, uint32_t step, uint32_t total, 
     return min_lr + (base - min_lr) * 0.5f * (1.0f + cosf(3.14159265f * p));
 }
 
-static void clamp_tokens(uint32_t *tokens, uint32_t n, uint32_t vocab_size) {
-    if (!tokens || vocab_size == 0u) return;
-    for (uint32_t i = 0; i < n; ++i) tokens[i] %= vocab_size;
-}
-
 int main(int argc, char **argv) {
+    tokenizer_init();
+    const uint32_t live_vocab = tokenizer_vocab_size();
+    if (live_vocab == 0u || live_vocab > NIYAH_MAX_VOCAB) {
+        fputs("[NIYAH] invalid tokenizer vocabulary\n", stderr);
+        tokenizer_free();
+        return 1;
+    }
+
     NiyahConfig cfg = {
         .magic = NIYAH_MAGIC,
         .version = NIYAH_VER,
-        .vocab_size = 8192,
-        .ctx_len = 64,
+        .vocab_size = live_vocab,
+        .ctx_len = 256,
         .embed_dim = 128,
         .n_layers = 4,
         .n_heads = 8,
-        .n_kv_heads = 8,
+        .n_kv_heads = 4,
         .ffn_mult = 4,
         .rope_theta = 10000.0f,
         .rms_eps = 1e-5f,
@@ -83,10 +84,20 @@ int main(int argc, char **argv) {
     if (min_lr > base_lr) min_lr = base_lr * 0.1f;
 
     NiyahModel *model = niyah_alloc(&cfg);
-    if (!model) { fputs("[NIYAH] alloc failed\n", stderr); return 1; }
+    if (!model) {
+        fputs("[NIYAH] alloc failed\n", stderr);
+        tokenizer_free();
+        return 1;
+    }
+    niyah_init_weights(model, UINT64_C(0x4341535045521337));
 
     NiyahAdam *opt = niyah_adam_alloc(model);
-    if (!opt) { fputs("[NIYAH] adam alloc failed\n", stderr); niyah_free(model); return 1; }
+    if (!opt) {
+        fputs("[NIYAH] adam alloc failed\n", stderr);
+        niyah_free(model);
+        tokenizer_free();
+        return 1;
+    }
     opt->lr = base_lr;
     opt->beta1 = 0.9f;
     opt->beta2 = 0.999f;
@@ -96,10 +107,14 @@ int main(int argc, char **argv) {
     FILE *data = open_training_data_path(data_path);
     if (!data) {
         fputs("[NIYAH] no data file found\n", stderr);
-        niyah_adam_free(opt); niyah_free(model); return 1;
+        niyah_adam_free(opt);
+        niyah_free(model);
+        tokenizer_free();
+        return 1;
     }
 
-    tokenizer_init();
+    fputs("[NIYAH] compatibility trainer: lm_head only; use tools/train_casper.py for full-model training\n", stderr);
+
     char line[4096];
     uint32_t total_lines = 0u;
     while (fgets(line, sizeof(line), data)) {
@@ -108,13 +123,21 @@ int main(int argc, char **argv) {
     rewind(data);
     if (total_lines == 0u) {
         fputs("[NIYAH] no usable lines\n", stderr);
-        fclose(data); tokenizer_free(); niyah_adam_free(opt); niyah_free(model); return 1;
+        fclose(data);
+        tokenizer_free();
+        niyah_adam_free(opt);
+        niyah_free(model);
+        return 1;
     }
 
     uint64_t step_budget = (uint64_t)total_lines * (uint64_t)epochs;
     if (step_budget == 0u || step_budget > UINT32_MAX) {
         fputs("[NIYAH] invalid training step budget\n", stderr);
-        fclose(data); tokenizer_free(); niyah_adam_free(opt); niyah_free(model); return 1;
+        fclose(data);
+        tokenizer_free();
+        niyah_adam_free(opt);
+        niyah_free(model);
+        return 1;
     }
     uint32_t total_steps = (uint32_t)step_budget;
     uint32_t warmup_steps = total_steps / 20u;
@@ -134,11 +157,9 @@ int main(int argc, char **argv) {
         uint32_t steps = 0u;
 
         while (fgets(line, sizeof(line), data)) {
-            uint32_t tokens[256];
-            uint32_t n = tokenizer_encode(line, tokens, 256u);
+            uint32_t tokens[1024];
+            uint32_t n = tokenizer_encode(line, tokens, cfg.ctx_len + 1u);
             if (n < 2u) continue;
-            if (n > cfg.ctx_len + 1u) n = cfg.ctx_len + 1u;
-            clamp_tokens(tokens, n, cfg.vocab_size);
 
             opt->lr = cosine_lr(base_lr, min_lr, global_step, total_steps, warmup_steps);
             float loss = niyah_train_step(model, opt, tokens, n);
@@ -161,8 +182,12 @@ int main(int argc, char **argv) {
             }
 
             if (steps % 2000u == 0u) {
-                if (ema < best_ema - 1e-3f) { best_ema = ema; bad_windows = 0; }
-                else if (++bad_windows >= 6) goto cleanup;
+                if (ema < best_ema - 1e-3f) {
+                    best_ema = ema;
+                    bad_windows = 0;
+                } else if (++bad_windows >= 6) {
+                    goto cleanup;
+                }
             }
         }
     }
@@ -170,11 +195,9 @@ int main(int argc, char **argv) {
 cleanup:
     fclose(data);
     tokenizer_free();
-    if (rc == 0) {
-        if (niyah_save(model, "niyah_trained.bin") != 0) {
-            fputs("[NIYAH] model save failed\n", stderr);
-            rc = 1;
-        }
+    if (rc == 0 && niyah_save(model, "niyah_trained.bin") != 0) {
+        fputs("[NIYAH] model save failed\n", stderr);
+        rc = 1;
     }
     printf("training_elapsed_s=%.3f\n", (double)(clock() - t0) / (double)CLOCKS_PER_SEC);
     niyah_adam_free(opt);
