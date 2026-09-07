@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
         --lint)     RUN_LINT=1 ;;
         --smoke)    RUN_SMOKE=1 ;;
         --bench)    RUN_BENCH=1 ;;
-        -h|--help)  sed -n '3,18p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        -h|--help)  sed -n '3,12p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *)          echo "[build] unknown flag: $1" >&2; exit 2 ;;
     esac
     shift
