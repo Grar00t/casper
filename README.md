@@ -1,143 +1,209 @@
-# Casper Engine - NIYAH v3.0
+# Casper
 
-A C11 inference and training engine combining a Transformer neural core with symbolic
-reasoning, cryptographic proof generation, and a linear constraint solver.
-No external runtime dependencies beyond libc and libm.
+Casper is a small experimental C11 language-model runtime plus local retrieval and rule-checking components. The repository also contains an optional Node.js service and a Windows WPF/WebView2 shell.
 
----
+The implementation is the source of truth. This repository does **not** ship trained model weights and does **not** claim that hashes, SVD metrics, retrieval scores, or rule checks prove factual or semantic correctness.
 
-## Subsystems
+## Implemented components
 
-### Neural Core (niyah_core.c)
-- Transformer decoder with Grouped-Query Attention (GQA)
-- SwiGLU feed-forward network
-- Rotary Position Embeddings (RoPE)
-- RMSNorm (pre-attention and pre-FFN)
-- KV-cache with head-major layout
-- Adam optimizer for training
-- Top-p nucleus sampling with temperature control
-- Model serialization to .bin format (64-byte header)
+### Native C11
 
-### Symbolic Reasoner (hybrid_reasoner.c)
-- First-order logic terms: atoms, variables, compound terms
-- Robinson unification algorithm with occurs check
-- Backward chaining (Prolog-style) with configurable depth limit
-- Knowledge base with clause indexing
+- `Core_CPP/niyah_core.c`
+  - decoder-only Transformer forward pass
+  - GQA attention, RoPE, RMSNorm, SwiGLU, KV cache
+  - temperature/top-p sampler
+  - model save/load
+  - output-layer Adam training step
+- `Core_CPP/hybrid_reasoner.c`
+  - symbolic terms, unification, clauses, and backward chaining
+- `Core_CPP/constraint_solver.c`
+  - integer/rational linear-constraint support
+- `Core_CPP/rule_parser.c`
+  - `.nrule` parsing and prompt/output checks
+- `Core_CPP/proof_generator.c`
+  - SHA-256 integrity records over prompt, output, and optional rule-file bytes
+  - integrity records are not signatures and provide no authenticity without a trusted external key/signature layer
+- `Core_CPP/khz_q_svd.c`
+  - byte-position/SVD structure diagnostic only
+- `Core_CPP/casper_rag.c`
+  - DuckDuckGo HTML retrieval
+  - WinHTTP on Windows
+  - `curl` executable on POSIX systems
+  - snippet parsing, lexical relevance score, per-source SHA-256, context SHA-256
+- `Core_CPP/niyah_hybrid_main.c`
+  - native smoke entry point
+  - `--audit-stdin` bridge for the Node service
+  - interactive retrieval loop
+  - model-backed generation when a valid `.bin` model is supplied
 
-### Constraint Solver (constraint_solver.c)
-- Exact rational arithmetic (int64 numerator/denominator, never float)
-- Linear inequality constraints
-- Bounds propagation with iterative tightening
-- Integrates with the symbolic reasoner to prune impossible bindings
+### Local Node service
 
-### Rule Parser (rule_parser.c)
-- Human-readable .nrule format for output verification
-- Recursive descent parser
-- Sequence-level verification: generate -> verify -> re-sample if violated
+`niyah_engine_local/` provides a loopback HTTP service. It binds to `127.0.0.1` by default.
 
-### Proof Generator (proof_generator.c)
-- SHA-256 (FIPS 180-4), no external crypto library
-- Proof hash: SHA-256(prompt || output || rule_file_contents)
-- Machine-verifiable .proof file (NIYAH-PROOF-V1)
+Implemented search order:
 
-### Math-Coherence Gate (khz_q_svd.c)
-- Energy-based coherence check (threshold >= 0.85)
-- All verification gates must pass before output is accepted
+1. configured SearXNG instance
+2. configured Brave Search API
+3. DuckDuckGo HTML fallback
 
-### RAG Pipeline (casper_rag.c)
-- Web search: DuckDuckGo HTML, Bing, or self-hosted SearXNG (no API key)
-- WinHTTP on Windows; libcurl stub on Linux
-- HTML snippet extraction, TF keyword relevance scoring
-- SHA-256 anchor per result, chain hash over full context
-- JSON trace output for UI integration
+Fetched result pages are restricted to public HTTP(S) targets and size-limited. The service can optionally call a local OpenAI-compatible `llama-server` through `PHI_HOST`.
 
----
+### Windows desktop shell
 
-## Quick Start
+`UI_CSharp/` is a .NET 9 WPF/WebView2 shell. It starts the local Node service when available and can invoke the native executable. There is no hardcoded public-server fallback.
 
-### Linux / macOS
+## Build
 
-    git clone https://github.com/Grar00t/casper.git
-    cd casper
-    bash scripts/build_gcc.sh
-    RUN_SMOKE=1 bash scripts/build_gcc.sh
-    ./niyah_hybrid --smoke
+### Linux
 
-### Windows (PowerShell)
+```bash
+bash scripts/build.sh --arch generic --lint --smoke
+```
 
-    .\scripts\niyah.ps1 build
-    .\scripts\niyah.ps1 smoke
-    .\scripts\niyah.ps1 bench
+Artifacts are written to `build/`.
 
-### Training
+Useful variants:
 
-    gcc -O2 -std=c11 Core_CPP/niyah_core.c Core_CPP/niyah_train.c tokenizer.c -o niyah_train -lm
-    ./niyah_train Data_Training/sovereign_knowledge.txt 3 0.001
+```bash
+bash scripts/build.sh --debug --arch generic
+bash scripts/build.sh --release --arch native
+bash scripts/build.sh --smoke
+```
 
----
+### PowerShell wrapper
 
-## CLI Reference
+```powershell
+.\scripts\niyah.ps1 build
+.\scripts\niyah.ps1 smoke
+.\scripts\niyah.ps1 bench
+```
 
-    # Interactive neural mode
-    ./niyah_hybrid --model model.bin --rules safety.nrule --interactive
+The wrapper calls the same `scripts/build.sh` pipeline and resolves artifacts from `build/`.
 
-    # RAG mode (web retrieval, no model weights required)
-    ./niyah_hybrid --rag
-    ./niyah_hybrid --rag --backend bing
-    ./niyah_hybrid --rag --backend searxng
+### Desktop shell
 
-    # Verify a proof file
-    ./niyah_hybrid --verify-proof response.proof
+```powershell
+dotnet build UI_CSharp/CasperUI.csproj -c Release
+```
 
----
+## Native CLI
 
-## Project Layout
+```bash
+# Native self-checks
+./build/niyah_hybrid --smoke
 
-    casper/
-    +-- Core_CPP/
-    |   +-- niyah_core.h / .c          Neural Transformer engine
-    |   +-- hybrid_reasoner.h / .c     Symbolic reasoner
-    |   +-- constraint_solver.h / .c   Rational arithmetic constraint solver
-    |   +-- rule_parser.h / .c         .nrule format parser
-    |   +-- proof_generator.h / .c     SHA-256 proof system
-    |   +-- khz_q_svd.h / .c           Math-coherence gate
-    |   +-- casper_rag.h / .c          RAG web search pipeline
-    |   +-- niyah_hybrid_main.c        Hybrid CLI entry point
-    |   +-- niyah_train.c              Standalone trainer
-    |   +-- bench_niyah.c              Benchmark harness
-    +-- tokenizer.c                    UTF-8 tokenizer (Arabic-aware)
-    +-- Data_Training/                 Training data
-    +-- scripts/
-    |   +-- build_gcc.sh               GCC/Clang build (Linux/macOS)
-    |   +-- build_msvc.ps1             MSVC build (Windows)
-    |   +-- niyah.ps1                  Unified PowerShell entry point
-    +-- include/
-    |   +-- casper_ffi.h               Stable C ABI for external integration
-    +-- AGENTS.md                      Developer and agent guidelines
+# DuckDuckGo retrieval loop; type "quit" to exit
+./build/niyah_hybrid --rag
 
----
+# Run a real serialized model
+./build/niyah_hybrid --model model.bin
 
-## Build Requirements
+# Run a model with rule checks
+./build/niyah_hybrid --model model.bin --rules Data_Training/safety.nrule
 
-- C11 compiler: GCC 7+, Clang 6+, or MSVC 2019+
-- No external libraries required
+# One-shot retrieval and integrity record
+./build/casper_cli "query"
+./build/casper_cli "query" Data_Training/safety.nrule
 
-## Model File Format (.bin)
+# Verify a stored integrity record against its embedded prompt/output/rule path
+./build/casper_cli --verify casper_deadbeef.integrity
+```
 
-| Offset | Size | Field                 |
-|--------|------|-----------------------|
-| 0x00   | 4    | Magic (NYQH)          |
-| 0x04   | 4    | Version               |
-| 0x08   | 4    | Embedding dimension   |
-| 0x0C   | 4    | Attention heads       |
-| 0x10   | 4    | KV heads (GQA)        |
-| 0x14   | 4    | Layers                |
-| 0x18   | 4    | FFN multiplier        |
-| 0x1C   | 4    | Vocabulary size       |
-| 0x20   | 4    | Context length        |
-| 0x24   | 4    | RoPE theta (float)    |
-| 0x28   | 4    | RMS epsilon (float)   |
-| 0x2C   | 20   | Reserved (zero)       |
-| 0x40   | ...  | Weight data (float32) |
+`--interactive` without a model is intentionally rejected. Allocating an untrained zero-filled model is not treated as inference.
 
-Any change to this layout requires bumping NIYAH_VER in niyah_core.h.
+## C11 audit bridge
+
+The Node service calls:
+
+```bash
+printf '%s' '{"prompt":"hello","text":"candidate output","rules":""}' \
+  | ./build/niyah_hybrid --audit-stdin
+```
+
+Example output shape:
+
+```json
+{
+  "audit_passed": true,
+  "integrity_sha256": "<64 lowercase hex characters>",
+  "structure_energy": 0.0,
+  "rule_violation": null
+}
+```
+
+`audit_passed` means only that the configured `.nrule` checks returned no violation. `structure_energy` is a byte-structure diagnostic and is not used as a semantic acceptance gate.
+
+## Training
+
+Build first, then supply a real text corpus:
+
+```bash
+./build/trainer Data_Training/sovereign_knowledge.txt 3 0.001 0.0001
+```
+
+The current native trainer updates the output layer; it is not a full end-to-end Transformer training implementation.
+
+To assemble tracked source text deterministically on PowerShell:
+
+```powershell
+.\scripts\build_corpus.ps1
+```
+
+The corpus script now only merges actual `.txt` files under `Data_Training/sources/`; it does not generate synthetic filler.
+
+`get_real_data.py` is an optional data-acquisition helper that uses Hugging Face `datasets` and network access. It is not part of the runtime.
+
+## Requirements
+
+Native core:
+
+- C11 compiler: GCC or Clang on the supported build script path
+- libc and libm
+- `cppcheck` only when `--lint` is requested
+- POSIX retrieval additionally requires the `curl` executable at runtime
+- Windows retrieval uses WinHTTP
+
+Node service:
+
+- Node.js 18+
+- dependencies from `niyah_engine_local/package-lock.json`
+- no cloud LLM is required; optional inference expects a reachable OpenAI-compatible local server
+
+Desktop shell:
+
+- .NET 9 SDK
+- Microsoft WebView2 runtime/package
+
+## Model file format
+
+`NiyahConfig` is serialized verbatim as a 64-byte header, followed by float32 model weights.
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| `0x00` | 4 | magic `NYQH` |
+| `0x04` | 4 | version |
+| `0x08` | 4 | embedding dimension |
+| `0x0C` | 4 | attention heads |
+| `0x10` | 4 | KV heads |
+| `0x14` | 4 | layers |
+| `0x18` | 4 | FFN multiplier |
+| `0x1C` | 4 | vocabulary size |
+| `0x20` | 4 | context length |
+| `0x24` | 4 | RoPE theta |
+| `0x28` | 4 | RMS epsilon |
+| `0x2C` | 4 | flags |
+| `0x30` | 16 | reserved padding |
+| `0x40` | ... | float32 weights |
+
+Changing this serialized layout requires a `NIYAH_VER` bump.
+
+## Verification
+
+The repository CI definition is `.github/workflows/ci.yml` and covers:
+
+- native build, lint, and smoke checks
+- Node syntax and URL-filtering checks
+- `--audit-stdin` contract
+- .NET desktop build
+
+Do not replace executable checks with fixed pass-count claims in documentation.
