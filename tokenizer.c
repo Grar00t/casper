@@ -14,8 +14,8 @@
  *
  * Known tokens stay compact. Unknown words, whitespace and unsupported
  * Unicode are represented losslessly as UTF-8 bytes instead of collapsing to
- * <UNK>. This makes teacher-generated English/Arabic/code data trainable while
- * keeping old ids stable.
+ * <UNK>. Matching is exact and case-sensitive so encode/decode never changes
+ * teacher text such as SHA, TCP, Casper, or mixed-case identifiers.
  */
 
 #include "tokenizer.h"
@@ -106,22 +106,14 @@ static uint32_t codepoint_id(uint32_t uc)
     return TOK_UNK;
 }
 
+/* Exact lookup only. Case folding would make encode/decode lossy. */
 static uint32_t lookup(const char *s)
 {
-    char folded[TOK_STR_MAX];
-    size_t i;
     uint32_t j;
 
     if (!s || !s[0]) return TOK_UNK;
     for (j = 0u; j < word_end; ++j) {
         if (strcmp(vocab[j].token, s) == 0) return vocab[j].id;
-    }
-    for (i = 0u; s[i] && i + 1u < sizeof(folded); ++i) {
-        folded[i] = (char)tolower((unsigned char)s[i]);
-    }
-    folded[i] = '\0';
-    for (j = 0u; j < word_end; ++j) {
-        if (strcmp(vocab[j].token, folded) == 0) return vocab[j].id;
     }
     return TOK_UNK;
 }
@@ -361,6 +353,7 @@ int main(void)
     static const char *const cases[] = {
         "malloc allocates heap memory",
         "unknown teacher vocabulary survives exactly",
+        "SHA-256 Casper TCP UDP",
         "\xd8\xa8\xd8\xb3\xd9\x85 \xd8\xa7\xd9\x84\xd9\x84\xd9\x87",
         "casper \xd9\x86\xd9\x8a\xd8\xa9 engine",
         "emoji: \xf0\x9f\xa7\xa0 CJK: \xe6\xb1\x89\xe5\xad\x97",
