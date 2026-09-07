@@ -163,7 +163,7 @@ static int run_all_smoke(void) {
     return total_fail;
 }
 
-static void rag_loop(RagBackend backend, NiyahRuleKB *rules) {
+static void rag_loop(NiyahRuleKB *rules) {
     char line[2048];
     while (1) {
         size_t len;
@@ -176,7 +176,7 @@ static void rag_loop(RagBackend backend, NiyahRuleKB *rules) {
         while(len && (line[len-1]=='\n'||line[len-1]=='\r')) line[--len]='\0';
         if (!len) continue;
         if (!strcmp(line,"quit") || !strcmp(line,"exit")) break;
-        ctx=casper_rag_query(line,backend,NULL);
+        ctx=casper_rag_query(line);
         if (!ctx) { (void)printf("[RAG] query failed\n"); continue; }
         (void)printf("sources=%d confidence=%.3f elapsed=%u\n",ctx->n_results,(double)ctx->confidence,ctx->elapsed_ms);
         for(i=0;i<ctx->n_results;++i)
@@ -290,8 +290,10 @@ static int json_get_string(const char *json, const char *key, char *out, size_t 
                 case 'r': c='\r'; break;
                 case 't': c='\t'; break;
                 case 'u': {
-                    int h0=json_hex(p[0]),h1=json_hex(p[1]),h2=json_hex(p[2]),h3=json_hex(p[3]);
+                    int h0,h1,h2,h3;
                     unsigned cp;
+                    if (!p[0] || !p[1] || !p[2] || !p[3]) return -1;
+                    h0=json_hex(p[0]);h1=json_hex(p[1]);h2=json_hex(p[2]);h3=json_hex(p[3]);
                     if(h0<0||h1<0||h2<0||h3<0) return -1;
                     cp=(unsigned)((h0<<12)|(h1<<8)|(h2<<4)|h3);
                     p += 4;
@@ -375,26 +377,16 @@ static int audit_stdin(void) {
     return 0;
 }
 
-static int parse_backend(const char *name, RagBackend *backend) {
-    if (!name || !backend) return -1;
-    if (!strcmp(name,"ddg")) *backend=RAG_BACKEND_DDG;
-    else if (!strcmp(name,"searxng")) *backend=RAG_BACKEND_SEARXNG;
-    else if (!strcmp(name,"bing")) *backend=RAG_BACKEND_BING;
-    else return -1;
-    return 0;
-}
-
 int main(int argc, char **argv) {
     if (argc < 2) {
-        (void)fprintf(stderr,"usage: %s --smoke | --audit-stdin | --rag [ddg|searxng|bing] | --model <file> [--rules file]\n",argv[0]);
+        (void)fprintf(stderr,"usage: %s --smoke | --audit-stdin | --rag | --model <file> [--rules file]\n",argv[0]);
         return 3;
     }
-    if (!strcmp(argv[1],"--smoke")) return run_all_smoke();
-    if (!strcmp(argv[1],"--audit-stdin")) return audit_stdin();
+    if (!strcmp(argv[1],"--smoke")) return argc == 2 ? run_all_smoke() : 3;
+    if (!strcmp(argv[1],"--audit-stdin")) return argc == 2 ? audit_stdin() : 3;
     if (!strcmp(argv[1],"--rag")) {
-        RagBackend backend=RAG_BACKEND_DDG;
-        if (argc >= 3 && parse_backend(argv[2],&backend)!=0) return 3;
-        rag_loop(backend,NULL);
+        if (argc != 2) return 3;
+        rag_loop(NULL);
         return 0;
     }
     if (!strcmp(argv[1],"--model")) {
