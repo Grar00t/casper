@@ -23,6 +23,12 @@ jobs:
       - name: Build and smoke-test C11 targets
         run: bash scripts/build.sh --arch generic --lint --smoke
 
+      - name: Check C11 audit bridge
+        run: |
+          printf '%s' '{"prompt":"hello","text":"plain text","rules":""}' \
+            | ./build/niyah_hybrid --audit-stdin \
+            | grep -E '"audit_passed":true.*"integrity_sha256":"[0-9a-f]{64}"'
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -39,27 +45,11 @@ jobs:
           node --check server.js
           node --check routes/niyah.js
           for f in lib/*.js; do node --check "$f"; done
+          for f in test/*.js; do node --check "$f"; done
 
-      - name: Check URL filtering primitives
+      - name: Run Node tests
         working-directory: niyah_engine_local
-        run: |
-          node - <<'NODE'
-          const assert = require('node:assert/strict');
-          const { isBlockedIp } = require('./lib/searchProvider');
-          assert.equal(isBlockedIp('127.0.0.1'), true);
-          assert.equal(isBlockedIp('10.0.0.1'), true);
-          assert.equal(isBlockedIp('169.254.169.254'), true);
-          assert.equal(isBlockedIp('192.168.1.1'), true);
-          assert.equal(isBlockedIp('::1'), true);
-          assert.equal(isBlockedIp('fc00::1'), true);
-          assert.equal(isBlockedIp('8.8.8.8'), false);
-          NODE
-
-      - name: Check C11 audit bridge
-        run: |
-          printf '%s' '{"prompt":"hello","text":"plain text","rules":""}' \
-            | ./build/niyah_hybrid --audit-stdin \
-            | grep -E '"audit_passed":true.*"integrity_sha256":"[0-9a-f]{64}"'
+        run: npm test
 
   desktop:
     runs-on: windows-latest
