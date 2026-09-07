@@ -10,21 +10,15 @@ namespace CasperUI;
 
 public partial class MainWindow : Window
 {
-    // Path to the C11 engine — same directory as this exe
-    // Engine lives in app/ subfolder; fall back to exe directory for dev runs
     private static readonly string EngineDir =
         Directory.Exists(Path.Combine(AppContext.BaseDirectory, "app"))
             ? Path.Combine(AppContext.BaseDirectory, "app")
             : AppContext.BaseDirectory;
-    private static readonly string EnginePath = Path.Combine(EngineDir, "niyah_hybrid.exe");
 
-    // Node.js agent process (started in background, killed on exit)
+    private static readonly string EnginePath = Path.Combine(EngineDir, "niyah_hybrid.exe");
     private Process? _agentProcess;
     private const int AgentPort = 3000;
-    private string _agentUrl = "http://20.91.208.59"; // updated after StartNodeAgent()
-
-    // WebView is x:Name in XAML — directly accessible as 'WebView' property
-    // CasperBridge accesses _owner.WebView.CoreWebView2 for PTY output
+    private static readonly string AgentUrl = $"http://127.0.0.1:{AgentPort}";
 
     public MainWindow()
     {
@@ -32,17 +26,15 @@ public partial class MainWindow : Window
         StartNodeAgent();
         InitWebView();
 
-        // Allow dragging the borderless window
-        MouseLeftButtonDown += (_, e) => { if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) DragMove(); };
-
-        // Kill agent on close
+        MouseLeftButtonDown += (_, e) =>
+        {
+            if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) DragMove();
+        };
         Closed += (_, _) => StopNodeAgent();
     }
 
     private void StartNodeAgent()
     {
-        // Look for niyah_engine server.js next to exe (app/niyah_engine/server.js)
-        // or in dev: niyah_engine_local/server.js from repo root
         var candidates = new[]
         {
             Path.Combine(AppContext.BaseDirectory, "app", "niyah_engine", "server.js"),
@@ -51,37 +43,37 @@ public partial class MainWindow : Window
         };
 
         string? serverJs = null;
-        foreach (var c in candidates)
-            if (File.Exists(c)) { serverJs = Path.GetFullPath(c); break; }
+        foreach (var candidate in candidates)
+        {
+            if (File.Exists(candidate))
+            {
+                serverJs = Path.GetFullPath(candidate);
+                break;
+            }
+        }
 
-        if (serverJs == null) return; // no Node engine found, use Azure fallback
-
-        // Find node.exe
-        string node = "node"; // must be on PATH
+        if (serverJs == null) return;
 
         try
         {
             var psi = new ProcessStartInfo
             {
-                FileName = node,
+                FileName = "node",
                 Arguments = $"\"{serverJs}\"",
                 WorkingDirectory = Path.GetDirectoryName(serverJs)!,
                 UseShellExecute = false,
-                CreateNoWindow  = true,
+                CreateNoWindow = true,
                 RedirectStandardOutput = false,
-                RedirectStandardError  = false,
+                RedirectStandardError = false,
             };
-            // Pass C11 exe path so agent can find it
             psi.Environment["NIYAH_HYBRID_EXE"] = EnginePath;
             psi.Environment["PORT"] = AgentPort.ToString();
+            psi.Environment["HOST"] = "127.0.0.1";
 
             _agentProcess = Process.Start(psi);
-            // Give it 1.5s to bind port
-            System.Threading.Thread.Sleep(1500);
         }
         catch
         {
-            // node not found or failed — fall through to Azure agent
             _agentProcess = null;
         }
     }
@@ -89,16 +81,16 @@ public partial class MainWindow : Window
     private void StopNodeAgent()
     {
         try { _agentProcess?.Kill(entireProcessTree: true); } catch { }
+        _agentProcess?.Dispose();
         _agentProcess = null;
     }
 
     private async void InitWebView()
     {
-        // Store WebView2 user data in %LOCALAPPDATA% so it works from
-        // Program Files and other protected directories (no write permission issues).
         string dataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "CasperApp", "webview2_data");
+            "CasperApp",
+            "webview2_data");
         Directory.CreateDirectory(dataDir);
 
         var env = await CoreWebView2Environment.CreateAsync(null, dataDir);
@@ -107,14 +99,9 @@ public partial class MainWindow : Window
         WebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
         WebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
         WebView.CoreWebView2.Settings.IsZoomControlEnabled = false;
-
-        // Register C# host object — exposed to JS as window.casper
         WebView.CoreWebView2.AddHostObjectToScript("casperBridge", new CasperBridge(this));
 
-        // AreHostObjectsAllowed is true by default, no need to set
-
-        // Look for HTML in app/ subfolder first, then fallback to exe directory
-        string appDir  = Path.Combine(AppContext.BaseDirectory, "app");
+        string appDir = Path.Combine(AppContext.BaseDirectory, "app");
         string htmlPath = File.Exists(Path.Combine(appDir, "casper_workbench.html"))
             ? Path.Combine(appDir, "casper_workbench.html")
             : Path.Combine(AppContext.BaseDirectory, "casper_workbench.html");
@@ -127,18 +114,11 @@ public partial class MainWindow : Window
 
     private void WebView_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
     {
-        // Determine agent URL: local Node.js if running, else Azure VM
-        _agentUrl = (_agentProcess != null && !_agentProcess.HasExited)
-            ? $"http://127.0.0.1:{AgentPort}"
-            : "http://20.91.208.59";
-
-        // Inject bridge + agent URL
         _ = WebView.CoreWebView2.ExecuteScriptAsync(
-            $"window.casper = window.chrome?.webview?.hostObjects?.casperBridge ?? null;" +
-            $"window._agentUrl = '{_agentUrl}';");
+            "window.casper = window.chrome?.webview?.hostObjects?.casperBridge ?? null;" +
+            $"window._agentUrl = '{AgentUrl}';");
     }
 
-    // Called from JS: window.casper.query("...")
     internal async Task<string> RunQuery(string query)
     {
         if (!File.Exists(EnginePath))
@@ -149,17 +129,16 @@ public partial class MainWindow : Window
             var psi = new ProcessStartInfo
             {
                 FileName = EnginePath,
-                Arguments = $"--rag",
-                RedirectStandardInput  = true,
+                Arguments = "--rag",
+                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
-                RedirectStandardError  = true,
+                RedirectStandardError = true,
                 UseShellExecute = false,
-                CreateNoWindow  = true,
+                CreateNoWindow = true,
                 WorkingDirectory = EngineDir,
-                // UTF-8 without BOM — BOM causes %EF%BB%BF prefix in DDG queries
-                StandardInputEncoding  = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                StandardInputEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
                 StandardOutputEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-                StandardErrorEncoding  = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                StandardErrorEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
             };
 
             using var proc = Process.Start(psi)!;
@@ -173,8 +152,8 @@ public partial class MainWindow : Window
 
             return JsonSerializer.Serialize(new
             {
-                output   = stdout,
-                trace    = stderr,
+                output = stdout,
+                trace = stderr,
                 exitCode = proc.ExitCode,
             });
         }
@@ -184,8 +163,7 @@ public partial class MainWindow : Window
         }
     }
 
-    // Minimal fallback if HTML file is missing
     private static string FallbackHtml() =>
-        "<html><body style='background:#040706;color:#2CF2DA;font-family:monospace;padding:40px'>" +
+        "<html><body style='font-family:monospace;padding:40px'>" +
         "<h2>Casper</h2><p>casper_workbench.html not found next to Casper.exe</p></body></html>";
 }
