@@ -2,9 +2,8 @@
 """Full-model Casper trainer.
 
 Trains the exact C runtime architecture with PyTorch autograd and exports the
-native NIYAH .bin layout consumed by Core_CPP/niyah_core.c. This is the
-supported path for teacher-distillation/SFT. The legacy C niyah_train_step()
-remains output-head-only for ABI compatibility.
+native NIYAH .bin layout consumed by Core_CPP/niyah_core.c. This path is for
+teacher-distillation/SFT and uses exact full-sequence causal autograd.
 """
 from __future__ import annotations
 
@@ -73,9 +72,6 @@ class CasperTokenizer:
 
         self.word_end = len(self.tokens)
         self.lookup_exact = {tok: i for i, tok in enumerate(self.tokens[: self.word_end])}
-        self.lookup_folded: dict[str, int] = {}
-        for i, tok in enumerate(self.tokens[: self.word_end]):
-            self.lookup_folded.setdefault(tok.lower(), i)
 
         self.char_base = len(self.tokens)
         self.codepoint_to_id: dict[int, int] = {}
@@ -98,9 +94,9 @@ class CasperTokenizer:
         return len(self.tokens)
 
     def _lookup_ascii(self, text: str) -> int:
-        if text in self.lookup_exact:
-            return self.lookup_exact[text]
-        return self.lookup_folded.get(text.lower(), TOK_UNK)
+        # Exact-only lookup is required for a lossless tokenizer contract.
+        # Case variants of compact tokens fall back to their original bytes.
+        return self.lookup_exact.get(text, TOK_UNK)
 
     def encode_bytes(self, data: bytes) -> list[int]:
         text = data.decode("utf-8", errors="strict")
@@ -182,6 +178,24 @@ class CasperTokenizer:
         return b"".join(chunks).decode("utf-8", errors="replace")
 
 
+def verify_tokenizer_contract(tok: CasperTokenizer) -> None:
+    probes = (
+        "malloc allocates heap memory",
+        "unknown teacher vocabulary survives exactly",
+        "SHA-256 Casper TCP UDP",
+        "بسم الله",
+        "casper نية engine",
+        "emoji: 🧠 CJK: 汉字",
+        "line one\nline two\tindent",
+    )
+    for probe in probes:
+        roundtrip = tok.decode(tok.encode(probe))
+        if roundtrip != probe:
+            raise RuntimeError(
+                f"tokenizer round-trip failure: expected={probe!r} actual={roundtrip!r}"
+            )
+
+
 @dataclass
 class ModelConfig:
     vocab_size: int
@@ -205,6 +219,8 @@ class ModelConfig:
             raise ValueError("ctx_len must be in 1..8192")
         if self.vocab_size <= 0 or self.vocab_size > 131072:
             raise ValueError("vocab_size out of range")
+        if (self.embed_dim // self.n_heads) % 2:
+            raise ValueError("head_dim must be even for RoPE")
 
 
 class RMSNorm(nn.Module):
@@ -551,6 +567,7 @@ def main() -> int:
         torch.use_deterministic_algorithms(True)
 
     tok = CasperTokenizer()
+    verify_tokenizer_contract(tok)
     cfg = ModelConfig(
         vocab_size=tok.vocab_size,
         ctx_len=args.ctx_len,
