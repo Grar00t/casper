@@ -11,6 +11,7 @@ typedef struct {
     float energy_preserved;
     float residual_penalty;
     int rank_used;
+    int chi_e; /* compatibility alias; identical to rank_used */
     bool passes_threshold;
 } KHZQ_Result;
 
@@ -20,6 +21,11 @@ typedef struct {
  * measure meaning, factuality, ethics, safety, or model correctness.
  */
 KHZQ_Result khz_q_analyze_output(const char *text, float target_energy);
+
+/* Compatibility entry point for existing callers; same structural metric. */
+static inline KHZQ_Result khz_q_verify_output(const char *text, float target_energy) {
+    return khz_q_analyze_output(text, target_energy);
+}
 
 void khz_q_build_byte_matrix(const char *text,
                              float matrix[KHZ_MAX_N][KHZ_MAX_N]);
