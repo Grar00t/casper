@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  c-core:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and smoke
+        env:
+          CC: ${{ matrix.compiler }}
+        run: bash scripts/build.sh --arch generic --smoke
+
+  node-runtime:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: niyah_engine_local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: niyah_engine_local/package-lock.json
+      - run: npm ci
+      - name: Syntax check
+        run: |
+          node --check server.js
+          node --check routes/niyah.js
+          for file in lib/*.js; do node --check "$file"; done
+
+  windows-ui:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Build WPF UI
+        run: dotnet build UI_CSharp/CasperUI.csproj -c Release
