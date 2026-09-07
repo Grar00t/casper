@@ -23,24 +23,27 @@ function Assert-ProcessSuccess([string]$Name, [int]$ExitCode) {
     }
 }
 
-function ConvertTo-BashLiteral([string]$Value) {
-    return "'" + $Value.Replace("'", "'\"'\"'") + "'"
-}
-
 function Invoke-Build([switch]$Smoke, [switch]$Bench) {
-    $args = @("scripts/build.sh", "--arch", "generic")
-    if ($Smoke) { $args += "--smoke" }
-    if ($Bench) { $args += "--bench" }
-    & bash @args
+    $buildArgs = @("scripts/build.sh", "--arch", "generic")
+    if ($Smoke) { $buildArgs += "--smoke" }
+    if ($Bench) { $buildArgs += "--bench" }
+    & bash @buildArgs
     Assert-ProcessSuccess "build" $LASTEXITCODE
 }
 
 function Invoke-Train {
     Invoke-Build
-    $data = ConvertTo-BashLiteral $DataPath
-    $command = "./build/trainer $data $Epochs $Lr $MinLr"
-    & bash -c $command
-    Assert-ProcessSuccess "train" $LASTEXITCODE
+    $env:NIYAH_DATA_PATH = $DataPath
+    $env:NIYAH_EPOCHS = [string]$Epochs
+    $env:NIYAH_LR = [string]$Lr
+    $env:NIYAH_MIN_LR = [string]$MinLr
+    try {
+        & bash -c './build/trainer "$NIYAH_DATA_PATH" "$NIYAH_EPOCHS" "$NIYAH_LR" "$NIYAH_MIN_LR"'
+        Assert-ProcessSuccess "train" $LASTEXITCODE
+    }
+    finally {
+        Remove-Item Env:NIYAH_DATA_PATH, Env:NIYAH_EPOCHS, Env:NIYAH_LR, Env:NIYAH_MIN_LR -ErrorAction SilentlyContinue
+    }
 }
 
 function Invoke-Run {
@@ -49,10 +52,15 @@ function Invoke-Run {
         throw "[niyah] model missing: $Model"
     }
 
-    $modelArg = ConvertTo-BashLiteral $Model
-    $inputText = @($Prompt, "quit") -join [Environment]::NewLine
-    $inputText | & bash -c "./build/niyah_hybrid --model $modelArg --interactive"
-    Assert-ProcessSuccess "run" $LASTEXITCODE
+    $env:NIYAH_MODEL_PATH = $Model
+    try {
+        $inputText = @($Prompt, "quit") -join [Environment]::NewLine
+        $inputText | & bash -c './build/niyah_hybrid --model "$NIYAH_MODEL_PATH" --interactive'
+        Assert-ProcessSuccess "run" $LASTEXITCODE
+    }
+    finally {
+        Remove-Item Env:NIYAH_MODEL_PATH -ErrorAction SilentlyContinue
+    }
 }
 
 switch ($Action) {
