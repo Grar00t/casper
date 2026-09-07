@@ -19,7 +19,9 @@ jobs:
       - name: Build and smoke
         env:
           CC: ${{ matrix.compiler }}
-        run: bash scripts/build.sh --arch generic --smoke
+        run: |
+          bash scripts/build.sh --arch generic --smoke
+          ./build/casper --self-check
 
   node-runtime:
     runs-on: ubuntu-latest
