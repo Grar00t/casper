@@ -12,8 +12,6 @@ dist/
 *.ilk
 
 # Extensionless build artifacts.
-# These names were missing before, which is why casper_engine (137880 B) and
-# Core_CPP/trainer (28824 B) ended up committed.
 casper_engine
 tokenizer_test
 Core_CPP/casper
@@ -34,11 +32,14 @@ test_csp
 test_rules
 test_proof
 
-# ---- Model weights ------------------------------------------------------
+# ---- Model weights / training state -------------------------------------
 *.bin
 *.gguf
 *.safetensors
+*.pt
+*.pth
 niyah_trained.bin
+casper_trained.bin.manifest.json
 
 # ---- Training corpora (large and regenerable) ---------------------------
 Data_Training/sources/train.txt
