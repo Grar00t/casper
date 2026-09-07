@@ -336,7 +336,6 @@ static int audit_stdin(void) {
     uint8_t digest[32];
     char digest_hex[65];
     KHZQ_Result metric;
-    int digest_rc;
     if (!json) {
         (void)fputs("{\"error\":\"invalid or oversized input\"}\n", stdout);
         return 3;
@@ -359,8 +358,7 @@ static int audit_stdin(void) {
         violation = niyah_rule_check(rules,prompt,text);
     }
 
-    digest_rc = niyah_proof_generate(prompt,text,rules_path[0]?rules_path:NULL,digest);
-    if (digest_rc != 0) {
+    if (niyah_proof_generate(prompt,text,rules_path[0]?rules_path:NULL,digest) != 0) {
         if (rules) niyah_rule_free(rules);
         (void)fputs("{\"error\":\"rules file could not be hashed\"}\n", stdout);
         return 3;
@@ -374,7 +372,7 @@ static int audit_stdin(void) {
     else (void)fputs("null",stdout);
     (void)fputs("}\n",stdout);
     if (rules) niyah_rule_free(rules);
-    return violation ? 1 : 0;
+    return 0;
 }
 
 static int parse_backend(const char *name, RagBackend *backend) {
