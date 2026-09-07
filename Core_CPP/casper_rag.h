@@ -1,13 +1,8 @@
-/*
- * casper_rag.h — Retrieval-Augmented Generation pipe for Casper
- * C11, zero external dependencies in the public API.
- */
+/* casper_rag.h — minimal web retrieval for the native Casper CLI. */
 #ifndef CASPER_RAG_H
 #define CASPER_RAG_H
 
 #include <stdint.h>
-#include <stdbool.h>
-#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,9 +30,7 @@ typedef enum {
     TRACE_FETCH = 2,
     TRACE_RANK = 3,
     TRACE_CONTEXT = 4,
-    TRACE_SYMBOLIC = 5,
-    TRACE_COMPOSE = 6,
-    TRACE_WARN = 7
+    TRACE_WARN = 5
 } TraceKind;
 
 typedef struct {
@@ -55,23 +48,16 @@ typedef struct {
     TraceStep trace[RAG_TRACE_MAX];
     int n_steps;
     float confidence;
-    bool contradiction;
-    uint8_t chain_hash[32];
+    uint8_t context_sha256[32];
     uint32_t elapsed_ms;
 } RagCtx;
 
-typedef enum {
-    RAG_BACKEND_DDG = 0,
-    RAG_BACKEND_SEARXNG = 1,
-    RAG_BACKEND_BING = 2
-} RagBackend;
-
-RagCtx *casper_rag_query(const char *query,
-                         RagBackend backend,
-                         const char *rules_path);
+/*
+ * Query DuckDuckGo's HTML endpoint and rank returned snippets lexically.
+ * Windows uses WinHTTP. POSIX uses the curl executable at runtime.
+ */
+RagCtx *casper_rag_query(const char *query);
 void casper_rag_free(RagCtx *ctx);
-char *casper_rag_to_json(const RagCtx *ctx);
-bool casper_rag_online(RagBackend backend);
 
 #ifdef __cplusplus
 }
