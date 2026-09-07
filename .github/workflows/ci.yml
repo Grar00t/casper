@@ -22,6 +22,12 @@ jobs:
         run: |
           bash scripts/build.sh --arch generic --smoke
           ./build/casper --self-check
+      - name: Debug sanitizer smoke
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          bash scripts/build.sh --debug --arch generic --smoke
+          ./build/casper --self-check
 
   node-runtime:
     runs-on: ubuntu-latest
