@@ -164,7 +164,7 @@ static int cmd_self_check(void) {
     (void)snprintf(ctx.results[0].title, sizeof(ctx.results[0].title), "%s", "low");
     (void)snprintf(ctx.results[0].snippet, sizeof(ctx.results[0].snippet), "%s", "low snippet");
     (void)snprintf(ctx.results[0].url, sizeof(ctx.results[0].url), "%s",
-                   "//duckduckgo.com/l/?uddg=https%%3A%%2F%%2Fexample.com%%2Flow&amp;rut=x");
+                   "//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Flow&amp;rut=x");
 
     ctx.results[1].score = 1.000f;
     (void)snprintf(ctx.results[1].title, sizeof(ctx.results[1].title), "%s", "best");
