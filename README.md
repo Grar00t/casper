@@ -57,7 +57,8 @@ The build uses C11 plus warnings-as-errors. `--arch generic` avoids host-specifi
 
 | Path | Implemented role |
 |---|---|
-| `Core_CPP/niyah_core.c` | model allocation, forward computation, sampling, Adam step, save/load |
+| `Core_CPP/niyah_core.c` | model allocation, inference, sampling, persistence, legacy output-head adaptation |
+| `Core_CPP/niyah_train_full.c` | deterministic initialization and full-parameter truncated-BPTT training |
 | `Core_CPP/niyah_train.c` | training executable |
 | `Core_CPP/hybrid_reasoner.c` | terms, unification, clause solving |
 | `Core_CPP/constraint_solver.c` | rational constraints and propagation |
@@ -109,7 +110,15 @@ Current supported entry points include:
 ./build/trainer Data_Training/sovereign_knowledge.txt 3 0.001 0.0001
 ```
 
-The trainer writes `niyah_trained.bin` on a successful run.
+The trainer now derives `vocab_size` from the live tokenizer, applies deterministic non-zero initialization, and updates token embeddings, all attention and FFN projections, RMSNorm scales, and the LM head. A successful run writes `niyah_trained.bin`.
+
+The training algorithm uses a deliberate detached-KV boundary: each position backpropagates through its current Q/K/V path, but future losses do not propagate into earlier cached K/V states. This is full-parameter truncated backpropagation, not exact full-sequence BPTT. The C self-check includes an overfit regression that requires loss reduction and a change in an attention backbone matrix.
+
+An optional fifth argument supplies the deterministic initialization seed:
+
+```bash
+./build/trainer Data_Training/sovereign_knowledge.txt 3 0.001 0.0001 0x434153504552
+```
 
 ## Proof Verification
 
@@ -127,4 +136,4 @@ Constraint values use integer numerator/denominator representation. Where availa
 
 ## CI
 
-GitHub Actions builds and smokes the C runtime with GCC and Clang, checks Node.js source syntax, and builds the WPF UI on Windows. CI is the repository-level evidence for buildability; documentation claims are not treated as implementation evidence.
+GitHub Actions builds and smokes the C runtime with GCC and Clang, checks Node.js source syntax, and builds the WPF UI on Windows. The C smoke path runs the trainer overfit/backbone-update regression. CI is the repository-level evidence for buildability; documentation claims are not treated as implementation evidence.
