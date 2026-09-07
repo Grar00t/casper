@@ -2,8 +2,8 @@ name: ci
 
 on:
   push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,6 +20,10 @@ jobs:
         env:
           CC: ${{ matrix.compiler }}
         run: bash scripts/build.sh --arch generic --smoke
+      - name: Debug sanitizer smoke
+        env:
+          CC: ${{ matrix.compiler }}
+        run: bash scripts/build.sh --debug --arch generic --smoke
 
   node-runtime:
     runs-on: ubuntu-latest
