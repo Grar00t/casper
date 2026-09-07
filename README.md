@@ -128,7 +128,3 @@ Constraint values use integer numerator/denominator representation. Where availa
 ## CI
 
 GitHub Actions builds and smokes the C runtime with GCC and Clang, checks Node.js source syntax, and builds the WPF UI on Windows. CI is the repository-level evidence for buildability; documentation claims are not treated as implementation evidence.
-
-## License
-
-MIT. See `LICENSE` if present in the checked-out revision and individual third-party data/package licensing for optional corpora and dependencies.
