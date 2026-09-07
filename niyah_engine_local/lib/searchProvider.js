@@ -1,6 +1,67 @@
 'use strict';
 
+const dns = require('dns').promises;
+const net = require('net');
+
 const DEFAULT_TIMEOUT_MS = 8000;
+const MAX_PAGE_BYTES = 2 * 1024 * 1024;
+const MAX_REDIRECTS = 5;
+
+function isBlockedIp(address) {
+  if (net.isIPv4(address)) {
+    const p = address.split('.').map(Number);
+    return p[0] === 0
+      || p[0] === 10
+      || p[0] === 127
+      || (p[0] === 169 && p[1] === 254)
+      || (p[0] === 172 && p[1] >= 16 && p[1] <= 31)
+      || (p[0] === 192 && p[1] === 168)
+      || p[0] >= 224;
+  }
+
+  if (net.isIPv6(address)) {
+    const a = address.toLowerCase();
+    if (a === '::' || a === '::1') return true;
+    if (a.startsWith('fc') || a.startsWith('fd')) return true;
+    if (/^fe[89ab]/.test(a)) return true;
+    if (a.startsWith('::ffff:')) {
+      const mapped = a.substring(7);
+      return net.isIPv4(mapped) ? isBlockedIp(mapped) : true;
+    }
+  }
+  return false;
+}
+
+async function assertPublicHttpUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error('invalid URL');
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`unsupported URL scheme: ${url.protocol}`);
+  }
+  if (url.username || url.password) throw new Error('URL credentials are not allowed');
+
+  const host = url.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) {
+    throw new Error('local hostnames are not allowed');
+  }
+
+  if (net.isIP(host)) {
+    if (isBlockedIp(host)) throw new Error('private or special-use address is not allowed');
+    return url;
+  }
+
+  const addresses = await dns.lookup(host, { all: true, verbatim: true });
+  if (!addresses.length) throw new Error('hostname did not resolve');
+  if (addresses.some(({ address }) => isBlockedIp(address))) {
+    throw new Error('hostname resolves to a private or special-use address');
+  }
+  return url;
+}
 
 class SearchProvider {
   constructor(opts = {}) {
@@ -9,14 +70,45 @@ class SearchProvider {
     this.timeoutMs = opts.timeoutMs || DEFAULT_TIMEOUT_MS;
   }
 
+  backendName() {
+    if (this.searxngBaseUrl) return 'searxng';
+    if (this.braveApiKey) return 'brave';
+    return 'duckduckgo_html';
+  }
+
   async _fetchWithTimeout(url, options = {}) {
     const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
-      return res;
+      return await fetch(url, { ...options, signal: controller.signal });
     } finally {
-      clearTimeout(t);
+      clearTimeout(timer);
+    }
+  }
+
+  async _readTextLimited(res, maxBytes = MAX_PAGE_BYTES) {
+    const declared = Number(res.headers.get('content-length'));
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      throw new Error(`response exceeds ${maxBytes} bytes`);
+    }
+    if (!res.body) return '';
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8', { fatal: false });
+    let bytes = 0;
+    let text = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > maxBytes) throw new Error(`response exceeds ${maxBytes} bytes`);
+        text += decoder.decode(value, { stream: true });
+      }
+      text += decoder.decode();
+      return text;
+    } finally {
+      reader.releaseLock();
     }
   }
 
@@ -62,13 +154,13 @@ class SearchProvider {
     const res = await this._fetchWithTimeout(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
         'Cache-Control': 'no-cache',
       },
     });
     if (!res.ok) throw new Error(`DuckDuckGo HTML HTTP ${res.status}`);
-    const html = await res.text();
+    const html = await this._readTextLimited(res);
     const results = [];
 
     const patterns = [
@@ -92,14 +184,18 @@ class SearchProvider {
     for (const pattern of patterns) {
       while ((m = pattern.exec(html)) !== null) {
         let href = m[1];
-        if (href.includes('/l/?uddg=')) {
-          href = decodeURIComponent(href.replace(/^.*\/l\/\?uddg=/, '').split('&')[0]);
-        } else if (href.startsWith('/')) {
-          href = 'https://duckduckgo.com' + href;
+        try {
+          if (href.includes('/l/?uddg=')) {
+            href = decodeURIComponent(href.replace(/^.*\/l\/\?uddg=/, '').split('&')[0]);
+          } else if (href.startsWith('/')) {
+            href = 'https://duckduckgo.com' + href;
+          }
+        } catch {
+          continue;
         }
         const title = strip(m[2]);
-        if (href && title && !href.includes('duckduckgo.com') && href.startsWith('http')) {
-          if (!links.some(l => l.url === href)) links.push({ url: href, title });
+        if (href && title && !href.includes('duckduckgo.com') && /^https?:\/\//.test(href)) {
+          if (!links.some((link) => link.url === href)) links.push({ url: href, title });
         }
       }
     }
@@ -112,35 +208,46 @@ class SearchProvider {
       }
     }
 
-    for (let i = 0; i < Math.min(links.length, maxResults); i++) {
-      results.push({ title: links[i].title, url: links[i].url, snippet: snippets[i] || '', source: 'duckduckgo_html' });
-    }
-
-    if (results.length === 0) {
-      console.warn(`[niyah/search] DDG returned 0. links=${links.length} snippets=${snippets.length}`);
-      if (process.env.DEBUG_SEARCH) {
-        require('fs').writeFileSync('duckduckgo_debug.html', html);
-      }
+    for (let i = 0; i < Math.min(links.length, maxResults); i += 1) {
+      results.push({
+        title: links[i].title,
+        url: links[i].url,
+        snippet: snippets[i] || '',
+        source: 'duckduckgo_html',
+      });
     }
     return results;
   }
 
   async fetchPageText(pageUrl) {
-    const res = await this._fetchWithTimeout(pageUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
-      },
-      redirect: 'follow',
-    });
-    if (!res.ok) throw new Error(`fetchPageText HTTP ${res.status} for ${pageUrl}`);
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('text/html') && !contentType.includes('text/plain')) {
-      throw new Error(`unsupported content-type: ${contentType}`);
+    let current = await assertPublicHttpUrl(pageUrl);
+    for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
+      const res = await this._fetchWithTimeout(current.href, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
+        },
+        redirect: 'manual',
+      });
+
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location');
+        if (!location) throw new Error(`redirect ${res.status} without Location`);
+        if (redirects === MAX_REDIRECTS) throw new Error('too many redirects');
+        current = await assertPublicHttpUrl(new URL(location, current).href);
+        continue;
+      }
+
+      if (!res.ok) throw new Error(`fetchPageText HTTP ${res.status} for ${current.href}`);
+      const contentType = (res.headers.get('content-type') || '').toLowerCase();
+      if (!contentType.includes('text/html') && !contentType.includes('text/plain')) {
+        throw new Error(`unsupported content-type: ${contentType}`);
+      }
+      const html = await this._readTextLimited(res);
+      return this._stripHtml(html);
     }
-    const html = await res.text();
-    return this._stripHtml(html);
+    throw new Error('too many redirects');
   }
 
   _stripHtml(html) {
@@ -149,9 +256,13 @@ class SearchProvider {
       .replace(/<style[\s\S]*?<\/style>/gi, ' ')
       .replace(/<!--[\s\S]*?-->/g, ' ')
       .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-      .replace(/\s+/g, ' ').trim();
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 }
 
-module.exports = { SearchProvider };
+module.exports = { SearchProvider, assertPublicHttpUrl, isBlockedIp };
