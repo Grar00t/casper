@@ -1,27 +1,24 @@
 # Project Structure
 
-Generated from the tree, not written by hand. Regenerate after any file move:
+Generated from `git ls-files` on `integrate-teacher-training` at
+`f30f8712ae0831ac641861042ba0335c91afb000`. Documentation is not
+implementation evidence.
 
-```bash
-git ls-files | tree --fromfile -a --noreport
-```
-
-The previous revision declared 7 files that do not exist
-(`Core_CPP/casper_core.cpp`, `matrix.cpp`, `trainer.cpp`, `trainer_real.cpp`,
-`trainer_real_fix.cpp`, `scripts/build_msvc.ps1`, `test_generation.c`) and
-omitted 19 that do. It also claimed "6 directories, 37 files".
+The previous tree listing included paths that are not present
+(`.agents/`, `CLAUDE.md`) and omitted `tools/` and `niyah_train_full.*`.
 
 ```text
 .
-├── .agents/
 ├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── .vscode/
 │   └── settings.json
 ├── Core_CPP/
 │   ├── bench_niyah.c
-│   ├── casper_cli.c              # CLI entry point, emits the JSON contract
-│   ├── casper_rag.c              # search transport, parser, ranker
-│   ├── casper_rag.h              # the live search contract
+│   ├── casper_cli.c
+│   ├── casper_rag.c
+│   ├── casper_rag.h
 │   ├── constraint_solver.c
 │   ├── constraint_solver.h
 │   ├── hybrid_reasoner.c
@@ -33,38 +30,40 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── niyah_hybrid_main.c
 │   ├── niyah_main.c
 │   ├── niyah_train.c
+│   ├── niyah_train_full.c
+│   ├── niyah_train_full.h
 │   ├── proof_generator.c
 │   ├── proof_generator.h
 │   ├── rule_parser.c
 │   └── rule_parser.h
 ├── Data_Training/
-│   ├── safety.nrule                      # 1252 B
+│   ├── safety.nrule
 │   ├── sources/
 │   │   ├── languages/
-│   │   │   └── en_ar.txt                 # 379922 B
+│   │   │   └── en_ar.txt
 │   │   ├── programming/
-│   │   │   └── code_cpp_assembly.txt     # 123733 B
+│   │   │   └── code_cpp_assembly.txt
 │   │   ├── quran/
-│   │   │   └── test.txt                  # 17 B
-│   │   └── test.txt                      # 17 B
-│   └── sovereign_knowledge.txt           # 134 B
+│   │   │   └── test.txt
+│   │   └── test.txt
+│   └── sovereign_knowledge.txt
 ├── Math_ASM/
-│   └── avx_mult.asm              # 714 B, not referenced by scripts/build.sh
+│   └── avx_mult.asm
 ├── UI_CSharp/
 │   ├── App.xaml
 │   ├── App.xaml.cs
 │   ├── AssemblyInfo.cs
-│   ├── CasperBridge.cs           # window.casper host object for WebView2
+│   ├── CasperBridge.cs
 │   ├── CasperUI.csproj
 │   ├── MainWindow.xaml
 │   ├── MainWindow.xaml.cs
-│   ├── PtyBridge.cs              # ConPTY session
+│   ├── PtyBridge.cs
 │   ├── app.manifest
 │   └── casper_workbench.html
 ├── include/
 │   ├── casper_ffi.h
 │   └── tokenizer.h
-├── niyah_engine_local/           # Node service, no model weights
+├── niyah_engine_local/
 │   ├── lib/
 │   │   ├── memory.js
 │   │   ├── niyahEngine.js
@@ -78,15 +77,17 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── package.json
 │   └── server.js
 ├── scripts/
-│   ├── build.sh                  # the only build entry point
+│   ├── build.sh
 │   ├── build_corpus.ps1
 │   ├── build_trainer.ps1
 │   ├── niyah.ps1
 │   └── run_trainer.ps1
+├── tools/
+│   ├── generate_teacher_dataset.py
+│   └── train_casper.py
 ├── .gitattributes
 ├── .gitignore
 ├── AGENTS.md
-├── CLAUDE.md
 ├── README.md
 ├── STRUCTURE.md
 ├── get_real_data.py
@@ -96,8 +97,9 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 
 ## Training data
 
-Measured with `find Data_Training -type f -printf '%s %p\n'`, not inferred from
-the top-level listing:
+Tracked raw text under `Data_Training/` is not a teacher SFT JSONL set.
+`.gitignore` ignores `Data_Training/sources/languages/` and
+`Data_Training/sources/programming/`, but those paths remain tracked.
 
 | Path | Bytes |
 | --- | --- |
@@ -107,50 +109,47 @@ the top-level listing:
 | `Data_Training/sovereign_knowledge.txt` | 134 |
 | `Data_Training/sources/test.txt` | 17 |
 | `Data_Training/sources/quran/test.txt` | 17 |
-| **total** | **505075** |
 
-It is raw text, not instruction pairs. It is enough to exercise the tokenizer and
-the byte-level path; it is not a supervised fine-tuning set.
+`get_real_data.py` writes `sources/languages/ar.txt`,
+`sources/languages/en.txt`, and `sources/programming/code_c.txt`. Those
+names are not the tracked files above.
 
-`get_real_data.py` writes `sources/languages/ar.txt`, `sources/languages/en.txt`
-and `sources/programming/code_c.txt` -- none of which are the files above. A
-fetch therefore grows a second, parallel set of filenames instead of extending
-the corpus. Pick one naming scheme before the next fetch.
+Do not feed these dumps into `tools/train_casper.py`. That path requires
+JSONL with `instruction` and `response`.
 
 ## Build artifacts
 
-`scripts/build.sh` writes every binary to `build/`, which is ignored. Nothing
-compiled belongs in this tree. Two binaries were previously committed because
-their names were absent from `.gitignore`:
+`scripts/build.sh` writes binaries under `build/`, which is ignored.
+`scripts/build_trainer.ps1` still points at `Core_CPP/trainer.cpp`,
+which is not in the tree. The live C trainer is `./build/trainer` from
+`scripts/build.sh`.
 
-| Path | Size | Status |
-| --- | --- | --- |
-| `casper_engine` | 137880 B | removed |
-| `Core_CPP/trainer` | 28824 B | removed |
+## Verified integration contracts
 
-Both are gone from the tree and still present in history, so a clone still pays
-for them. Removing them from history rewrites every commit id and is a separate,
-deliberate decision.
+- SFT prompt text is `Instruction:\n...\nResponse:\n` in both
+  `tools/train_casper.py` and `Core_CPP/niyah_hybrid_main.c`.
+- Tokenizer vocabulary v2 size is 1756: historical ids `0..1499`, byte
+  fallback `1500..1755`.
+- C `tokenizer_encode` wraps BOS/EOS. Hybrid inference strips a trailing
+  EOS from the prompt before generation. Python SFT builds
+  `[BOS] + prompt_ids + response_ids + [EOS]` with prompt/response
+  encoded `bos=False, eos=False`.
+- `build/niyah` self-check includes the C trainer overfit/backbone
+  regression. `build/casper --self-check` covers CLI ranking only.
+- `scripts/build.sh --smoke` runs `build/niyah` and
+  `build/niyah_hybrid --smoke`. It does not invoke `build/casper`.
+  CI additionally runs `./build/casper --self-check`.
 
-## Removed in this cleanup
+## Open integration defects
 
-| Path | Reason |
+Recorded for specialist branches. Not fixed on `audit/integration`.
+
+| Owner | Defect |
 | --- | --- |
-| `casper_engine` | compiled artifact |
-| `Core_CPP/trainer` | compiled artifact |
-| `.gitmodules` | declared `proof/llm-core-logic`, absent from the tree, so `clone --recursive` failed |
-| `Core_CPP/build_gcc.sh` | superseded by `scripts/build.sh` |
-| `scripts/build_gcc.sh` | superseded by `scripts/build.sh` |
-| `scripts/gen_rag.py` | hardcoded `C:/Users/sulaimanalshammari/...`; rewrote `Core_CPP/casper_rag.c` from byte literals and stopped after the header, truncating the file |
-| `scripts/fix_rag.py` | hardcoded path; both substitutions it applied are already present in the committed source |
-| `Core_CPP/casper_search.h` | 7054 B. `casper_search`, `casper_build_context`, `casper_ctx_free`, `casper_ctx_to_json` and `casper_search_available` were declared, implemented nowhere, and referenced by no source file: `grep -rn casper_search --include='*.c'` returned 0, and a second pass over `*.h`, `*.cs`, `*.html`, `*.ps1` and `*.md` returned only this document's own note |
-
-## Known defects, not yet fixed
-
-| Where | Defect |
-| --- | --- |
-| `Core_CPP/casper_rag.c` vs `Core_CPP/casper_cli.c` | two JSON serialisers. `casper_rag_to_json` emits `query, confidence, elapsed_ms, chain_hash, n_sources, n_steps`; the CLI emits those plus `answer`, `proof` and `sources[]` |
-| `Core_CPP/casper_rag.c` | `score_rel` uses `strtok`, which is not reentrant |
-| `niyah_engine_local/server.js` | `Access-Control-Allow-Origin: *` next to `GET /fetch?url=`, which is an open proxy if the service is ever exposed |
-| `Math_ASM/avx_mult.asm` | in no build target |
-| `README.md`, `AGENTS.md`, `CLAUDE.md` | still claim "no external runtime dependencies" beside an Express service, and still name the deleted `build_gcc.sh` |
+| Agent 3 ML/data | `tools/generate_teacher_dataset.py` default `--max-tokens` is 256. Empty final `content` was observed at that cap; 1024 completed those requests. |
+| Agent 3 ML/data | Generator stores `message.content` only, but resume/load paths do not reject existing JSONL rows that contain `reasoning` / `reasoning_content`. |
+| Agent 4 repo/CI | `scripts/build_trainer.ps1` compiles missing `Core_CPP/trainer.cpp`. `scripts/run_trainer.ps1` expects `Core_CPP/trainer.exe`. |
+| Agent 4 repo/CI | Tracked corpus files under gitignored `languages/` and `programming/` directories. |
+| Agent 4 repo/CI | `niyah_engine_local/server.js` sets `Access-Control-Allow-Origin: *` and serves `GET /fetch?url=` as an open proxy; listen address is not restricted to loopback. Header comment names an Azure VM / nginx deployment. |
+| Agent 2 native | `Math_ASM/avx_mult.asm` is not referenced by `scripts/build.sh`. |
+| Agent 2 native | Two JSON serialisers: `casper_rag_to_json` vs CLI JSON in `casper_cli.c`. |

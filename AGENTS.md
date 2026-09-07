@@ -1,6 +1,6 @@
 # Casper Repository Rules
 
-This file describes the repository as it exists on `main`. Do not infer features from old documentation or deleted scripts.
+This file describes the repository as it exists on the current working branch. Do not infer features from old documentation or deleted scripts. On `integrate-teacher-training` the teacher JSONL generator and Python SFT trainer are present; they are not on `main` at `195aca04`.
 
 ## Build
 
@@ -35,6 +35,7 @@ C build/run and `train-c` require `bash` plus GCC or Clang. Full-model `train` r
 | `Core_CPP/niyah_train_full.c` | deterministic initialization and full-parameter detached-KV/truncated-BPTT C training |
 | `Core_CPP/niyah_train.c` | native C training executable |
 | `tools/train_casper.py` | full-sequence PyTorch/CUDA SFT, checkpoint/resume, native `.bin` export |
+| `tools/generate_teacher_dataset.py` | local OpenAI-compatible teacher JSONL generator; intended supervision is final `response` only |
 | `Core_CPP/hybrid_reasoner.c` | symbolic terms, unification, clause solving |
 | `Core_CPP/constraint_solver.c` | rational constraint operations and propagation |
 | `Core_CPP/rule_parser.c` | `.nrule` parser and verification |
@@ -86,7 +87,7 @@ Historical ids `0..1499` are preserved. Vocabulary v2 appends byte fallback ids 
 `.github/workflows/ci.yml` checks:
 
 - C core with GCC and Clang using generic architecture, release smoke, and debug sanitizer smoke.
-- Python training-tool syntax.
+- Python training-tool syntax (`tools/train_casper.py` and `tools/generate_teacher_dataset.py`).
 - Node source syntax after `npm ci`.
 - Windows WPF build with .NET 9.
 
