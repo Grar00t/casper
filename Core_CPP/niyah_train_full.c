@@ -253,7 +253,7 @@ float niyah_full_train_step(NiyahModel *m, NiyahAdam *opt,
     float inv_steps;
     int failed = 0;
 
-    if (!m || !opt || !tokens) return 0.0f;
+    if (!m || !opt || !tokens) return NAN;
     if (n < 2u) return 0.0f;
     if (steps > m->cfg.ctx_len) return NAN;
     if (opt->n_weights != niyah_param_count(m)) return NAN;
