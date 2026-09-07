@@ -105,6 +105,27 @@ static void normalize_result_url(RagResult *r) {
     }
 }
 
+/* Keep the emitted source hash bound to the emitted normalized URL + snippet. */
+static void rehash_result(RagResult *r) {
+    uint8_t anchor[RAG_URL_MAX + 1u + RAG_SNIPPET_MAX];
+    size_t ul;
+    size_t sl;
+    size_t n;
+
+    if (!r) return;
+    ul = strnlen(r->url, sizeof(r->url));
+    sl = strnlen(r->snippet, sizeof(r->snippet));
+    if (ul >= RAG_URL_MAX || sl >= RAG_SNIPPET_MAX) {
+        memset(r->sha256, 0, sizeof(r->sha256));
+        return;
+    }
+    n = ul + 1u + sl;
+    memcpy(anchor, r->url, ul);
+    anchor[ul] = 0u;
+    memcpy(anchor + ul + 1u, r->snippet, sl);
+    niyah_sha256(anchor, n, r->sha256);
+}
+
 static int result_cmp_cli(const void *a, const void *b) {
     const RagResult *ra = (const RagResult *)a;
     const RagResult *rb = (const RagResult *)b;
@@ -120,13 +141,17 @@ static int result_cmp_cli(const void *a, const void *b) {
 /*
  * Defensive normalization at the CLI boundary. The RAG layer already ranks
  * results, but the CLI must never trust array order when choosing an answer
- * or emitting source order. This also makes stale/alternate RAG producers
- * deterministic at this boundary.
+ * or emitting source order. This also normalizes DDG destinations and keeps
+ * the source hashes aligned with what the CLI actually emits.
  */
 static void normalize_results(RagCtx *ctx) {
     int i;
     if (!ctx || ctx->n_results <= 0) return;
-    for (i = 0; i < ctx->n_results; ++i) normalize_result_url(&ctx->results[i]);
+    if (ctx->n_results > RAG_MAX_RESULTS) ctx->n_results = RAG_MAX_RESULTS;
+    for (i = 0; i < ctx->n_results; ++i) {
+        normalize_result_url(&ctx->results[i]);
+        rehash_result(&ctx->results[i]);
+    }
     qsort(ctx->results, (size_t)ctx->n_results, sizeof(ctx->results[0]), result_cmp_cli);
 }
 
@@ -155,10 +180,11 @@ static int cmd_self_check(void) {
     RagCtx ctx;
     char answer[512];
     int saw_unwrapped = 0;
+    int saw_hash = 0;
     int i;
 
     memset(&ctx, 0, sizeof(ctx));
-    ctx.n_results = 3;
+    ctx.n_results = RAG_MAX_RESULTS + 2;
 
     ctx.results[0].score = 0.500f;
     (void)snprintf(ctx.results[0].title, sizeof(ctx.results[0].title), "%s", "low");
@@ -177,6 +203,10 @@ static int cmd_self_check(void) {
     (void)snprintf(ctx.results[2].url, sizeof(ctx.results[2].url), "%s", "https://example.com/middle");
 
     normalize_results(&ctx);
+    if (ctx.n_results != RAG_MAX_RESULTS) {
+        fputs("CASPER SELF-CHECK FAIL bounds\n", stderr);
+        return 1;
+    }
     if (ctx.results[0].score != 1.000f || strcmp(ctx.results[0].title, "best") != 0) {
         fputs("CASPER SELF-CHECK FAIL ranking\n", stderr);
         return 1;
@@ -190,12 +220,23 @@ static int cmd_self_check(void) {
 
     for (i = 0; i < ctx.n_results; ++i) {
         if (!strcmp(ctx.results[i].url, "https://example.com/low")) {
+            int j;
             saw_unwrapped = 1;
+            for (j = 0; j < 32; ++j) {
+                if (ctx.results[i].sha256[j] != 0u) {
+                    saw_hash = 1;
+                    break;
+                }
+            }
             break;
         }
     }
     if (!saw_unwrapped) {
         fputs("CASPER SELF-CHECK FAIL ddg-url\n", stderr);
+        return 1;
+    }
+    if (!saw_hash) {
+        fputs("CASPER SELF-CHECK FAIL source-hash\n", stderr);
         return 1;
     }
 
@@ -214,7 +255,8 @@ int main(int argc,char **argv){
     RagCtx *ctx=casper_rag_query(query,pick_backend(),rules_path);
     if(!ctx){printf("{\"error\":\"rag allocation failure\"}\n");return 2;}
     if(ctx->n_results<=0){
-        printf("{\"query\":");json_str(stdout,query);printf(",\"error\":\"no results - offline or no match\",\"relevance_score\":0.0}\n");
+        printf("{\n  \"query\":");json_str(stdout,query);
+        printf(",\n  \"answer\":\"\",\n  \"error\":\"no results - offline or no match\",\n  \"relevance_score\":0.000,\n  \"confidence\":0.000,\n  \"confidence_kind\":\"top_lexical_relevance\",\n  \"mean_relevance\":0.000,\n  \"elapsed_ms\":%u,\n  \"violated\":false,\n  \"rejected\":false,\n  \"proof\":null,\n  \"proof_file\":null,\n  \"n_sources\":0,\n  \"sources\":[]\n}\n",ctx->elapsed_ms);
         casper_rag_free(ctx); return 2;
     }
 
