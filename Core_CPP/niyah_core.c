@@ -71,7 +71,7 @@ static float dot_f32(const float * restrict a,const float * restrict b,size_t n)
 #if defined(SIMD_AVX2)
     __m256 a0=_mm256_setzero_ps(),a1=_mm256_setzero_ps();size_t i=0;for(;i+15<n;i+=16){a0=_mm256_fmadd_ps(_mm256_loadu_ps(a+i),_mm256_loadu_ps(b+i),a0);a1=_mm256_fmadd_ps(_mm256_loadu_ps(a+i+8),_mm256_loadu_ps(b+i+8),a1);}__m256 acc=_mm256_add_ps(a0,a1);__m128 lo=_mm256_castps256_ps128(acc),hi=_mm256_extractf128_ps(acc,1),s4=_mm_add_ps(lo,hi),s2=_mm_add_ps(s4,_mm_movehdup_ps(s4));float d=_mm_cvtss_f32(_mm_add_ss(s2,_mm_movehl_ps(s2,s2)));for(;i<n;i++)d+=a[i]*b[i];return d;
 #elif defined(SIMD_NEON)
-    float32x4_t a0=vdupq_n_f32(0.f),a1=vdupq_n_f32(0.f);size_t i=0;for(;i+7<n;i+=8){a0=vfmaq_f32(a0,vld1q_f32(a+i),vld1q_f32(b+i));a1=vfmaq_f32(a1,vld1q_f32(a+i+4),vld1q_f32(b+i+4));}float32x4_t acc=vaddq_f32(a0,a1);float32x2_t lo2=vadd_f32(vget_low_f32(acc),vget_high_f32(acc));float d=vget_lane_f32(vpadd_f32(lo2,lo2),0);for(;i<n;i++)d+=a[i]*b[i];return d;
+    float32x4_t a0=vdupq_n_f32(0.f),a1=vdupq_n_f32(0.f);size_t i=0;for(;i+7<n;i+=8){a0=vfmaq_f32(a0,vld1q_f32(a+i),vld1q_f32(b+i),a0);a1=vfmaq_f32(a1,vld1q_f32(a+i+4),vld1q_f32(b+i+4),a1);}float32x4_t acc=vaddq_f32(a0,a1);float32x2_t lo2=vadd_f32(vget_low_f32(acc),vget_high_f32(acc));float d=vget_lane_f32(vpadd_f32(lo2,lo2),0);for(;i<n;i++)d+=a[i]*b[i];return d;
 #else
     float d=0.f;for(size_t i=0;i<n;i++)d+=a[i]*b[i];return d;
 #endif
@@ -119,5 +119,51 @@ uint32_t niyah_sample(const float*logits,uint32_t vocab_size,NiyahSampler*s){if(
 NiyahAdam*niyah_adam_alloc(const NiyahModel*m){if(!m)return NULL;NiyahAdam*opt=xcalloc(1u,sizeof(*opt));opt->n_weights=weight_count(&m->cfg);opt->m=xcalloc(opt->n_weights,sizeof(float));opt->v=xcalloc(opt->n_weights,sizeof(float));opt->lr=3e-4f;opt->beta1=.9f;opt->beta2=.999f;opt->eps=1e-8f;opt->wd=.01f;return opt;}
 void niyah_adam_free(NiyahAdam*opt){if(!opt)return;free(opt->m);free(opt->v);free(opt);}
 
-float niyah_train_step(NiyahModel*m,NiyahAdam*opt,const uint32_t*tokens,uint32_t n){if(!m||!opt||!tokens||n<2u)return 0.f;for(uint32_t i=0;i<n;i++)if(tokens[i]>=m->cfg.vocab_size||tokens[i]>=m->cfg.ctx_len)return NAN;size_t nw=weight_count(&m->cfg);float*grad=xcalloc(nw,sizeof(float));float*dL=xmalloc((size_t)m->cfg.vocab_size*sizeof(float));float loss=0.f;uint32_t d=m->cfg.embed_dim;for(uint32_t t=0;t+1<n;t++){const float*logits=niyah_forward(m,tokens[t],t);if(!logits){free(dL);free(grad);return NAN;}uint32_t tgt=tokens[t+1];float mx=logits[0];for(uint32_t i=1;i<m->cfg.vocab_size;i++)if(logits[i]>mx)mx=logits[i];float lse_sum=0.f;for(uint32_t i=0;i<m->cfg.vocab_size;i++){float z=logits[i]-mx;if(z<-80.f)z=-80.f;lse_sum+=expf(z);}if(!(lse_sum>0.f)||!isfinite(lse_sum)){free(dL);free(grad);return NAN;}float lse=logf(lse_sum)+mx;loss+=lse-logits[tgt];for(uint32_t i=0;i<m->cfg.vocab_size;i++)dL[i]=expf(logits[i]-lse);dL[tgt]-=1.f;const float*xb=SCR_XB(m);size_t off=nw-(size_t)m->cfg.vocab_size*d;float*dW=grad+off;for(uint32_t i=0;i<m->cfg.vocab_size;i++){float dl=dL[i];for(uint32_t j=0;j<d;j++)dW[(size_t)i*d+j]+=dl*xb[j];}}
-    loss/=(float)(n-1u);opt->step++;float bc1=1.f-powf(opt->beta1,(float)opt->step),bc2=1.f-powf(opt->beta2,(float)opt->step);if(!(bc1>0.f&&bc2>0.f)){free(dL);free(grad);return NAN;}size_t off=nw-(size_t)m->cfg.vocab_size*d;float*W=(float*)m->_pool+off;const float*gW=grad+off;float*mW=opt->m+off,*vW=opt->v+off;size_t cnt=(size_t)m->cfg.vocab_size*d;for(size_t i=0;i<cnt;i++){float g=gW[i]+opt->wd*W[i];mW[i]=opt->beta1*mW[i]+(1.f-opt->beta1)*g;vW[i]=opt->beta2*vW[i]+(1.f-opt->beta2)*g*g;float mh=mW[i]/bc1,vh=vW[i]/bc2;if(!isfinite(mh)||!isfinite(vh)){free(dL);free(grad);return NAN;}W[i]-=opt->lr*mh/(sqrtf(vh)+opt->eps);}free(dL);free(grad);return isfinite(loss)?loss:NAN;}
+float niyah_train_step(NiyahModel*m,NiyahAdam*opt,const uint32_t*tokens,uint32_t n){
+    if(!m||!opt||!tokens||n<2u)return 0.f;
+    if(n>m->cfg.ctx_len+1u)return NAN;
+    for(uint32_t i=0;i<n;i++)if(tokens[i]>=m->cfg.vocab_size)return NAN;
+    const uint32_t d=m->cfg.embed_dim;
+    const size_t head_count=(size_t)m->cfg.vocab_size*d;
+    const size_t head_off=(size_t)(m->lm_head-(float*)m->_pool);
+    float*grad=xcalloc(head_count,sizeof(float));
+    float*dL=xmalloc((size_t)m->cfg.vocab_size*sizeof(float));
+    float loss=0.f;
+    for(uint32_t t=0;t+1<n;t++){
+        const float*logits=niyah_forward(m,tokens[t],t);
+        if(!logits){free(dL);free(grad);return NAN;}
+        const uint32_t tgt=tokens[t+1];
+        float mx=logits[0];
+        for(uint32_t i=1;i<m->cfg.vocab_size;i++)if(logits[i]>mx)mx=logits[i];
+        float lse_sum=0.f;
+        for(uint32_t i=0;i<m->cfg.vocab_size;i++){float z=logits[i]-mx;if(z<-80.f)z=-80.f;lse_sum+=expf(z);}
+        if(!(lse_sum>0.f)||!isfinite(lse_sum)){free(dL);free(grad);return NAN;}
+        const float lse=logf(lse_sum)+mx;
+        loss+=lse-logits[tgt];
+        for(uint32_t i=0;i<m->cfg.vocab_size;i++)dL[i]=expf(logits[i]-lse);
+        dL[tgt]-=1.f;
+        const float*xb=SCR_XB(m);
+        for(uint32_t i=0;i<m->cfg.vocab_size;i++){
+            const float dl=dL[i];
+            for(uint32_t j=0;j<d;j++)grad[(size_t)i*d+j]+=dl*xb[j];
+        }
+    }
+    const float inv_targets=1.f/(float)(n-1u);
+    loss*=inv_targets;
+    opt->step++;
+    const float bc1=1.f-powf(opt->beta1,(float)opt->step);
+    const float bc2=1.f-powf(opt->beta2,(float)opt->step);
+    if(!(bc1>0.f&&bc2>0.f)){free(dL);free(grad);return NAN;}
+    float*W=m->lm_head;
+    float*mW=opt->m+head_off,*vW=opt->v+head_off;
+    for(size_t i=0;i<head_count;i++){
+        const float g=grad[i]*inv_targets+opt->wd*W[i];
+        mW[i]=opt->beta1*mW[i]+(1.f-opt->beta1)*g;
+        vW[i]=opt->beta2*vW[i]+(1.f-opt->beta2)*g*g;
+        const float mh=mW[i]/bc1,vh=vW[i]/bc2;
+        if(!isfinite(mh)||!isfinite(vh)){free(dL);free(grad);return NAN;}
+        W[i]-=opt->lr*mh/(sqrtf(vh)+opt->eps);
+    }
+    free(dL);free(grad);
+    return isfinite(loss)?loss:NAN;
+}
