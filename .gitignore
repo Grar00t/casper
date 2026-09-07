@@ -34,6 +34,12 @@ test_csp
 test_rules
 test_proof
 
+# ---- Python local environments / caches ---------------------------------
+.venv/
+venv/
+__pycache__/
+*.pyc
+
 # ---- Model weights / training state -------------------------------------
 *.bin
 *.gguf
