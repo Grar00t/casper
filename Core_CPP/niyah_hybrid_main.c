@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <time.h>
+#include <float.h>
 
 int niyah_sym_smoke(void);
 int niyah_csp_smoke(void);
@@ -40,6 +41,10 @@ static uint32_t generate_tokens(NiyahModel *m, const uint32_t *prompt_tokens,
 
     uint32_t n_out = 0u;
     while (logits && n_out < max_out && pos < ctx) {
+        for (uint32_t id = 0u; id < m->cfg.vocab_size; ++id) {
+            if (!tokenizer_token_allowed_for_generation(id)) logits[id] = -FLT_MAX;
+        }
+
         const uint32_t tok = niyah_sample(logits, m->cfg.vocab_size, sampler);
         if (tok >= m->cfg.vocab_size) return 0u;
         if (tok == TOK_EOS) break;
