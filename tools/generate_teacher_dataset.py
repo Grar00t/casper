@@ -82,6 +82,7 @@ def teacher_completion(
         "temperature": temperature,
         "top_p": top_p,
         "max_tokens": max_tokens,
+        "reasoning_effort": "none",
         "stream": False,
     }
     obj = _json_request(base_url.rstrip("/") + "/v1/chat/completions", payload, timeout)
@@ -93,7 +94,7 @@ def teacher_completion(
         raise RuntimeError("teacher returned no message")
     content = message.get("content")
     if not isinstance(content, str) or not content.strip():
-        raise RuntimeError("teacher returned empty content")
+        raise RuntimeError("teacher returned empty final content")
     return content.strip()
 
 
