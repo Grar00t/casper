@@ -24,108 +24,116 @@ class NiyahEngine {
     }
 
     const trace = [];
-    const t = () => Date.now() - start;
+    const elapsed = () => Date.now() - start;
 
-    /* Step 1: Tokenize */
     const tokens = tokenize(query);
     trace.push({
       step: 'TOKENIZE',
-      ms: t(),
+      ms: elapsed(),
       detail: `${tokens.length} tokens extracted`,
       data: tokens.slice(0, 8).join(' · '),
     });
 
-    /* Step 2: Memory check */
     if (!opts.forceFresh) {
       const cached = this.memory.recall(query);
       if (cached) {
         trace.push({
           step: 'MEMORY HIT',
-          ms: t(),
-          detail: `cosine similarity = ${cached.similarity.toFixed(3)} ≥ threshold 0.55`,
+          ms: elapsed(),
+          detail: `similarity = ${cached.similarity.toFixed(3)}`,
           data: `matched: "${cached.query.substring(0, 50)}"`,
         });
         return {
-          answer: cached.answer, citations: cached.sources,
-          confidence: cached.confidence, fromMemory: true,
-          memorySimilarity: cached.similarity, tookMs: t(), trace,
+          answer: cached.answer,
+          citations: cached.sources,
+          confidence: cached.confidence,
+          fromMemory: true,
+          memorySimilarity: cached.similarity,
+          tookMs: elapsed(),
+          trace,
         };
       }
       trace.push({
         step: 'MEMORY MISS',
-        ms: t(),
-        detail: `no cached entry with similarity ≥ 0.55`,
+        ms: elapsed(),
+        detail: 'no sufficiently similar cached entry',
         data: `${this.memory._allRows().length} entries checked`,
       });
     }
 
-    /* Step 3: DDG search */
     const rawResults = await this.search.search(query, this.searchResultCount);
+    const actualBackend = rawResults[0]?.source || this.search.backendName();
     trace.push({
-      step: 'DDG SEARCH',
-      ms: t(),
-      detail: `GET html.duckduckgo.com/html/?q=${encodeURIComponent(query.substring(0,30))}`,
+      step: 'SEARCH',
+      ms: elapsed(),
+      detail: `backend=${actualBackend}`,
       data: `${rawResults.length} results returned`,
     });
 
     if (rawResults.length === 0) {
       return {
-        answer: 'DDG returned 0 results. Check internet or try a different query.',
-        citations: [], confidence: 0, fromMemory: false, tookMs: t(), trace,
+        answer: 'Search returned no results.',
+        citations: [],
+        confidence: 0,
+        fromMemory: false,
+        tookMs: elapsed(),
+        trace,
       };
     }
 
-    /* Step 4: TF-IDF rank */
-    const ranked = rankByRelevance(query, rawResults, (r) => `${r.title} ${r.snippet}`);
+    const ranked = rankByRelevance(query, rawResults, (result) => `${result.title} ${result.snippet}`);
     const topCandidates = ranked.slice(0, this.pagesToFetch);
     trace.push({
-      step: 'TF-IDF RANK',
-      ms: t(),
-      detail: `cosine similarity against query tokens`,
-      data: `top score = ${(ranked[0]?.relevanceScore||0).toFixed(3)} · fetching top ${topCandidates.length}`,
+      step: 'RANK',
+      ms: elapsed(),
+      detail: 'cosine similarity against query tokens',
+      data: `top score = ${(ranked[0]?.relevanceScore || 0).toFixed(3)}; fetching ${topCandidates.length}`,
     });
 
-    /* Step 5: Fetch pages */
     const sourcesWithText = [];
     for (const candidate of topCandidates) {
       try {
         const text = await this.search.fetchPageText(candidate.url);
         if (text && text.length > 200) {
           sourcesWithText.push({ title: candidate.title, url: candidate.url, text });
+        } else if (candidate.snippet && candidate.snippet.length > 40) {
+          sourcesWithText.push({ title: candidate.title, url: candidate.url, text: candidate.snippet });
         }
-      } catch (err) {
+      } catch (_) {
         if (candidate.snippet && candidate.snippet.length > 40) {
           sourcesWithText.push({ title: candidate.title, url: candidate.url, text: candidate.snippet });
         }
       }
     }
     trace.push({
-      step: 'FETCH PAGES',
-      ms: t(),
-      detail: `HTTP GET each URL · strip HTML · extract text`,
-      data: `${sourcesWithText.length}/${topCandidates.length} pages fetched successfully`,
+      step: 'FETCH',
+      ms: elapsed(),
+      detail: 'public HTTP(S) pages only; HTML stripped to text',
+      data: `${sourcesWithText.length}/${topCandidates.length} sources available`,
     });
 
     if (sourcesWithText.length === 0) {
       return {
-        answer: 'Pages found but text extraction failed.',
-        citations: [], confidence: 0, fromMemory: false, tookMs: t(), trace,
+        answer: 'Results were found but no usable page text or snippets were available.',
+        citations: [],
+        confidence: 0,
+        fromMemory: false,
+        tookMs: elapsed(),
+        trace,
       };
     }
 
-    /* Step 6: Extractive synthesis (TF-IDF sentence scoring) */
     const { answer, citations, confidence } = synthesize(query, sourcesWithText);
-    this.memory.store(query, answer, citations, confidence);
+    if (answer && confidence > 0) this.memory.store(query, answer, citations, confidence);
 
-    const tookMs = t();
+    const tookMs = elapsed();
     trace.push({
-      step: 'EXTRACT & CITE',
+      step: 'EXTRACT',
       ms: tookMs,
-      detail: `score sentences · pick top N · attach [n] citation refs`,
-      data: `${citations.length} citations · confidence = ${confidence}`,
+      detail: 'score sentences and attach source references',
+      data: `${citations.length} citations; relevance confidence=${confidence}`,
     });
 
-    console.log(`[niyah] done ${tookMs}ms conf=${confidence}`);
     return { answer, citations, confidence, fromMemory: false, tookMs, trace };
   }
 
