@@ -21,16 +21,20 @@ PowerShell wrapper:
 .\scripts\niyah.ps1 build
 .\scripts\niyah.ps1 smoke
 .\scripts\niyah.ps1 bench
-.\scripts\niyah.ps1 train
+.\scripts\niyah.ps1 train C:\path\to\teacher.jsonl -Device cuda
+.\scripts\niyah.ps1 train-c Data_Training\sovereign_knowledge.txt
 ```
 
-The PowerShell wrapper calls the same `scripts/build.sh` entry point and therefore requires `bash` plus GCC or Clang.
+C build/run and `train-c` require `bash` plus GCC or Clang. Full-model `train` runs natively through Python/PyTorch and does not require Bash.
 
-## Implemented C Components
+## Implemented Components
 
 | Path | Responsibility |
 |---|---|
-| `Core_CPP/niyah_core.c` | neural model allocation, forward path, sampling, optimizer, model save/load |
+| `Core_CPP/niyah_core.c` | neural allocation, forward path, sampling, persistence, legacy output-head adaptation |
+| `Core_CPP/niyah_train_full.c` | deterministic initialization and full-parameter detached-KV/truncated-BPTT C training |
+| `Core_CPP/niyah_train.c` | native C training executable |
+| `tools/train_casper.py` | full-sequence PyTorch/CUDA SFT, checkpoint/resume, native `.bin` export |
 | `Core_CPP/hybrid_reasoner.c` | symbolic terms, unification, clause solving |
 | `Core_CPP/constraint_solver.c` | rational constraint operations and propagation |
 | `Core_CPP/rule_parser.c` | `.nrule` parser and verification |
@@ -39,18 +43,18 @@ The PowerShell wrapper calls the same `scripts/build.sh` entry point and therefo
 | `Core_CPP/casper_rag.c` | search transport, result parsing/ranking, trace/context hashing |
 | `Core_CPP/casper_cli.c` | Casper query/proof CLI |
 | `Core_CPP/niyah_hybrid_main.c` | hybrid command-line entry point |
-| `tokenizer.c` | tokenizer implementation |
+| `tokenizer.c` | deterministic UTF-8 tokenizer with byte fallback |
 
-## Runtime Dependencies
+## Runtime and Training Dependencies
 
-The non-RAG C core links against the C runtime and `libm`.
+The non-RAG C runtime links against the C runtime and `libm`.
 
 RAG transport is platform-specific:
 
 - Windows: WinHTTP.
-- POSIX: the `curl` executable is invoked by `casper_rag.c`; RAG is therefore not dependency-free on Linux/macOS.
+- POSIX: the `curl` executable is invoked by `casper_rag.c`.
 
-The Node and WPF directories are separate optional runtimes and have their own package/runtime dependencies.
+PyTorch is training-only for `tools/train_casper.py`; exported `.bin` inference does not depend on PyTorch. The Node and WPF directories are optional runtimes with separate dependencies.
 
 ## Verification Rules
 
@@ -59,23 +63,30 @@ The Node and WPF directories are separate optional runtimes and have their own p
 3. C changes must compile with the warning gate in `scripts/build.sh`.
 4. Run `bash scripts/build.sh --arch generic --smoke` after C changes.
 5. Use the debug sanitizer build for memory-sensitive C changes.
-6. Do not claim a fixed smoke-test count. Treat the process exit status and current output as the evidence.
+6. Do not claim a fixed smoke-test count. Treat process exit status/current output as evidence.
 7. Do not claim network availability from configuration alone.
 8. Do not claim a feature is implemented because it appears in documentation.
-9. Keep proof-format, model-format, and public ABI changes explicit and versioned.
+9. Keep proof-format, model-format, tokenizer-contract, and public ABI changes explicit.
 10. Do not commit credentials, deployment addresses, private infrastructure details, or machine-specific paths.
+11. Do not describe the C trainer as exact full-sequence BPTT: its KV gradient boundary is intentionally truncated.
+12. Do not describe the Python training path as verified on CUDA unless it has actually run with CUDA on the target environment.
+
+## Tokenizer Contract
+
+Historical ids `0..1499` are preserved. Vocabulary v2 appends byte fallback ids `1500..1755` for raw UTF-8 bytes. Old checkpoints were not trained on these appended ids and should not be assumed to use them meaningfully.
 
 ## Arithmetic and Determinism
 
 - Constraint rationals use integer numerator/denominator representation.
-- Cross-multiplication uses `__int128` where the compiler provides it; the current portability fallback in `constraint_solver.c` is not exact for every int64 value. Do not describe that fallback as exact.
-- Determinism claims apply only to code paths that exclude network responses, wall-clock data, random seeds not fixed by the caller, and other external state.
+- Cross-multiplication uses `__int128` where provided; the portability fallback is not exact for every int64 value.
+- Determinism claims apply only to paths excluding network responses, wall-clock data, unfixed random seeds, nondeterministic GPU kernels, and other external state.
 
 ## CI
 
 `.github/workflows/ci.yml` checks:
 
-- C core with GCC and Clang using generic architecture plus smoke execution.
+- C core with GCC and Clang using generic architecture, release smoke, and debug sanitizer smoke.
+- Python training-tool syntax.
 - Node source syntax after `npm ci`.
 - Windows WPF build with .NET 9.
 

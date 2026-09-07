@@ -34,11 +34,20 @@ test_csp
 test_rules
 test_proof
 
-# ---- Model weights ------------------------------------------------------
+# ---- Python local environments / caches ---------------------------------
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# ---- Model weights / training state -------------------------------------
 *.bin
 *.gguf
 *.safetensors
+*.pt
+*.pth
 niyah_trained.bin
+casper_trained.bin.manifest.json
 
 # ---- Training corpora (large and regenerable) ---------------------------
 Data_Training/sources/train.txt
