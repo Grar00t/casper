@@ -164,6 +164,7 @@ KHZQ_Result khz_q_analyze_output(const char *text, float target_energy) {
     }
 
     result.rank_used = rank_used;
+    result.chi_e = rank_used;
     result.energy_preserved = total_energy > KHZ_JACOBI_EPS ? cumulative / total_energy : 0.0f;
     result.residual_penalty = khz_q_residual_penalty(singular_values, rank_used, KHZ_MAX_N);
     for (i = 0; i < rank_used; ++i) result.sigma[i] = singular_values[i];
