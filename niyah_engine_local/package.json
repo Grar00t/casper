@@ -1,7 +1,7 @@
 {
   "name": "casper-agent",
   "version": "3.0.0",
-  "description": "Casper Agent + NIYAH Engine — sovereign search, no model weights",
+  "description": "Local Casper search runtime with optional llama-server integration",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
