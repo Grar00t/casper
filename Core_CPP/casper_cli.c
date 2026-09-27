@@ -1,4 +1,4 @@
-/* casper_cli.c — Casper sovereign search agent CLI. C11. */
+/* casper_cli.c — Casper search/retrieval CLI with integrity receipts. C11. */
 #include "casper_rag.h"
 #include "rule_parser.h"
 #include "proof_generator.h"
@@ -12,6 +12,8 @@
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #endif
+
+#define CASPER_RULE_FILE_MAX (1024u * 1024u)
 
 static void configure_utf8_console(void) {
 #ifdef _WIN32
@@ -44,13 +46,27 @@ static void json_str(FILE *fp, const char *s) {
     fputc('"', fp);
 }
 
-/*
- * Backend selection.
- *
- * This used to be RAG_BACKEND_DDG, hardcoded at the single call site, so
- * every invocation scraped html.duckduckgo.com with no way to switch. Set
- * CASPER_BACKEND=searxng (or bing) to point somewhere else without a rebuild.
- */
+static char *read_text_file(const char *path, size_t max_bytes) {
+    FILE *fp;
+    long len;
+    char *buf;
+    size_t got;
+    if (!path) return NULL;
+    fp = fopen(path, "rb");
+    if (!fp) return NULL;
+    if (fseek(fp, 0, SEEK_END) != 0) { fclose(fp); return NULL; }
+    len = ftell(fp);
+    if (len < 0 || (size_t)len > max_bytes) { fclose(fp); return NULL; }
+    if (fseek(fp, 0, SEEK_SET) != 0) { fclose(fp); return NULL; }
+    buf = (char *)malloc((size_t)len + 1u);
+    if (!buf) { fclose(fp); return NULL; }
+    got = fread(buf, 1u, (size_t)len, fp);
+    if (got != (size_t)len || ferror(fp) || fclose(fp) != 0) { free(buf); return NULL; }
+    buf[got] = '\0';
+    return buf;
+}
+
+/* Set CASPER_BACKEND=searxng (or bing) to switch without a rebuild. */
 static RagBackend pick_backend(void) {
     const char *name = getenv("CASPER_BACKEND");
     if (!name || !name[0]) return RAG_BACKEND_DDG;
@@ -88,14 +104,12 @@ static void percent_decode(const char *in, char *out, size_t max) {
     out[o] = '\0';
 }
 
-/* Convert DuckDuckGo redirect links back to their actual destination URL. */
 static void normalize_result_url(RagResult *r) {
     const char *marker;
     const char *end;
     char encoded[RAG_URL_MAX];
     char decoded[RAG_URL_MAX];
     size_t n;
-
     if (!r || !r->url[0]) return;
     if (!strstr(r->url, "duckduckgo.com/l/")) return;
     marker = strstr(r->url, "uddg=");
@@ -112,13 +126,11 @@ static void normalize_result_url(RagResult *r) {
     }
 }
 
-/* Keep the emitted source hash bound to the emitted normalized URL + snippet. */
 static void rehash_result(RagResult *r) {
     uint8_t anchor[RAG_URL_MAX + 1u + RAG_SNIPPET_MAX];
     size_t ul;
     size_t sl;
     size_t n;
-
     if (!r) return;
     ul = bounded_strlen(r->url, sizeof(r->url));
     sl = bounded_strlen(r->snippet, sizeof(r->snippet));
@@ -145,12 +157,6 @@ static int result_cmp_cli(const void *a, const void *b) {
     return strcmp(ra->title, rb->title);
 }
 
-/*
- * Defensive normalization at the CLI boundary. The RAG layer already ranks
- * results, but the CLI must never trust array order when choosing an answer
- * or emitting source order. This also normalizes DDG destinations and keeps
- * the source hashes aligned with what the CLI actually emits.
- */
 static void normalize_results(RagCtx *ctx) {
     int i;
     if (!ctx || ctx->n_results <= 0) return;
@@ -162,18 +168,20 @@ static void normalize_results(RagCtx *ctx) {
     qsort(ctx->results, (size_t)ctx->n_results, sizeof(ctx->results[0]), result_cmp_cli);
 }
 
-static int cmd_verify(const char *proof_path) {
-    FILE *fp=fopen(proof_path,"r");
-    if(!fp){fprintf(stderr,"[casper] cannot open proof file: %s\n",proof_path);return 3;}
-    char line[4096], prompt[1024]={0}, output[1024]={0};
-    while(fgets(line,sizeof(line),fp)){
-        if(!strncmp(line,"prompt: ",8)){size_t l=strlen(line+8);if(l&&line[8+l-1]=='\n')line[8+l-1]='\0';strncpy(prompt,line+8,sizeof(prompt)-1);prompt[sizeof(prompt)-1]='\0';}
-        else if(!strncmp(line,"output: ",8)){size_t l=strlen(line+8);if(l&&line[8+l-1]=='\n')line[8+l-1]='\0';strncpy(output,line+8,sizeof(output)-1);output[sizeof(output)-1]='\0';}
-    }
-    fclose(fp);
-    bool ok=niyah_proof_verify(proof_path,prompt,output,NULL);
-    printf("{\"proof_path\":");json_str(stdout,proof_path);printf(",\"valid\":%s}\n",ok?"true":"false");
-    return ok?0:1;
+static int cmd_verify(const char *proof_path, const char *rules_path) {
+    bool rules_bound = false;
+    bool rules_verified = false;
+    bool receipt_valid = niyah_proof_verify_saved(proof_path, rules_path,
+                                                   &rules_bound, &rules_verified);
+    bool valid = receipt_valid && (!rules_bound || rules_verified);
+    printf("{\"proof_path\":");
+    json_str(stdout, proof_path);
+    printf(",\"receipt_valid\":%s,\"rules_bound\":%s,\"rules_verified\":%s,\"valid\":%s}\n",
+           receipt_valid ? "true" : "false",
+           rules_bound ? "true" : "false",
+           rules_verified ? "true" : "false",
+           valid ? "true" : "false");
+    return valid ? 0 : 1;
 }
 
 static void build_answer(const RagCtx *ctx,char *out,size_t max){
@@ -189,73 +197,47 @@ static int cmd_self_check(void) {
     int saw_unwrapped = 0;
     int saw_hash = 0;
     int i;
-
     memset(&ctx, 0, sizeof(ctx));
     ctx.n_results = RAG_MAX_RESULTS + 2;
-
     ctx.results[0].score = 0.500f;
     (void)snprintf(ctx.results[0].title, sizeof(ctx.results[0].title), "%s", "low");
     (void)snprintf(ctx.results[0].snippet, sizeof(ctx.results[0].snippet), "%s", "low snippet");
     (void)snprintf(ctx.results[0].url, sizeof(ctx.results[0].url), "%s",
                    "//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Flow&amp;rut=x");
-
     ctx.results[1].score = 1.000f;
     (void)snprintf(ctx.results[1].title, sizeof(ctx.results[1].title), "%s", "best");
     (void)snprintf(ctx.results[1].snippet, sizeof(ctx.results[1].snippet), "%s", "best snippet");
     (void)snprintf(ctx.results[1].url, sizeof(ctx.results[1].url), "%s", "https://example.com/best");
-
     ctx.results[2].score = 0.667f;
     (void)snprintf(ctx.results[2].title, sizeof(ctx.results[2].title), "%s", "middle");
     (void)snprintf(ctx.results[2].snippet, sizeof(ctx.results[2].snippet), "%s", "middle snippet");
     (void)snprintf(ctx.results[2].url, sizeof(ctx.results[2].url), "%s", "https://example.com/middle");
-
     normalize_results(&ctx);
-    if (ctx.n_results != RAG_MAX_RESULTS) {
-        fputs("CASPER SELF-CHECK FAIL bounds\n", stderr);
-        return 1;
-    }
-    if (ctx.results[0].score != 1.000f || strcmp(ctx.results[0].title, "best") != 0) {
-        fputs("CASPER SELF-CHECK FAIL ranking\n", stderr);
-        return 1;
-    }
-
+    if (ctx.n_results != RAG_MAX_RESULTS) { fputs("CASPER SELF-CHECK FAIL bounds\n", stderr); return 1; }
+    if (ctx.results[0].score != 1.000f || strcmp(ctx.results[0].title, "best") != 0) { fputs("CASPER SELF-CHECK FAIL ranking\n", stderr); return 1; }
     build_answer(&ctx, answer, sizeof(answer));
-    if (!strstr(answer, "best snippet")) {
-        fputs("CASPER SELF-CHECK FAIL answer-source\n", stderr);
-        return 1;
-    }
-
+    if (!strstr(answer, "best snippet")) { fputs("CASPER SELF-CHECK FAIL answer-source\n", stderr); return 1; }
     for (i = 0; i < ctx.n_results; ++i) {
         if (!strcmp(ctx.results[i].url, "https://example.com/low")) {
             int j;
             saw_unwrapped = 1;
             for (j = 0; j < 32; ++j) {
-                if (ctx.results[i].sha256[j] != 0u) {
-                    saw_hash = 1;
-                    break;
-                }
+                if (ctx.results[i].sha256[j] != 0u) { saw_hash = 1; break; }
             }
             break;
         }
     }
-    if (!saw_unwrapped) {
-        fputs("CASPER SELF-CHECK FAIL ddg-url\n", stderr);
-        return 1;
-    }
-    if (!saw_hash) {
-        fputs("CASPER SELF-CHECK FAIL source-hash\n", stderr);
-        return 1;
-    }
-
+    if (!saw_unwrapped) { fputs("CASPER SELF-CHECK FAIL ddg-url\n", stderr); return 1; }
+    if (!saw_hash) { fputs("CASPER SELF-CHECK FAIL source-hash\n", stderr); return 1; }
     puts("CASPER SELF-CHECK PASS");
     return 0;
 }
 
 int main(int argc,char **argv){
     configure_utf8_console();
-    if(argc<2){fprintf(stderr,"usage: %s <query> [rules.nrule] | --verify <proof> | --self-check\n",argv[0]);return 3;}
+    if(argc<2){fprintf(stderr,"usage: %s <query> [rules.nrule] | --verify <proof> [rules.nrule] | --self-check\n",argv[0]);return 3;}
     if(!strcmp(argv[1],"--self-check")) return cmd_self_check();
-    if(!strcmp(argv[1],"--verify")){if(argc<3)return 3;return cmd_verify(argv[2]);}
+    if(!strcmp(argv[1],"--verify")){if(argc<3)return 3;return cmd_verify(argv[2],argc>=4?argv[3]:NULL);}
 
     const char *query=argv[1];
     const char *rules_path=argc>=3?argv[2]:NULL;
@@ -272,11 +254,13 @@ int main(int argc,char **argv){
     }
 
     normalize_results(ctx);
-
     NiyahRuleKB *kb=NULL;
+    char *rules_text=NULL;
     if(rules_path){
-        kb=niyah_rule_load(rules_path);
-        if(!kb){fprintf(stderr,"[casper] failed to load rules: %s\n",rules_path);casper_rag_free(ctx);return 3;}
+        rules_text=read_text_file(rules_path,CASPER_RULE_FILE_MAX);
+        if(!rules_text){fprintf(stderr,"[casper] failed to read rules: %s\n",rules_path);casper_rag_free(ctx);return 3;}
+        kb=niyah_rule_parse(rules_text);
+        if(!kb){fprintf(stderr,"[casper] failed to parse rules: %s\n",rules_path);free(rules_text);casper_rag_free(ctx);return 3;}
     }
 
     char answer[2048];
@@ -292,14 +276,15 @@ int main(int argc,char **argv){
     }
 
     uint8_t proof_bytes[32];
-    niyah_proof_generate(query,answer,rules_path,proof_bytes);
+    niyah_proof_generate(query,answer,rules_text,proof_bytes);
     char proof_hex[65];niyah_hash_to_hex(proof_bytes,proof_hex);
     char proof_path[256];
     int pn=snprintf(proof_path,sizeof(proof_path),"casper_%.8s.proof",proof_hex);
-    if(pn<0 || (size_t)pn>=sizeof(proof_path)){if(kb)niyah_rule_free(kb);casper_rag_free(ctx);return 3;}
-    if(niyah_proof_save(proof_path,proof_bytes,query,answer,rules_path)!=0){
+    if(pn<0 || (size_t)pn>=sizeof(proof_path)){if(kb)niyah_rule_free(kb);free(rules_text);casper_rag_free(ctx);return 3;}
+    if(niyah_proof_save(proof_path,proof_bytes,query,answer,rules_text)!=0){
         fprintf(stderr,"[casper] proof write failed: %s\n",proof_path);
         if(kb){niyah_rule_free(kb);}
+        free(rules_text);
         casper_rag_free(ctx);
         return 1;
     }
@@ -310,7 +295,7 @@ int main(int argc,char **argv){
         printf("  \"relevance_score\":%.3f,\n  \"confidence\":%.3f,\n  \"confidence_kind\":\"top_lexical_relevance\",\n  \"mean_relevance\":%.3f,\n  \"elapsed_ms\":%u,\n  \"violated\":%s,\n  \"rejected\":%s,\n",
                top_relevance,top_relevance,(double)ctx->confidence,ctx->elapsed_ms,violation?"true":"false",rejected?"true":"false");
     }
-    printf("  \"proof\":\"%s\",\n  \"proof_file\":",proof_hex);json_str(stdout,proof_path);printf(",\n  \"n_sources\":%d,\n  \"sources\":[\n",ctx->n_results);
+    printf("  \"proof_kind\":\"NIYAH-PROOF-V2\",\n  \"rules_bound\":%s,\n  \"proof\":\"%s\",\n  \"proof_file\":",rules_text?"true":"false",proof_hex);json_str(stdout,proof_path);printf(",\n  \"n_sources\":%d,\n  \"sources\":[\n",ctx->n_results);
     for(int i=0;i<ctx->n_results;++i){
         const RagResult *r=&ctx->results[i];char src_hex[65];niyah_hash_to_hex(r->sha256,src_hex);
         printf("    {\"n\":%d,\"score\":%.3f,\"sha256\":\"%s\",\"title\":",i+1,(double)r->score,src_hex);json_str(stdout,r->title);printf(",\"url\":");json_str(stdout,r->url);printf(",\"snippet\":");json_str(stdout,r->snippet);printf("}%s\n",i+1<ctx->n_results?",":"");
@@ -318,6 +303,7 @@ int main(int argc,char **argv){
     printf("  ]\n}\n");
 
     if(kb)niyah_rule_free(kb);
+    free(rules_text);
     casper_rag_free(ctx);
     return violation?1:0;
 }
