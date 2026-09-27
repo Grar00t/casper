@@ -95,24 +95,35 @@ void niyah_proof_generate(const char *prompt,const char *output,const char *rule
     niyah_proof_generate_hashed(prompt,output,rules_hash,proof);
 }
 
+static int write_hex_text(FILE *f,const char *label,const char *text){
+    static const char x[]="0123456789abcdef";
+    const unsigned char *p=(const unsigned char *)(text?text:"");
+    if(fputs(label,f)==EOF)return -1;
+    while(*p){
+        if(fputc(x[*p>>4],f)==EOF||fputc(x[*p&15u],f)==EOF)return -1;
+        ++p;
+    }
+    return fputc('\n',f)==EOF?-1:0;
+}
+
 int niyah_proof_save_hashed(const char *path,const uint8_t proof[32],const char *prompt,const char *output,const uint8_t rules_hash[32]){
     FILE *f;
     char hex[65];
     uint8_t h[32],empty_rules_hash[32];
     const uint8_t *rh=rules_hash;
-    int rc;
+    int rc=0;
     if(!path||!proof)return -1;
     if(!rh){hash_text(NULL,empty_rules_hash);rh=empty_rules_hash;}
     f=fopen(path,"w");
     if(!f)return -1;
-    fputs("NIYAH-PROOF-V2\n",f);
-    niyah_hash_to_hex(proof,hex);fprintf(f,"hash: %s\n",hex);
-    hash_text(prompt,h);niyah_hash_to_hex(h,hex);fprintf(f,"prompt_hash: %s\n",hex);
-    hash_text(output,h);niyah_hash_to_hex(h,hex);fprintf(f,"output_hash: %s\n",hex);
-    niyah_hash_to_hex(rh,hex);fprintf(f,"rules_hash: %s\n",hex);
-    if(prompt)fprintf(f,"prompt: %s\n",prompt);
-    if(output)fprintf(f,"output: %s\n",output);
-    rc=ferror(f)?-1:0;
+    if(fputs("NIYAH-PROOF-V2\n",f)==EOF)rc=-1;
+    niyah_hash_to_hex(proof,hex);if(fprintf(f,"hash: %s\n",hex)<0)rc=-1;
+    hash_text(prompt,h);niyah_hash_to_hex(h,hex);if(fprintf(f,"prompt_hash: %s\n",hex)<0)rc=-1;
+    hash_text(output,h);niyah_hash_to_hex(h,hex);if(fprintf(f,"output_hash: %s\n",hex)<0)rc=-1;
+    niyah_hash_to_hex(rh,hex);if(fprintf(f,"rules_hash: %s\n",hex)<0)rc=-1;
+    if(write_hex_text(f,"prompt_hex: ",prompt)!=0)rc=-1;
+    if(write_hex_text(f,"output_hex: ",output)!=0)rc=-1;
+    if(ferror(f))rc=-1;
     if(fclose(f)!=0)rc=-1;
     return rc;
 }
@@ -149,6 +160,100 @@ bool niyah_proof_verify(const char *proof_path,const char *prompt,const char *ou
     hash_text(rule_material,actual_rules);if(memcmp(meta,actual_rules,32u)!=0)return false;
     niyah_proof_generate_hashed(prompt,output,actual_rules,actual);
     return memcmp(stored,actual,32u)==0;
+}
+
+static char *read_line_alloc(FILE *f){
+    size_t cap=256u,len=0u;
+    char *buf;
+    int ch;
+    if(!f)return NULL;
+    buf=(char*)malloc(cap);
+    if(!buf)return NULL;
+    while((ch=fgetc(f))!=EOF){
+        if(len+1u>=cap){
+            size_t next=cap*2u;
+            char *grown;
+            if(next<=cap){free(buf);return NULL;}
+            grown=(char*)realloc(buf,next);
+            if(!grown){free(buf);return NULL;}
+            buf=grown;cap=next;
+        }
+        if(ch=='\n')break;
+        if(ch!='\r')buf[len++]=(char)ch;
+    }
+    if(ch==EOF&&len==0u){free(buf);return NULL;}
+    buf[len]='\0';
+    return buf;
+}
+
+static char *dup_text(const char *s){size_t n;char *p;if(!s)return NULL;n=strlen(s)+1u;p=(char*)malloc(n);if(p)memcpy(p,s,n);return p;}
+
+static char *decode_hex_text(const char *hex){
+    size_t n,i;
+    char *out;
+    if(!hex)return NULL;
+    n=strlen(hex);
+    if((n&1u)!=0u)return NULL;
+    out=(char*)malloc(n/2u+1u);
+    if(!out)return NULL;
+    for(i=0u;i<n;i+=2u){
+        int hi=(hex[i]>='0'&&hex[i]<='9')?hex[i]-'0':(hex[i]>='a'&&hex[i]<='f')?hex[i]-'a'+10:(hex[i]>='A'&&hex[i]<='F')?hex[i]-'A'+10:-1;
+        int lo=(hex[i+1u]>='0'&&hex[i+1u]<='9')?hex[i+1u]-'0':(hex[i+1u]>='a'&&hex[i+1u]<='f')?hex[i+1u]-'a'+10:(hex[i+1u]>='A'&&hex[i+1u]<='F')?hex[i+1u]-'A'+10:-1;
+        unsigned char byte;
+        if(hi<0||lo<0){free(out);return NULL;}
+        byte=(unsigned char)((hi<<4)|lo);
+        if(byte==0u){free(out);return NULL;}
+        out[i/2u]=(char)byte;
+    }
+    out[n/2u]='\0';
+    return out;
+}
+
+bool niyah_proof_verify_saved(const char *proof_path,const char *rule_file_path,bool *rules_bound,bool *rules_verified){
+    FILE *f;
+    char *line;
+    char header[32]={0},stored_hex[65]={0},prompt_hash_hex[65]={0},output_hash_hex[65]={0},rules_hash_hex[65]={0};
+    char *prompt_data_hex=NULL,*output_data_hex=NULL,*prompt=NULL,*output=NULL;
+    uint8_t stored[32],prompt_meta[32],output_meta[32],rules_meta[32],actual_prompt[32],actual_output[32],actual[32],empty_hash[32],file_hash[32];
+    bool ok=false,bound=false,rule_ok=false;
+    if(rules_bound)*rules_bound=false;
+    if(rules_verified)*rules_verified=false;
+    if(!proof_path)return false;
+    f=fopen(proof_path,"r");
+    if(!f)return false;
+    line=read_line_alloc(f);
+    if(!line){fclose(f);return false;}
+    (void)snprintf(header,sizeof(header),"%s",line);
+    free(line);
+    while((line=read_line_alloc(f))!=NULL){
+        const char *value=NULL;
+        if(!strncmp(line,"hash: ",6)){value=line+6;if(strlen(value)==64u)memcpy(stored_hex,value,65u);}
+        else if(!strncmp(line,"prompt_hash: ",13)){value=line+13;if(strlen(value)==64u)memcpy(prompt_hash_hex,value,65u);}
+        else if(!strncmp(line,"output_hash: ",13)){value=line+13;if(strlen(value)==64u)memcpy(output_hash_hex,value,65u);}
+        else if(!strncmp(line,"rules_hash: ",12)){value=line+12;if(strlen(value)==64u)memcpy(rules_hash_hex,value,65u);}
+        else if(!strncmp(line,"prompt_hex: ",12)){free(prompt_data_hex);prompt_data_hex=dup_text(line+12);}
+        else if(!strncmp(line,"output_hex: ",12)){free(output_data_hex);output_data_hex=dup_text(line+12);}
+        free(line);
+    }
+    fclose(f);
+    if(strcmp(header,"NIYAH-PROOF-V2")!=0)goto done;
+    if(!prompt_data_hex||!output_data_hex)goto done;
+    prompt=decode_hex_text(prompt_data_hex);output=decode_hex_text(output_data_hex);
+    if(!prompt||!output)goto done;
+    if(!hex_to_hash(stored_hex,stored)||!hex_to_hash(prompt_hash_hex,prompt_meta)||!hex_to_hash(output_hash_hex,output_meta)||!hex_to_hash(rules_hash_hex,rules_meta))goto done;
+    hash_text(prompt,actual_prompt);hash_text(output,actual_output);hash_text(NULL,empty_hash);
+    if(memcmp(prompt_meta,actual_prompt,32u)!=0||memcmp(output_meta,actual_output,32u)!=0)goto done;
+    niyah_proof_generate_hashed(prompt,output,rules_meta,actual);
+    if(memcmp(stored,actual,32u)!=0)goto done;
+    bound=memcmp(rules_meta,empty_hash,32u)!=0;
+    if(!bound)rule_ok=true;
+    else if(rule_file_path&&niyah_sha256_file(rule_file_path,file_hash)&&memcmp(file_hash,rules_meta,32u)==0)rule_ok=true;
+    ok=true;
+done:
+    free(prompt_data_hex);free(output_data_hex);free(prompt);free(output);
+    if(rules_bound)*rules_bound=bound;
+    if(rules_verified)*rules_verified=rule_ok;
+    return ok;
 }
 
 int niyah_proof_smoke(void){
