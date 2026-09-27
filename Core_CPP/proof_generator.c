@@ -6,6 +6,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define NIYAH_PROOF_MAX_FILE_BYTES (2u * 1024u * 1024u)
+#define NIYAH_PROOF_MAX_LINE_BYTES (1024u * 1024u)
+#define NIYAH_PROOF_MAX_HEX_BYTES  (1024u * 1024u)
+
 #define ROTR(x,n) (((x)>>(n))|((x)<<(32-(n))))
 #define CH(x,y,z) (((x)&(y))^(~(x)&(z)))
 #define MAJ(x,y,z) (((x)&(y))^((x)&(z))^((y)&(z)))
@@ -162,24 +166,28 @@ bool niyah_proof_verify(const char *proof_path,const char *prompt,const char *ou
     return memcmp(stored,actual,32u)==0;
 }
 
-static char *read_line_alloc(FILE *f){
+static char *read_line_alloc(FILE *f,size_t max_len){
     size_t cap=256u,len=0u;
     char *buf;
     int ch;
-    if(!f)return NULL;
+    if(!f||max_len==0u)return NULL;
+    if(cap>max_len+1u)cap=max_len+1u;
     buf=(char*)malloc(cap);
     if(!buf)return NULL;
     while((ch=fgetc(f))!=EOF){
+        if(ch=='\n')break;
+        if(ch=='\r')continue;
+        if(len>=max_len){free(buf);return NULL;}
         if(len+1u>=cap){
             size_t next=cap*2u;
             char *grown;
+            if(next>max_len+1u)next=max_len+1u;
             if(next<=cap){free(buf);return NULL;}
             grown=(char*)realloc(buf,next);
             if(!grown){free(buf);return NULL;}
             buf=grown;cap=next;
         }
-        if(ch=='\n')break;
-        if(ch!='\r')buf[len++]=(char)ch;
+        buf[len++]=(char)ch;
     }
     if(ch==EOF&&len==0u){free(buf);return NULL;}
     buf[len]='\0';
@@ -193,7 +201,7 @@ static char *decode_hex_text(const char *hex){
     char *out;
     if(!hex)return NULL;
     n=strlen(hex);
-    if((n&1u)!=0u)return NULL;
+    if(n>NIYAH_PROOF_MAX_HEX_BYTES||(n&1u)!=0u)return NULL;
     out=(char*)malloc(n/2u+1u);
     if(!out)return NULL;
     for(i=0u;i<n;i+=2u){
@@ -209,6 +217,15 @@ static char *decode_hex_text(const char *hex){
     return out;
 }
 
+static bool proof_file_size_ok(FILE *f){
+    long size;
+    if(!f)return false;
+    if(fseek(f,0,SEEK_END)!=0)return false;
+    size=ftell(f);
+    if(size<0||(unsigned long)size>(unsigned long)NIYAH_PROOF_MAX_FILE_BYTES)return false;
+    return fseek(f,0,SEEK_SET)==0;
+}
+
 bool niyah_proof_verify_saved(const char *proof_path,const char *rule_file_path,bool *rules_bound,bool *rules_verified){
     FILE *f;
     char *line;
@@ -219,13 +236,14 @@ bool niyah_proof_verify_saved(const char *proof_path,const char *rule_file_path,
     if(rules_bound)*rules_bound=false;
     if(rules_verified)*rules_verified=false;
     if(!proof_path)return false;
-    f=fopen(proof_path,"r");
+    f=fopen(proof_path,"rb");
     if(!f)return false;
-    line=read_line_alloc(f);
+    if(!proof_file_size_ok(f)){fclose(f);return false;}
+    line=read_line_alloc(f,NIYAH_PROOF_MAX_LINE_BYTES);
     if(!line){fclose(f);return false;}
     (void)snprintf(header,sizeof(header),"%s",line);
     free(line);
-    while((line=read_line_alloc(f))!=NULL){
+    while((line=read_line_alloc(f,NIYAH_PROOF_MAX_LINE_BYTES))!=NULL){
         const char *value=NULL;
         if(!strncmp(line,"hash: ",6)){value=line+6;if(strlen(value)==64u)memcpy(stored_hex,value,65u);}
         else if(!strncmp(line,"prompt_hash: ",13)){value=line+13;if(strlen(value)==64u)memcpy(prompt_hash_hex,value,65u);}
@@ -235,9 +253,11 @@ bool niyah_proof_verify_saved(const char *proof_path,const char *rule_file_path,
         else if(!strncmp(line,"output_hex: ",12)){free(output_data_hex);output_data_hex=dup_text(line+12);}
         free(line);
     }
+    if(ferror(f)){fclose(f);goto done;}
     fclose(f);
     if(strcmp(header,"NIYAH-PROOF-V2")!=0)goto done;
     if(!prompt_data_hex||!output_data_hex)goto done;
+    if(strlen(prompt_data_hex)>NIYAH_PROOF_MAX_HEX_BYTES||strlen(output_data_hex)>NIYAH_PROOF_MAX_HEX_BYTES)goto done;
     prompt=decode_hex_text(prompt_data_hex);output=decode_hex_text(output_data_hex);
     if(!prompt||!output)goto done;
     if(!hex_to_hash(stored_hex,stored)||!hex_to_hash(prompt_hash_hex,prompt_meta)||!hex_to_hash(output_hash_hex,output_meta)||!hex_to_hash(rules_hash_hex,rules_meta))goto done;
