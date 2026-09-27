@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main, fix/proof-audit-contracts-20260927]
+    branches: [main]
   pull_request:
 
 permissions:
