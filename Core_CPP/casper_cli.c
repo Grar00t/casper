@@ -1,6 +1,7 @@
 /* casper_cli.c — Casper search/retrieval CLI with integrity receipts. C11. */
 #include "casper_rag.h"
 #include "rule_parser.h"
+#include "rule_source_guard.h"
 #include "proof_generator.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,7 +67,6 @@ static char *read_text_file(const char *path, size_t max_bytes) {
     return buf;
 }
 
-/* Set CASPER_BACKEND=searxng (or bing) to switch without a rebuild. */
 static RagBackend pick_backend(void) {
     const char *name = getenv("CASPER_BACKEND");
     if (!name || !name[0]) return RAG_BACKEND_DDG;
@@ -256,11 +256,20 @@ int main(int argc,char **argv){
     normalize_results(ctx);
     NiyahRuleKB *kb=NULL;
     char *rules_text=NULL;
+    uint8_t rules_hash[32];
+    const uint8_t *rules_hash_ptr=NULL;
     if(rules_path){
         rules_text=read_text_file(rules_path,CASPER_RULE_FILE_MAX);
-        if(!rules_text){fprintf(stderr,"[casper] failed to read rules: %s\n",rules_path);casper_rag_free(ctx);return 3;}
+        if(!rules_text || !niyah_sha256_file(rules_path,rules_hash)){
+            fprintf(stderr,"[casper] failed to read/hash rules: %s\n",rules_path);
+            free(rules_text);casper_rag_free(ctx);return 3;
+        }
         kb=niyah_rule_parse(rules_text);
-        if(!kb){fprintf(stderr,"[casper] failed to parse rules: %s\n",rules_path);free(rules_text);casper_rag_free(ctx);return 3;}
+        if(!kb || !niyah_rule_source_guard(rules_text,kb)){
+            fprintf(stderr,"[casper] invalid or partial rules policy: %s\n",rules_path);
+            if(kb)niyah_rule_free(kb);free(rules_text);casper_rag_free(ctx);return 3;
+        }
+        rules_hash_ptr=rules_hash;
     }
 
     char answer[2048];
@@ -276,14 +285,14 @@ int main(int argc,char **argv){
     }
 
     uint8_t proof_bytes[32];
-    niyah_proof_generate(query,answer,rules_text,proof_bytes);
+    niyah_proof_generate_hashed(query,answer,rules_hash_ptr,proof_bytes);
     char proof_hex[65];niyah_hash_to_hex(proof_bytes,proof_hex);
     char proof_path[256];
     int pn=snprintf(proof_path,sizeof(proof_path),"casper_%.8s.proof",proof_hex);
     if(pn<0 || (size_t)pn>=sizeof(proof_path)){if(kb)niyah_rule_free(kb);free(rules_text);casper_rag_free(ctx);return 3;}
-    if(niyah_proof_save(proof_path,proof_bytes,query,answer,rules_text)!=0){
+    if(niyah_proof_save_hashed(proof_path,proof_bytes,query,answer,rules_hash_ptr)!=0){
         fprintf(stderr,"[casper] proof write failed: %s\n",proof_path);
-        if(kb){niyah_rule_free(kb);}
+        if(kb)niyah_rule_free(kb);
         free(rules_text);
         casper_rag_free(ctx);
         return 1;
@@ -295,7 +304,7 @@ int main(int argc,char **argv){
         printf("  \"relevance_score\":%.3f,\n  \"confidence\":%.3f,\n  \"confidence_kind\":\"top_lexical_relevance\",\n  \"mean_relevance\":%.3f,\n  \"elapsed_ms\":%u,\n  \"violated\":%s,\n  \"rejected\":%s,\n",
                top_relevance,top_relevance,(double)ctx->confidence,ctx->elapsed_ms,violation?"true":"false",rejected?"true":"false");
     }
-    printf("  \"proof_kind\":\"NIYAH-PROOF-V2\",\n  \"rules_bound\":%s,\n  \"proof\":\"%s\",\n  \"proof_file\":",rules_text?"true":"false",proof_hex);json_str(stdout,proof_path);printf(",\n  \"n_sources\":%d,\n  \"sources\":[\n",ctx->n_results);
+    printf("  \"proof_kind\":\"NIYAH-PROOF-V2\",\n  \"rules_bound\":%s,\n  \"proof\":\"%s\",\n  \"proof_file\":",rules_hash_ptr?"true":"false",proof_hex);json_str(stdout,proof_path);printf(",\n  \"n_sources\":%d,\n  \"sources\":[\n",ctx->n_results);
     for(int i=0;i<ctx->n_results;++i){
         const RagResult *r=&ctx->results[i];char src_hex[65];niyah_hash_to_hex(r->sha256,src_hex);
         printf("    {\"n\":%d,\"score\":%.3f,\"sha256\":\"%s\",\"title\":",i+1,(double)r->score,src_hex);json_str(stdout,r->title);printf(",\"url\":");json_str(stdout,r->url);printf(",\"snippet\":");json_str(stdout,r->snippet);printf("}%s\n",i+1<ctx->n_results?",":"");
