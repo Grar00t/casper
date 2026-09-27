@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include <time.h>
 
 void tokenizer_init(void);
@@ -115,11 +116,169 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
     }
 
     if (proof_out) memset(proof_out, 0, 32u);
-    if (proof_out && generate_proof && result)
+    /*
+     * A loaded NiyahRuleKB does not retain its source file path. Do not emit a
+     * proof that silently omits active rules. The --audit-stdin path below has
+     * the rule-file path and therefore can bind the exact rule bytes.
+     */
+    if (proof_out && generate_proof && result && !rules)
         niyah_proof_generate(prompt, result, NULL, proof_out);
 
     tokenizer_free();
     return result;
+}
+
+static int json_hexval(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+static bool json_put_utf8(uint32_t cp, char *out, size_t cap, size_t *used) {
+    size_t n = *used;
+    if (cp <= 0x7Fu) {
+        if (n + 1u >= cap) return false;
+        out[n++] = (char)cp;
+    } else if (cp <= 0x7FFu) {
+        if (n + 2u >= cap) return false;
+        out[n++] = (char)(0xC0u | (cp >> 6));
+        out[n++] = (char)(0x80u | (cp & 0x3Fu));
+    } else {
+        if (n + 3u >= cap) return false;
+        out[n++] = (char)(0xE0u | (cp >> 12));
+        out[n++] = (char)(0x80u | ((cp >> 6) & 0x3Fu));
+        out[n++] = (char)(0x80u | (cp & 0x3Fu));
+    }
+    *used = n;
+    return true;
+}
+
+static const char *json_find_value(const char *json, const char *key) {
+    char needle[96];
+    int nw;
+    const char *p;
+    if (!json || !key) return NULL;
+    nw = snprintf(needle, sizeof(needle), "\"%s\"", key);
+    if (nw <= 0 || (size_t)nw >= sizeof(needle)) return NULL;
+    p = strstr(json, needle);
+    if (!p) return NULL;
+    p += (size_t)nw;
+    while (*p && isspace((unsigned char)*p)) ++p;
+    if (*p != ':') return NULL;
+    ++p;
+    while (*p && isspace((unsigned char)*p)) ++p;
+    return p;
+}
+
+static bool json_get_string(const char *json, const char *key, char *out, size_t cap) {
+    const char *p = json_find_value(json, key);
+    size_t used = 0u;
+    if (!p || !out || cap == 0u || *p != '"') return false;
+    ++p;
+    while (*p && *p != '"') {
+        unsigned char c = (unsigned char)*p++;
+        if (c == '\\') {
+            uint32_t cp;
+            int h0, h1, h2, h3;
+            c = (unsigned char)*p++;
+            if (!c) return false;
+            if (c == 'n') c = '\n';
+            else if (c == 'r') c = '\r';
+            else if (c == 't') c = '\t';
+            else if (c == 'b') c = '\b';
+            else if (c == 'f') c = '\f';
+            else if (c == '"' || c == '\\' || c == '/') { /* literal */ }
+            else if (c == 'u') {
+                h0 = json_hexval(p[0]); h1 = json_hexval(p[1]);
+                h2 = json_hexval(p[2]); h3 = json_hexval(p[3]);
+                if (h0 < 0 || h1 < 0 || h2 < 0 || h3 < 0) return false;
+                cp = (uint32_t)((h0 << 12) | (h1 << 8) | (h2 << 4) | h3);
+                p += 4;
+                if (cp >= 0xD800u && cp <= 0xDFFFu) return false;
+                if (!json_put_utf8(cp, out, cap, &used)) return false;
+                continue;
+            } else return false;
+        }
+        if (used + 1u >= cap) return false;
+        out[used++] = (char)c;
+    }
+    if (*p != '"') return false;
+    out[used] = '\0';
+    return true;
+}
+
+static void json_write_string(FILE *fp, const char *s) {
+    const unsigned char *p = (const unsigned char *)(s ? s : "");
+    fputc('"', fp);
+    while (*p) {
+        unsigned char c = *p++;
+        if (c == '"') fputs("\\\"", fp);
+        else if (c == '\\') fputs("\\\\", fp);
+        else if (c == '\n') fputs("\\n", fp);
+        else if (c == '\r') fputs("\\r", fp);
+        else if (c == '\t') fputs("\\t", fp);
+        else if (c < 0x20u) fprintf(fp, "\\u%04x", (unsigned)c);
+        else fputc((int)c, fp);
+    }
+    fputc('"', fp);
+}
+
+static int run_audit_stdin(void) {
+    char payload[32768];
+    char prompt[2049];
+    char text[4097];
+    char rules_path[4096];
+    size_t nread = fread(payload, 1u, sizeof(payload) - 1u, stdin);
+    clock_t started = clock();
+    NiyahRuleKB *rules = NULL;
+    const char *violation = NULL;
+    KHZQ_Result khz;
+    uint8_t proof[32];
+    char proof_hex[65];
+    bool verified;
+    double elapsed_ms;
+
+    if (ferror(stdin) || nread == sizeof(payload) - 1u) {
+        fputs("{\"verified\":false,\"error\":\"stdin payload too large or unreadable\"}\n", stdout);
+        return 0;
+    }
+    payload[nread] = '\0';
+    rules_path[0] = '\0';
+
+    if (!json_get_string(payload, "prompt", prompt, sizeof(prompt)) ||
+        !json_get_string(payload, "text", text, sizeof(text))) {
+        fputs("{\"verified\":false,\"error\":\"invalid audit JSON\"}\n", stdout);
+        return 0;
+    }
+    (void)json_get_string(payload, "rules", rules_path, sizeof(rules_path));
+
+    if (rules_path[0]) {
+        rules = niyah_rule_load(rules_path);
+        if (!rules) {
+            fputs("{\"verified\":false,\"error\":\"rule file load failed\",\"rule_violation\":\"RULE_LOAD_ERROR\"}\n", stdout);
+            return 0;
+        }
+    }
+
+    khz = khz_q_verify_output(text, 0.85f);
+    if (rules) violation = niyah_rule_check(rules, prompt, text);
+    verified = khz.is_coherent && violation == NULL;
+
+    niyah_proof_generate(prompt, text, rules_path[0] ? rules_path : NULL, proof);
+    niyah_hash_to_hex(proof, proof_hex);
+    elapsed_ms = ((double)(clock() - started) * 1000.0) / (double)CLOCKS_PER_SEC;
+
+    fputs("{\"verified\":", stdout);
+    fputs(verified ? "true" : "false", stdout);
+    fputs(",\"chain_hash\":", stdout); json_write_string(stdout, proof_hex);
+    fprintf(stdout, ",\"confidence\":%.6f,\"confidence_kind\":\"khz_energy_not_truth\",\"elapsed_ms\":%.3f,\"khz_energy\":%.6f,\"rule_violation\":",
+            verified ? (double)khz.energy_preserved : 0.0, elapsed_ms, (double)khz.energy_preserved);
+    if (violation) json_write_string(stdout, violation); else fputs("null", stdout);
+    fputs("}\n", stdout);
+
+    if (rules) niyah_rule_free(rules);
+    return 0;
 }
 
 static int run_all_smoke(void) {
@@ -144,6 +303,13 @@ static int run_all_smoke(void) {
         total_fail += fail;
 #undef KHZQ_PASS
         (void)pass;
+    }
+    {
+        char p[64], t[64], r[64];
+        const char *sample = "{\"prompt\":\"hello\\nworld\",\"text\":\"answer\\\"ok\",\"rules\":\"rules.nrule\"}";
+        if (!json_get_string(sample, "prompt", p, sizeof(p)) || strcmp(p, "hello\nworld") != 0) ++total_fail;
+        if (!json_get_string(sample, "text", t, sizeof(t)) || strcmp(t, "answer\"ok") != 0) ++total_fail;
+        if (!json_get_string(sample, "rules", r, sizeof(r)) || strcmp(r, "rules.nrule") != 0) ++total_fail;
     }
     {
         NiyahConfig cfg = {.magic=NIYAH_MAGIC,.version=NIYAH_VER,.embed_dim=64,.n_heads=4,.n_kv_heads=4,.n_layers=2,.ffn_mult=4,.vocab_size=256,.ctx_len=32,.rope_theta=10000.f,.rms_eps=1e-5f};
@@ -198,8 +364,9 @@ static void interactive_loop(NiyahModel *m, NiyahRuleKB *rules) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) { (void)fprintf(stderr,"usage: %s --smoke | --rag | --model <file> | --interactive\n",argv[0]); return 3; }
+    if (argc < 2) { (void)fprintf(stderr,"usage: %s --smoke | --audit-stdin | --rag | --model <file> | --interactive\n",argv[0]); return 3; }
     if (!strcmp(argv[1],"--smoke")) return run_all_smoke();
+    if (!strcmp(argv[1],"--audit-stdin")) return run_audit_stdin();
     if (!strcmp(argv[1],"--rag")) { rag_loop(RAG_BACKEND_DDG,NULL); return 0; }
     if (!strcmp(argv[1],"--model")) {
         if (argc < 3) return 3;
