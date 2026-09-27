@@ -29,23 +29,32 @@ void niyah_sha256(const uint8_t *data, size_t len, uint8_t out[32]);
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 /*
- * Generate proof hash: SHA-256(prompt || output || rule_file_contents).
- * rule_file may be NULL (hashed as empty string).
+ * Generate a V2 proof hash bound to:
+ *   prompt || NUL || output || NUL || SHA256(rule-file bytes)
+ *
+ * rule_file is a filesystem path. NULL or "" means no rule file and binds
+ * SHA256(empty). If a non-empty rule_file cannot be read, proof is zeroed.
  */
 void niyah_proof_generate(const char *prompt, const char *output,
                           const char *rule_file, uint8_t proof[32]);
 
 /*
- * Save proof to a .proof file (human-readable + machine-verifiable).
- * Returns 0 on success, -1 on I/O error.
+ * Save a NIYAH-PROOF-V2 file. Prompt/output are escaped onto single lines,
+ * and rules_path/rules_hash identify the exact rule file bytes used.
+ * Returns 0 on success, -1 on I/O/rule-file error.
  */
 int niyah_proof_save(const char *path, const uint8_t proof[32],
                      const char *prompt, const char *output,
                      const char *rule_file);
 
 /*
- * Verify a .proof file by re-computing the hash and comparing.
- * Returns true if the proof matches.
+ * Verify a proof file.
+ *
+ * V2 proofs are self-describing: embedded escaped prompt/output and rules_path
+ * are used, so callers may pass NULL for prompt/output/rule_file. The current
+ * rule file must still exist and match the recorded content hash.
+ *
+ * V1 proofs retain the legacy caller-supplied verification behavior.
  */
 bool niyah_proof_verify(const char *proof_path,
                         const char *prompt,
