@@ -11,6 +11,33 @@ static const char *skip_space_no_nl(const char *p)
     return p;
 }
 
+static bool rule_line_shape_valid(const char *line, size_t len)
+{
+    static const char prefix[] = "rule:";
+    size_t i;
+    const char *p;
+    const char *limit = line + len;
+
+    if (len < sizeof(prefix) - 1u) return false;
+    for (i = 0u; i < sizeof(prefix) - 1u; ++i) {
+        if (tolower((unsigned char)line[i]) != prefix[i]) return false;
+    }
+
+    p = line + (sizeof(prefix) - 1u);
+    while (p < limit && (*p == ' ' || *p == '\t' || *p == '\r')) ++p;
+    if (p >= limit || *p != '"') return false;
+    ++p;
+
+    /* The legacy parser has no escaped-quote syntax: first quote closes body. */
+    while (p < limit && *p != '"') ++p;
+    if (p >= limit) return false;
+    ++p;
+
+    while (p < limit && (*p == ' ' || *p == '\t' || *p == '\r')) ++p;
+    if (p == limit) return true;
+    return (size_t)(limit - p) >= 2u && p[0] == '/' && p[1] == '/';
+}
+
 bool niyah_rule_source_guard(const char *source, const NiyahRuleKB *kb)
 {
     const char *p;
@@ -35,12 +62,7 @@ bool niyah_rule_source_guard(const char *source, const NiyahRuleKB *kb)
         } else if (len >= 2u && line[0] == '/' && line[1] == '/') {
             /* comment */
         } else {
-            const char prefix[] = "rule:";
-            size_t i;
-            if (len < sizeof(prefix) - 1u) return false;
-            for (i = 0u; i < sizeof(prefix) - 1u; ++i) {
-                if (tolower((unsigned char)line[i]) != prefix[i]) return false;
-            }
+            if (!rule_line_shape_valid(line, len)) return false;
             ++declared;
         }
 
