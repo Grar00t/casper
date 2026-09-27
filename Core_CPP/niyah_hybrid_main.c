@@ -4,6 +4,7 @@
 
 #include "niyah_core.h"
 #include "rule_parser.h"
+#include "rule_source_guard.h"
 #include "proof_generator.h"
 #include "khz_q_svd.h"
 #include "casper_rag.h"
@@ -109,7 +110,9 @@ static int json_u16(const char *p, uint32_t *out)
     int i;
     if (!p || !out) return 0;
     for (i = 0; i < 4; ++i) {
-        int h = json_hex_value(p[i]);
+        int h;
+        if (p[i] == '\0') return 0;
+        h = json_hex_value(p[i]);
         if (h < 0) return 0;
         v = (v << 4) | (uint32_t)h;
     }
@@ -225,9 +228,13 @@ static int audit_stdin(void)
     const char *violation = NULL;
     KHZQ_Result khz;
     uint8_t proof[32], rules_hash[32];
+    const uint8_t *rules_hash_ptr = NULL;
     char proof_hex[65], rules_hex[65];
     bool rules_bound = false;
-    bool verified = false;
+    bool khz_pass = false;
+    bool rules_pass = false;
+    bool receipt_created = false;
+    bool local_gate_verified = false;
     const char *error = NULL;
 
     if (!payload) error = "invalid or oversized stdin payload";
@@ -237,39 +244,52 @@ static int audit_stdin(void)
     if (!error && (!prompt || !text || !rules_path)) error = "payload must contain string fields prompt, text, and rules";
 
     if (!error && rules_path[0]) {
-        rules_bound = true;
         rules_text = read_text_file_bounded(rules_path, AUDIT_RULE_FILE_MAX);
-        if (!rules_text) error = "rules file unreadable or too large";
+        if (!rules_text || !niyah_sha256_file(rules_path, rules_hash)) {
+            error = "rules file unreadable, too large, or unhashable";
+        }
         if (!error) {
             kb = niyah_rule_parse(rules_text);
-            if (!kb) error = "rules file could not be parsed";
+            if (!kb || !niyah_rule_source_guard(rules_text, kb)) {
+                error = "rules file is empty, malformed, or only partially parsed";
+            } else {
+                rules_bound = true;
+                rules_hash_ptr = rules_hash;
+            }
         }
     }
 
     memset(&khz, 0, sizeof(khz));
     if (!error) {
         khz = khz_q_verify_output(text, 0.85f);
+        khz_pass = khz.is_coherent;
         if (kb) violation = niyah_rule_check(kb, prompt, text);
-        niyah_proof_generate(prompt, text, rules_text, proof);
-        if (rules_text) niyah_sha256((const uint8_t *)rules_text, strlen(rules_text), rules_hash);
-        else niyah_sha256((const uint8_t *)"", 0u, rules_hash);
+        rules_pass = (violation == NULL);
+        niyah_proof_generate_hashed(prompt, text, rules_hash_ptr, proof);
+        receipt_created = true;
+        if (!rules_hash_ptr) niyah_sha256((const uint8_t *)"", 0u, rules_hash);
         niyah_hash_to_hex(proof, proof_hex);
         niyah_hash_to_hex(rules_hash, rules_hex);
-        verified = khz.is_coherent && violation == NULL;
+        local_gate_verified = khz_pass && rules_pass && receipt_created;
     } else {
         memset(proof_hex, '0', 64u); proof_hex[64] = '\0';
         memset(rules_hex, '0', 64u); rules_hex[64] = '\0';
     }
 
     printf("{");
-    printf("\"verified\":%s", verified ? "true" : "false");
-    printf(",\"verification_scope\":\"khz_q_heuristic+text_rules+receipt_integrity\"");
+    printf("\"verified\":%s", local_gate_verified ? "true" : "false");
+    printf(",\"local_gate_verified\":%s", local_gate_verified ? "true" : "false");
+    printf(",\"khz_pass\":%s", khz_pass ? "true" : "false");
+    printf(",\"rules_pass\":%s", rules_pass ? "true" : "false");
+    printf(",\"receipt_created\":%s", receipt_created ? "true" : "false");
+    printf(",\"receipt_verified\":false");
+    printf(",\"verification_scope\":\"khz_q_heuristic+text_rules\"");
     printf(",\"factual_truth_verified\":false");
     printf(",\"chain_hash\":\"%s\"", proof_hex);
     printf(",\"proof_kind\":\"NIYAH-PROOF-V2\"");
     printf(",\"rules_bound\":%s", rules_bound ? "true" : "false");
     printf(",\"rules_hash\":\"%s\"", rules_hex);
-    printf(",\"confidence\":%.6f", verified ? (double)khz.energy_preserved : 0.0);
+    printf(",\"confidence\":%.6f", local_gate_verified ? (double)khz.energy_preserved : 0.0);
     printf(",\"khz_energy\":%.6f", (double)khz.energy_preserved);
     printf(",\"khz_penalty\":%.6f", (double)khz.penalty_nasl);
     printf(",\"rule_violation\":");
@@ -377,9 +397,6 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
     }
 
     if (proof_out) memset(proof_out, 0, 32u);
-    /* Fail closed: a parsed rule KB has no byte-level provenance in this API.
-     * Do not emit an unbound receipt when rules are active. The CLI/audit path
-     * binds the exact rule-file bytes and should be used for rules-bound proof. */
     if (proof_out && generate_proof && result && !rules)
         niyah_proof_generate(prompt, result, NULL, proof_out);
 
