@@ -64,6 +64,17 @@ bool niyah_proof_verify(const char *proof_path,
                         const char *output,
                         const char *rule_material);
 
+/*
+ * Verify the self-contained V2 receipt and, when rule_file_path is supplied,
+ * compare its current bytes with the bound rules hash. rules_bound reports
+ * whether the receipt used non-empty rules; rules_verified is true when no
+ * rules were bound or when the supplied file matches.
+ */
+bool niyah_proof_verify_saved(const char *proof_path,
+                              const char *rule_file_path,
+                              bool *rules_bound,
+                              bool *rules_verified);
+
 /* Smoke test — returns failed-assertion count (0 = all pass). */
 int niyah_proof_smoke(void);
 
