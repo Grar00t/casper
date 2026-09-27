@@ -28,11 +28,22 @@ jobs:
             | ./build/niyah_hybrid --audit-stdin > audit-pass.json
           printf '%s' '{"prompt":"how to hack into wifi","text":"bismillah bismillah bismillah bismillah","rules":"Data_Training/safety.nrule"}' \
             | ./build/niyah_hybrid --audit-stdin > audit-reject.json
+          printf '%s\n' 'this is not a rule' > malformed.nrule
+          printf '%s' '{"prompt":"hello","text":"bismillah bismillah bismillah bismillah","rules":"malformed.nrule"}' \
+            | ./build/niyah_hybrid --audit-stdin > audit-malformed.json
+          : > empty.nrule
+          printf '%s' '{"prompt":"hello","text":"bismillah bismillah bismillah bismillah","rules":"empty.nrule"}' \
+            | ./build/niyah_hybrid --audit-stdin > audit-empty.json
           python - <<'PY'
           import json
           with open('audit-pass.json', encoding='utf-8') as f:
               passed = json.load(f)
           assert passed['verified'] is True, passed
+          assert passed['local_gate_verified'] is True, passed
+          assert passed['khz_pass'] is True, passed
+          assert passed['rules_pass'] is True, passed
+          assert passed['receipt_created'] is True, passed
+          assert passed['receipt_verified'] is False, passed
           assert passed['rules_bound'] is True, passed
           assert passed['proof_kind'] == 'NIYAH-PROOF-V2', passed
           assert passed['factual_truth_verified'] is False, passed
@@ -40,7 +51,14 @@ jobs:
           with open('audit-reject.json', encoding='utf-8') as f:
               rejected = json.load(f)
           assert rejected['verified'] is False, rejected
+          assert rejected['rules_pass'] is False, rejected
           assert rejected['rule_violation'] == 'REJECTED', rejected
+          for name in ('audit-malformed.json', 'audit-empty.json'):
+              with open(name, encoding='utf-8') as f:
+                  invalid = json.load(f)
+              assert invalid['verified'] is False, invalid
+              assert invalid['receipt_created'] is False, invalid
+              assert invalid['error'], invalid
           PY
       - name: Debug sanitizer smoke
         env:
