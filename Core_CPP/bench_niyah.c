@@ -106,30 +106,18 @@ int main(void) {
         for (int it = 0; it < ITER; it++) matvec_scalar_ref(y, A, x, R, C);
         double bef = now_ms() - t0;
 
-        /* After: SIMD (use niyah's internal matvec via forward pass — proxy) */
-        /* We time niyah_forward on a small model as the best proxy: */
-        NiyahConfig mc = {
-            .magic=NIYAH_MAGIC,.version=NIYAH_VER,
-            .embed_dim=512,.n_heads=8,.n_kv_heads=8,
-            .n_layers=1,.ffn_mult=4,.vocab_size=1024,
-            .ctx_len=32,.rope_theta=10000.f,.rms_eps=1e-5f
-        };
-        NiyahModel *mm = niyah_alloc(&mc);
-        init_weights(mm);
-        /* Warm-up */
-        for (int i = 0; i < 5; i++) niyah_forward(mm, (uint32_t)i, 0);
+        /* After: direct NIYAH SIMD matvec, identical 4096x4096 workload */
+        for (int i = 0; i < 3; i++)
+            niyah_matvec_f32(y, A, x, R, C);
+
         t0 = now_ms();
-        for (int it = 0; it < ITER*10; it++)
-            niyah_forward(mm, (uint32_t)(it%mc.vocab_size), 0);
+        for (int it = 0; it < ITER; it++)
+            niyah_matvec_f32(y, A, x, R, C);
         double aft = now_ms() - t0;
-        niyah_free(mm);
 
         size_t bytes = R*C*sizeof(float)*2;
         bench_row("matvec scalar 4096×4096", bef, bef, bytes, ITER);
-        bench_row("matvec SIMD   4096×4096", bef,
-                  /* scale bench to equivalent 4096×4096 work */
-                  aft * (double)(R*C) / (double)(mc.embed_dim*mc.embed_dim*9),
-                  bytes, ITER);
+        bench_row("matvec SIMD   4096×4096", bef, aft, bytes, ITER);
 
         free(A); free(x); free(y);
     }

@@ -67,6 +67,13 @@ static void matvec(float * restrict y,const float * restrict A,const float * res
 #endif
 }
 
+void niyah_matvec_f32(float * restrict y,
+                      const float * restrict A,
+                      const float * restrict x,
+                      size_t rows, size_t cols) {
+    matvec(y, A, x, rows, cols);
+}
+
 static float dot_f32(const float * restrict a,const float * restrict b,size_t n){
 #if defined(SIMD_AVX2)
     __m256 a0=_mm256_setzero_ps(),a1=_mm256_setzero_ps();size_t i=0;for(;i+15<n;i+=16){a0=_mm256_fmadd_ps(_mm256_loadu_ps(a+i),_mm256_loadu_ps(b+i),a0);a1=_mm256_fmadd_ps(_mm256_loadu_ps(a+i+8),_mm256_loadu_ps(b+i+8),a1);}__m256 acc=_mm256_add_ps(a0,a1);__m128 lo=_mm256_castps256_ps128(acc),hi=_mm256_extractf128_ps(acc,1),s4=_mm_add_ps(lo,hi),s2=_mm_add_ps(s4,_mm_movehdup_ps(s4));float d=_mm_cvtss_f32(_mm_add_ss(s2,_mm_movehl_ps(s2,s2)));for(;i<n;i++)d+=a[i]*b[i];return d;

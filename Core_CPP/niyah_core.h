@@ -103,6 +103,10 @@ float niyah_train_step(NiyahModel *m, NiyahAdam *opt,
                        const uint32_t *tokens, uint32_t n);
 NiyahAdam *niyah_adam_alloc(const NiyahModel *m);
 void       niyah_adam_free (NiyahAdam *opt);
+void niyah_matvec_f32(float * restrict y,
+                      const float * restrict A,
+                      const float * restrict x,
+                      size_t rows, size_t cols);
 const char *niyah_simd_name(void);
 size_t      niyah_param_count(const NiyahModel *m);
 
