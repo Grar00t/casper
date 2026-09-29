@@ -18,18 +18,11 @@
 extern "C" {
 #endif
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * Constants
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 #define NIYAH_MAGIC     UINT32_C(0x4E595148)   /* "NYQH" */
 #define NIYAH_VER       UINT32_C(0x0005)
 #define NIYAH_MAX_CTX   UINT32_C(8192)
 #define NIYAH_MAX_VOCAB UINT32_C(131072)
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * Config — serialised verbatim to .bin header
- * Changing any field requires bumping NIYAH_VER.
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 typedef struct {
     uint32_t magic;
     uint32_t version;
@@ -46,9 +39,6 @@ typedef struct {
     uint8_t  _pad[16];      /* pad to 64 bytes total */
 } NiyahConfig;             /* sizeof must be 64 */
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * Layer weight layout (all pointers into pool)
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 typedef struct {
     float *wq;          /* [embed × embed]           Q projection */
     float *wk;          /* [kv_dim × embed]          K projection */
@@ -61,125 +51,79 @@ typedef struct {
     float *rms_ffn;     /* [embed]                   pre-ffn norm */
 } NiyahLayer;
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * Model — single-pool allocation
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 typedef struct {
     NiyahConfig  cfg;
     NiyahLayer  *layers;       /* array[n_layers] in pool */
-
     float *token_embed;        /* [vocab × embed]  */
     float *rms_final;          /* [embed]          */
     float *lm_head;            /* [vocab × embed]  */
 
     /*
-     * KV cache — head-major layout (best attention-loop locality):
+     * KV cache — head-major layout:
      *   kv_k[layer][head][seq_pos][head_dim]
      *   kv_v[layer][head][seq_pos][head_dim]
-     * stride: layer_stride = n_kv_heads * ctx_len * head_dim
      */
     float *kv_k;
     float *kv_v;
-
-    /* Run-state scratch buffer (points inside pool) */
     float *scratch;
-    float *_logits;            /* inside scratch, model-local */
-
-    /* Single pool — one owner, zero fragmentation */
+    float *_logits;
     void  *_pool;
     size_t _pool_bytes;
-
-    /* Derived constants (computed at alloc, never serialised) */
-    uint32_t head_dim;         /* embed_dim / n_heads     */
-    uint32_t kv_dim;           /* n_kv_heads * head_dim   */
-    uint32_t ffn_dim;          /* embed_dim * ffn_mult    */
+    uint32_t head_dim;
+    uint32_t kv_dim;
+    uint32_t ffn_dim;
 } NiyahModel;
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * Adam optimizer state
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 typedef struct {
-    float   *m;            /* 1st moment  (same count as weights) */
-    float   *v;            /* 2nd moment  */
+    float   *m;
+    float   *v;
     uint32_t step;
-    float    lr;           /* learning rate          default 3e-4 */
-    float    beta1;        /* momentum decay         default 0.9  */
-    float    beta2;        /* variance decay         default 0.999*/
-    float    eps;          /* numerical stability    default 1e-8 */
-    float    wd;           /* weight decay           default 0.01 */
-    size_t   n_weights;    /* total floats managed              */
+    float    lr;
+    float    beta1;
+    float    beta2;
+    float    eps;
+    float    wd;
+    size_t   n_weights;
 } NiyahAdam;
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * Sampler
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 typedef struct {
     float temperature;
     float top_p;
     uint64_t seed;
 } NiyahSampler;
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * Public API
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-
-/* Allocation / free */
 NiyahModel *niyah_alloc(const NiyahConfig *cfg);
 void        niyah_free (NiyahModel *m);
-
-/* Persistence — returns 0 on success, -1 I/O error, -2 version mismatch */
 int  niyah_save(const NiyahModel *m, const char *path);
 int  niyah_load(NiyahModel **out,    const char *path);
-
-/* Inference — KV-cache written at pos; pos must be monotonically increasing.
- * Returns pointer to logit buffer (owned by model, valid until next call).
- * Call with pos=0 to reset generation. */
 float *niyah_forward(NiyahModel *m, uint32_t token, uint32_t pos);
-
-/* Sampling */
 uint32_t niyah_sample(const float *logits, uint32_t vocab_size,
                       NiyahSampler *s);
-
-/* Training — output-layer Adam step; returns mean cross-entropy loss */
 float niyah_train_step(NiyahModel *m, NiyahAdam *opt,
                        const uint32_t *tokens, uint32_t n);
-
-/* Adam lifecycle */
 NiyahAdam *niyah_adam_alloc(const NiyahModel *m);
 void       niyah_adam_free (NiyahAdam *opt);
-
-/* Introspection */
-const char *niyah_simd_name(void);      /* "AVX2+FMA" | "NEON" | "Scalar" */
+const char *niyah_simd_name(void);
 size_t      niyah_param_count(const NiyahModel *m);
 
-/*
- * niyah_smoke() used to be declared here. It was merged into
- * Niyah.Engine / NiyahKernel and is defined in no translation unit of this
- * repository, so keeping the declaration made every target that links
- * niyah_core.c fail at `undefined reference to niyah_smoke`. The engine
- * self-check now lives in Core_CPP/niyah_main.c and builds as build/niyah.
- */
-
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * Hybrid neuro-symbolic API
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-
-/* Forward declaration — full types in rule_parser.h */
 typedef struct NiyahRuleKBTag NiyahRuleKBOpaque;
 
-/* Hybrid generation options */
 typedef struct {
     void        *rules;         /* NiyahRuleKB* or NULL for pure neural */
     uint32_t     max_retries;   /* re-sample attempts on violation (default 3) */
-    bool         generate_proof;/* compute proof hash */
+    bool         generate_proof;/* request an integrity receipt hash */
 } NiyahHybridOpts;
 
 /*
- * Generate text with optional symbolic verification.
+ * Generate text with optional deterministic text-rule verification.
  *
  * Returns malloc'd string (caller frees).
- * If proof_out is non-NULL, 32-byte SHA-256 hash is written there.
- * If no rules are provided, runs pure neural generation.
+ * If proof_out is non-NULL it is always initialized to 32 zero bytes first.
+ * A V2 receipt hash is emitted only when generate_proof is true and no parsed
+ * rule KB is active, because this API does not carry the exact rule-file bytes
+ * needed to bind a rules-backed receipt. For rules-backed receipts use the
+ * CLI/audit path, which hashes the exact rule material. This fail-closed rule
+ * avoids producing a receipt that appears to cover rules when it does not.
  */
 char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
                             const NiyahHybridOpts *opts,

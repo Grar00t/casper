@@ -14,12 +14,11 @@ const engine = new NiyahEngine({
   memoryDbPath: process.env.NIYAH_MEMORY_DB || undefined,
 });
 
-/* ── C11 audit bridge ────────────────────────────────────────────────────────
- * Sends { prompt, text, rules } as JSON to niyah_hybrid.exe --audit-stdin
- * via stdin pipe. Returns parsed JSON or null on error/timeout.
- * Uses the compiled binary next to this server: app/niyah_hybrid.exe
- * or the build output at Core_CPP/niyah_hybrid.exe.
- * ──────────────────────────────────────────────────────────────────────────── */
+/* C11 audit bridge.
+ * Sends bounded JSON to niyah_hybrid --audit-stdin. The C result is a local
+ * gate result plus an unkeyed SHA-256 integrity receipt. It is not a factual
+ * truth, authenticity, or compliance attestation.
+ */
 const C11_EXE = (() => {
   const candidates = [
     process.env.NIYAH_HYBRID_EXE,
@@ -45,16 +44,10 @@ const DEFAULT_RULES = (() => {
   return null;
 })();
 
-/**
- * @param {string} prompt  — original user query
- * @param {string} text    — synthesized answer from NIYAH engine
- * @param {string} [rules] — path to .nrule file
- * @returns {Promise<{verified,chain_hash,confidence,elapsed_ms,khz_energy,rule_violation}|null>}
- */
 function c11Audit(prompt, text, rules) {
   return new Promise((resolve) => {
     if (!C11_EXE) {
-      console.warn('[c11] niyah_hybrid.exe not found — skipping audit');
+      console.warn('[c11] niyah_hybrid executable not found — skipping audit');
       return resolve(null);
     }
 
@@ -76,7 +69,7 @@ function c11Audit(prompt, text, rules) {
         }
         try {
           const result = JSON.parse(stdout.trim());
-          console.log(`[c11] verified=${result.verified} conf=${result.confidence} hash=${(result.chain_hash||'').substring(0,12)}...`);
+          console.log(`[c11] local_gate=${result.verified} hash=${(result.chain_hash || '').substring(0, 12)}...`);
           resolve(result);
         } catch (parseErr) {
           console.error('[c11] JSON parse error:', parseErr.message, '| raw:', stdout.substring(0, 100));
@@ -85,8 +78,10 @@ function c11Audit(prompt, text, rules) {
       }
     );
 
-    // Write JSON payload to child stdin then close it
-    child.stdin.write(payload, 'utf8', () => child.stdin.end());
+    child.stdin.on('error', (err) => {
+      console.error('[c11] stdin error:', err.message);
+    });
+    child.stdin.end(payload, 'utf8');
   });
 }
 
@@ -96,29 +91,42 @@ router.post('/ask', async (req, res) => {
     return res.status(400).json({ error: 'query مطلوب.' });
   }
   try {
-    /* Step 1: Node.js NIYAH pipeline (DDG search → fetch → TF-IDF → cite) */
     const result = await engine.ask(query, { forceFresh: Boolean(forceFresh) });
 
-    /* Step 2: C11 symbolic audit + SHA-256 proof (non-blocking fallback) */
     let c11 = null;
     if (result.answer && result.answer.length > 10) {
       c11 = await c11Audit(query, result.answer);
     }
 
-    /* Merge: if C11 audit ran, use its verified confidence + chain_hash */
     if (c11) {
-      result.proof_verified  = c11.verified;
-      result.chain_hash      = c11.chain_hash;
-      result.khz_energy      = c11.khz_energy;
-      result.rule_violation  = c11.rule_violation || null;
-      /* Take minimum of both confidences — conservative & honest */
+      result.local_gate_verified     = Boolean(c11.verified);
+      result.verification_scope      = c11.verification_scope || null;
+      result.factual_truth_verified  = false;
+      result.integrity_receipt = c11.chain_hash ? {
+        kind: c11.proof_kind || 'NIYAH-PROOF-V2',
+        sha256: c11.chain_hash,
+        rules_bound: Boolean(c11.rules_bound),
+        rules_sha256: c11.rules_hash || null,
+      } : null;
+
+      // Legacy field retained fail-closed: this bridge creates an unkeyed
+      // integrity receipt but does not independently verify authenticity.
+      result.proof_verified = false;
+      result.chain_hash = c11.chain_hash || null;
+      result.khz_energy = c11.khz_energy;
+      result.khz_penalty = c11.khz_penalty;
+      result.rule_violation = c11.rule_violation || null;
+      result.c11_error = c11.error || null;
       if (typeof c11.confidence === 'number') {
         result.confidence = Math.min(result.confidence || 0, c11.confidence);
       }
       result.c11_elapsed_ms = c11.elapsed_ms;
     } else {
+      result.local_gate_verified = false;
+      result.factual_truth_verified = false;
+      result.integrity_receipt = null;
       result.proof_verified = false;
-      result.chain_hash     = null;
+      result.chain_hash = null;
     }
 
     return res.json(result);

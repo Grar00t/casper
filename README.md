@@ -1,6 +1,6 @@
 # Casper / NIYAH
 
-Casper is a C11 neural/runtime and symbolic reasoning codebase with rational constraints, `.nrule` verification, SHA-256 proof files, and a web-retrieval CLI. The repository also contains optional Node.js and Windows WPF interfaces.
+Casper is a C11 neural/runtime and symbolic reasoning codebase with rational constraints, `.nrule` verification, SHA-256 integrity receipts, and a web-retrieval CLI. The repository also contains optional Node.js and Windows WPF interfaces.
 
 ## Build the C Runtime
 
@@ -120,16 +120,28 @@ C build/run and `train-c` require `bash` plus GCC/Clang. Full-model `train` runs
 | `Core_CPP/niyah_train.c` | C training executable |
 | `tools/train_casper.py` | full-sequence PyTorch/CUDA training, checkpoint/resume, native `.bin` export |
 | `tokenizer.c` | deterministic UTF-8 tokenizer with byte fallback |
-| `Core_CPP/hybrid_reasoner.c` | terms, unification, clause solving |
+| `Core_CPP/hybrid_reasoner.c` | terms, Robinson unification, occurs-check, backward chaining |
 | `Core_CPP/constraint_solver.c` | rational constraints and propagation |
-| `Core_CPP/rule_parser.c` | `.nrule` parsing and verification |
-| `Core_CPP/proof_generator.c` | SHA-256 and proof generation/verification |
-| `Core_CPP/khz_q_svd.c` | numerical output gate |
+| `Core_CPP/rule_parser.c` | deterministic `.nrule` text matching and replacement/rejection |
+| `Core_CPP/proof_generator.c` | SHA-256 integrity receipt generation/verification |
+| `Core_CPP/khz_q_svd.c` | numerical text-shape/coherence heuristic |
 | `Core_CPP/casper_rag.c` | HTTP search transport, parsing, ranking, trace/context hashing |
-| `Core_CPP/casper_cli.c` | query/proof CLI |
-| `Core_CPP/niyah_hybrid_main.c` | hybrid CLI |
+| `Core_CPP/casper_cli.c` | query/integrity-receipt CLI |
+| `Core_CPP/niyah_hybrid_main.c` | hybrid CLI and C11 audit bridge |
 | `niyah_engine_local/` | optional Node.js runtime |
 | `UI_CSharp/` | optional Windows WPF UI |
+
+## Security and Semantic Boundaries
+
+The repository uses some historical names such as `KHZ_Q`, `penalty_nasl`, and "coherence". These identifiers must not be interpreted as evidence of factual truth, ethics, policy compliance, or formal correctness.
+
+- Casper/NIYAH is a native user-space program. It is not a Ring-0 kernel component and is not bare-metal software.
+- `NiyahModel` uses a contiguous pool for neural weights, KV cache, layer metadata, and scratch space. Other subsystems still use ordinary heap allocation where required. Single-pool model allocation is not a memory-safety proof.
+- `khz_q_svd.c` is a numerical heuristic over byte-frequency buckets and retained spectral energy. It does not understand meaning or prove that output is true or ethical.
+- `.nrule` is a deterministic text-rule filter (`CONTAINS`, equality, replacement, rejection). It is separate from the Prolog-like symbolic reasoner.
+- `hybrid_reasoner.c` and `constraint_solver.c` are implemented subsystems, but the current neural generation path does not invoke them as final authorities. Wiring them into generation requires an explicit semantic contract rather than an implicit claim.
+- "Sovereign" is a deployment/design objective (local execution, minimized dependencies), not a formally verified security property.
+- SIMD paths can change floating-point reduction order. Identical seeds do not by themselves establish bit-identical logits across compilers or architectures.
 
 ## Casper Query CLI
 
@@ -147,7 +159,7 @@ SEARXNG_HOST=search.example.test CASPER_BACKEND=searxng ./build/casper "example 
 
 On Windows the C RAG path uses WinHTTP. On POSIX it invokes the `curl` executable. Network-backed results are not deterministic because remote content and availability can change.
 
-## Hybrid CLI
+## Hybrid CLI and Audit Bridge
 
 ```bash
 ./build/niyah_hybrid --smoke
@@ -155,13 +167,41 @@ On Windows the C RAG path uses WinHTTP. On POSIX it invokes the `curl` executabl
 ./build/niyah_hybrid --model casper_trained.bin --interactive
 ```
 
-## Proof Verification
+The Node runtime uses a bounded stdin JSON audit contract:
+
+```bash
+printf '%s' '{"prompt":"hello","text":"candidate answer","rules":"Data_Training/safety.nrule"}' \
+  | ./build/niyah_hybrid --audit-stdin
+```
+
+The audit response separates the local KHZ_Q/text-rule gate from receipt verification. `verified` and `local_gate_verified` mean the local heuristic/rule checks passed and a receipt was created; `receipt_verified` remains false until a saved receipt is independently verified. This path explicitly reports `factual_truth_verified=false`.
+
+`--rag` currently uses the backend wired by `niyah_hybrid_main.c`; do not assume the standalone Casper CLI backend selection syntax applies to this command.
+```
+
+## Integrity Receipt Verification
+
+New receipts use `NIYAH-PROOF-V2`. The receipt binds:
+
+- SHA-256 of the exact prompt bytes,
+- SHA-256 of the exact output bytes,
+- SHA-256 of the exact applied rule-file bytes, or SHA-256 of an empty rule set.
+
+Prompt and output payloads are stored as hex in the receipt so multiline text is unambiguous.
+
+For a receipt with no rules:
 
 ```bash
 ./build/casper --verify response.proof
 ```
 
-A proof file verifies the data encoded by that format; it is not a general cryptographic attestation of external data, model quality, or remote sources.
+For a rules-bound receipt, supply the rule file whose current bytes must match the bound hash:
+
+```bash
+./build/casper --verify response.proof Data_Training/safety.nrule
+```
+
+The CLI separates `receipt_valid`, `rules_bound`, `rules_verified`, and final `valid`. A receipt is an integrity checksum/receipt. It is not a digital signature, authenticity proof, factual-truth proof, external-source attestation, model-quality certificate, or legal/compliance determination. A proof file verifies only the data encoded by that format and the supplied rule bytes when rules are bound.
 
 ## Constraint Arithmetic
 
@@ -169,4 +209,4 @@ Constraint values use integer numerator/denominator representation. Where availa
 
 ## CI
 
-GitHub Actions builds and smokes the C runtime with GCC and Clang, runs the debug sanitizer smoke path, syntax-checks the Python training tool, checks Node.js source syntax, and builds the WPF UI on Windows. The C smoke path includes the trainer overfit/backbone-update regression. CI is repository-level evidence for buildability; documentation claims are not implementation evidence.
+GitHub Actions builds and smokes the C runtime with GCC and Clang, runs the debug sanitizer smoke path, exercises the `--audit-stdin` safe/reject contract, syntax-checks the Python training tools and Node.js sources, and builds the WPF UI on Windows. The C smoke path includes the trainer overfit/backbone-update regression and proof receipt smoke checks. CI is repository-level evidence for the exercised build/test contracts; documentation claims are not implementation evidence.

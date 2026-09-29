@@ -131,7 +131,8 @@ if [[ "$RUN_LINT" == "1" ]]; then
         "$CORE/niyah_train.c"     "$CORE/niyah_train_full.c" \
         "$CORE/niyah_hybrid_main.c" \
         "$CORE/casper_cli.c"      "$CORE/casper_rag.c" \
-        "$CORE/rule_parser.c"     "$CORE/proof_generator.c" \
+        "$CORE/rule_parser.c"     "$CORE/rule_source_guard.c" \
+        "$CORE/proof_generator.c" \
         "$CORE/constraint_solver.c" "$CORE/hybrid_reasoner.c" \
         "$CORE/khz_q_svd.c"
     echo "   cppcheck: clean"
@@ -158,12 +159,13 @@ build_target trainer \
 build_target niyah_hybrid \
     "$CORE/niyah_hybrid_main.c" "$CORE/niyah_core.c" \
     "$CORE/hybrid_reasoner.c" "$CORE/constraint_solver.c" \
-    "$CORE/rule_parser.c" "$CORE/proof_generator.c" \
-    "$CORE/khz_q_svd.c" "$CORE/casper_rag.c" "$ROOT/tokenizer.c"
+    "$CORE/rule_parser.c" "$CORE/rule_source_guard.c" \
+    "$CORE/proof_generator.c" "$CORE/khz_q_svd.c" \
+    "$CORE/casper_rag.c" "$ROOT/tokenizer.c"
 
 build_target casper \
     "$CORE/casper_cli.c" "$CORE/casper_rag.c" "$CORE/rule_parser.c" \
-    "$CORE/proof_generator.c" "$CORE/khz_q_svd.c"
+    "$CORE/rule_source_guard.c" "$CORE/proof_generator.c" "$CORE/khz_q_svd.c"
 
 if [[ -f "$CORE/bench_niyah.c" ]]; then
     build_target bench_niyah "$CORE/bench_niyah.c" "$CORE/niyah_core.c"
