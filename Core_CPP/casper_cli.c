@@ -267,7 +267,10 @@ int main(int argc,char **argv){
         kb=niyah_rule_parse(rules_text);
         if(!kb || !niyah_rule_source_guard(rules_text,kb)){
             fprintf(stderr,"[casper] invalid or partial rules policy: %s\n",rules_path);
-            if(kb)niyah_rule_free(kb);free(rules_text);casper_rag_free(ctx);return 3;
+            if (kb) niyah_rule_free(kb);
+            free(rules_text);
+            casper_rag_free(ctx);
+            return 3;
         }
         rules_hash_ptr=rules_hash;
     }
