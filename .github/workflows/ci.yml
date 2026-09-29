@@ -29,6 +29,18 @@ jobs:
           bash scripts/build.sh --debug --arch generic --smoke
           ./build/casper --self-check
 
+  python-training-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile training tools
+        run: |
+          python -m py_compile tools/train_casper.py
+          python -m py_compile tools/generate_teacher_dataset.py
+
   node-runtime:
     runs-on: ubuntu-latest
     defaults:

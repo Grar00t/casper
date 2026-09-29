@@ -7,6 +7,7 @@
 #include "proof_generator.h"
 #include "khz_q_svd.h"
 #include "casper_rag.h"
+#include "tokenizer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,43 +15,44 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <time.h>
-
-void tokenizer_init(void);
-uint32_t tokenizer_encode(const char *text, uint32_t *tokens, uint32_t max_len);
-char *tokenizer_decode(const uint32_t *tokens, uint32_t n);
-void tokenizer_free(void);
+#include <float.h>
 
 int niyah_sym_smoke(void);
 int niyah_csp_smoke(void);
 int niyah_rule_smoke(void);
 int niyah_proof_smoke(void);
 
-static uint32_t clamp_token(uint32_t token, uint32_t vocab) {
-    return vocab ? token % vocab : 0u;
-}
-
 static uint32_t generate_tokens(NiyahModel *m, const uint32_t *prompt_tokens,
                                 uint32_t prompt_len, uint32_t *out_tokens,
                                 uint32_t max_out, NiyahSampler *sampler)
 {
     if (!m || !prompt_tokens || !out_tokens || !sampler || m->cfg.vocab_size == 0u) return 0u;
-    uint32_t ctx = m->cfg.ctx_len;
+    const uint32_t ctx = m->cfg.ctx_len;
     if (ctx == 0u || prompt_len == 0u || prompt_len > ctx) return 0u;
 
     uint32_t pos = 0u;
-    uint32_t n_out = 0u;
-    for (uint32_t i = 0u; i < prompt_len && pos < ctx; ++i, ++pos)
-        (void)niyah_forward(m, clamp_token(prompt_tokens[i], m->cfg.vocab_size), pos);
+    float *logits = NULL;
+    for (uint32_t i = 0u; i < prompt_len; ++i) {
+        const uint32_t tok = prompt_tokens[i];
+        if (tok >= m->cfg.vocab_size || pos >= ctx) return 0u;
+        logits = niyah_forward(m, tok, pos++);
+        if (!logits) return 0u;
+    }
 
-    uint32_t last_tok = clamp_token(prompt_tokens[prompt_len - 1u], m->cfg.vocab_size);
-    for (uint32_t i = 0u; i < max_out && pos < ctx; ++i, ++pos) {
-        float *logits = niyah_forward(m, last_tok, pos);
-        if (!logits) break;
-        uint32_t tok = clamp_token(niyah_sample(logits, m->cfg.vocab_size, sampler), m->cfg.vocab_size);
-        if (tok == 1u) break;
-        if (n_out >= max_out) break;
+    uint32_t n_out = 0u;
+    while (logits && n_out < max_out && pos < ctx) {
+        for (uint32_t id = 0u; id < m->cfg.vocab_size; ++id) {
+            if (!tokenizer_token_allowed_for_generation(id)) logits[id] = -FLT_MAX;
+        }
+
+        const uint32_t tok = niyah_sample(logits, m->cfg.vocab_size, sampler);
+        if (tok >= m->cfg.vocab_size) return 0u;
+        if (tok == TOK_EOS) break;
+
         out_tokens[n_out++] = tok;
-        last_tok = tok;
+        if (n_out >= max_out || pos >= ctx) break;
+
+        logits = niyah_forward(m, tok, pos++);
     }
     return n_out;
 }
@@ -60,53 +62,109 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
                             NiyahSampler *sampler,
                             uint8_t proof_out[32])
 {
+    static const char sft_prefix[] = "Instruction:\n";
+    static const char sft_suffix[] = "\nResponse:\n";
+
     if (!m || !prompt || !sampler || m->cfg.vocab_size == 0u || m->cfg.ctx_len == 0u) return NULL;
 
     tokenizer_init();
-    uint32_t prompt_tokens[512];
-    uint32_t prompt_len = tokenizer_encode(prompt, prompt_tokens, 512u);
-    if (prompt_len == 0u || prompt_len > m->cfg.ctx_len) {
+    const uint32_t tokenizer_vocab = tokenizer_vocab_size();
+    if (m->cfg.vocab_size != tokenizer_vocab) {
+        (void)fprintf(stderr,
+                      "[niyah] tokenizer/model vocabulary mismatch: model=%u tokenizer=%u\n",
+                      m->cfg.vocab_size, tokenizer_vocab);
         tokenizer_free();
         return NULL;
     }
 
-    for (uint32_t i = 0u; i < prompt_len; ++i)
-        prompt_tokens[i] = clamp_token(prompt_tokens[i], m->cfg.vocab_size);
+    const uint32_t ctx = m->cfg.ctx_len;
+    uint32_t *prompt_tokens = (uint32_t *)calloc((size_t)ctx, sizeof(*prompt_tokens));
+    uint32_t *out_tokens = (uint32_t *)calloc((size_t)ctx, sizeof(*out_tokens));
+    if (!prompt_tokens || !out_tokens) {
+        free(prompt_tokens);
+        free(out_tokens);
+        tokenizer_free();
+        return NULL;
+    }
 
-    uint32_t max_retries = (opts && opts->max_retries > 0u) ? opts->max_retries : 3u;
+    const size_t prefix_len = sizeof(sft_prefix) - 1u;
+    const size_t suffix_len = sizeof(sft_suffix) - 1u;
+    const size_t raw_len = strlen(prompt);
+    if (raw_len > SIZE_MAX - prefix_len - suffix_len - 1u) {
+        free(prompt_tokens);
+        free(out_tokens);
+        tokenizer_free();
+        return NULL;
+    }
+    const size_t sft_len = prefix_len + raw_len + suffix_len;
+    char *sft_prompt = (char *)malloc(sft_len + 1u);
+    if (!sft_prompt) {
+        free(prompt_tokens);
+        free(out_tokens);
+        tokenizer_free();
+        return NULL;
+    }
+    memcpy(sft_prompt, sft_prefix, prefix_len);
+    memcpy(sft_prompt + prefix_len, prompt, raw_len);
+    memcpy(sft_prompt + prefix_len + raw_len, sft_suffix, suffix_len);
+    sft_prompt[sft_len] = '\0';
+
+    uint32_t prompt_len = tokenizer_encode(sft_prompt, prompt_tokens, ctx);
+    free(sft_prompt);
+    if (prompt_len > 0u && prompt_tokens[prompt_len - 1u] == TOK_EOS) {
+        --prompt_len;
+    }
+    if (prompt_len == 0u || prompt_len >= ctx) {
+        free(prompt_tokens);
+        free(out_tokens);
+        tokenizer_free();
+        return NULL;
+    }
+
+    const uint32_t max_retries = (opts && opts->max_retries > 0u) ? opts->max_retries : 3u;
     NiyahRuleKB *rules = opts ? (NiyahRuleKB *)opts->rules : NULL;
-    bool generate_proof = opts ? opts->generate_proof : false;
-    uint32_t out_tokens[512];
+    const bool generate_proof = opts ? opts->generate_proof : false;
+    const uint32_t max_out = ctx - prompt_len;
     char *result = NULL;
 
     for (uint32_t attempt = 0u; attempt <= max_retries; ++attempt) {
         if (attempt > 0u) sampler->seed += UINT64_C(12345) * attempt;
-        uint32_t n_out = generate_tokens(m, prompt_tokens, prompt_len, out_tokens, 512u, sampler);
+        const uint32_t n_out = generate_tokens(m, prompt_tokens, prompt_len,
+                                               out_tokens, max_out, sampler);
         char *text = tokenizer_decode(out_tokens, n_out);
         if (!text) continue;
 
         KHZQ_Result khz = khz_q_verify_output(text, 0.85f);
-        if (!khz.is_coherent) { free(text); continue; }
+        if (!khz.is_coherent) {
+            tokenizer_free_string(text);
+            continue;
+        }
 
-        if (!rules) { result = text; break; }
+        if (!rules) {
+            result = text;
+            break;
+        }
         const char *violation = niyah_rule_check(rules, prompt, text);
-        if (!violation) { result = text; break; }
+        if (!violation) {
+            result = text;
+            break;
+        }
 
         if (attempt == max_retries) {
             if (strcmp(violation, "REJECTED") == 0) {
-                free(text);
+                tokenizer_free_string(text);
                 result = (char *)malloc(64u);
                 if (result) (void)snprintf(result, 64u, "[Output rejected by rules]");
             } else {
-                size_t len = strlen(violation) + 1u;
+                const size_t len = strlen(violation) + 1u;
                 char *replacement = (char *)malloc(len);
                 if (replacement) memcpy(replacement, violation, len);
-                free(text);
+                tokenizer_free_string(text);
                 result = replacement;
             }
             break;
         }
-        free(text);
+        tokenizer_free_string(text);
     }
 
     if (!result) {
@@ -118,6 +176,8 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
     if (proof_out && generate_proof && result)
         niyah_proof_generate(prompt, result, NULL, proof_out);
 
+    free(prompt_tokens);
+    free(out_tokens);
     tokenizer_free();
     return result;
 }
@@ -146,7 +206,10 @@ static int run_all_smoke(void) {
         (void)pass;
     }
     {
-        NiyahConfig cfg = {.magic=NIYAH_MAGIC,.version=NIYAH_VER,.embed_dim=64,.n_heads=4,.n_kv_heads=4,.n_layers=2,.ffn_mult=4,.vocab_size=256,.ctx_len=32,.rope_theta=10000.f,.rms_eps=1e-5f};
+        tokenizer_init();
+        const uint32_t live_vocab = tokenizer_vocab_size();
+        tokenizer_free();
+        NiyahConfig cfg = {.magic=NIYAH_MAGIC,.version=NIYAH_VER,.embed_dim=64,.n_heads=4,.n_kv_heads=4,.n_layers=2,.ffn_mult=4,.vocab_size=live_vocab,.ctx_len=32,.rope_theta=10000.f,.rms_eps=1e-5f};
         NiyahModel *m = niyah_alloc(&cfg);
         if (!m) ++total_fail;
         else {
@@ -210,7 +273,10 @@ int main(int argc, char **argv) {
         niyah_free(m); return 0;
     }
     if (!strcmp(argv[1],"--interactive")) {
-        NiyahConfig cfg={.magic=NIYAH_MAGIC,.version=NIYAH_VER,.embed_dim=128,.n_heads=8,.n_kv_heads=8,.n_layers=4,.ffn_mult=4,.vocab_size=8192,.ctx_len=64,.rope_theta=10000.f,.rms_eps=1e-5f};
+        tokenizer_init();
+        const uint32_t live_vocab = tokenizer_vocab_size();
+        tokenizer_free();
+        NiyahConfig cfg={.magic=NIYAH_MAGIC,.version=NIYAH_VER,.embed_dim=128,.n_heads=8,.n_kv_heads=8,.n_layers=4,.ffn_mult=4,.vocab_size=live_vocab,.ctx_len=64,.rope_theta=10000.f,.rms_eps=1e-5f};
         NiyahModel *m=niyah_alloc(&cfg); if(!m)return 1;
         interactive_loop(m,NULL); niyah_free(m); return 0;
     }
