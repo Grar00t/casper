@@ -31,7 +31,9 @@ char *tokenizer_decode(const uint32_t *tokens, uint32_t n);
 void tokenizer_free_string(char *s);
 
 /*
- * Generation policy only; encode/decode remains lossless for arbitrary UTF-8.
+ * Generation policy only; encode/decode round-trips non-NUL UTF-8 C strings.
+ * tokenizer_decode() renders a raw NUL byte-fallback token as the visible
+ * sequence \x00 so the returned C string cannot be silently truncated.
  * EOS is allowed. BOS/PAD/UNK, Arabic presentation-form compatibility glyphs,
  * control bytes, and raw non-ASCII byte fallback ids are not sampled by the
  * text generator. Arabic base-script tokens and printable ASCII remain valid.

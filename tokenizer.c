@@ -314,8 +314,17 @@ char *tokenizer_decode(const uint32_t *tokens, uint32_t n)
         if (id == TOK_BOS || id == TOK_EOS || id == TOK_PAD) continue;
 
         if (byte_base != 0u && id >= byte_base && id < byte_base + TOK_BYTE_COUNT) {
-            if (pos + 1u >= cap) break;
-            out[pos++] = (char)(unsigned char)(id - byte_base);
+            const unsigned char byte = (unsigned char)(id - byte_base);
+            if (byte == 0u) {
+                static const char escaped_nul[] = "\\x00";
+                const size_t escaped_len = sizeof(escaped_nul) - 1u;
+                if (pos + escaped_len >= cap) break;
+                (void)memcpy(out + pos, escaped_nul, escaped_len);
+                pos += escaped_len;
+            } else {
+                if (pos + 1u >= cap) break;
+                out[pos++] = (char)byte;
+            }
             continue;
         }
 
@@ -413,6 +422,16 @@ int main(void)
             ++failures;
         }
         tokenizer_free_string(rt);
+    }
+
+    {
+        const uint32_t nul_token = byte_base;
+        char *escaped = tokenizer_decode(&nul_token, 1u);
+        if (escaped == NULL || strcmp(escaped, "\\x00") != 0) {
+            (void)fprintf(stderr, "NUL byte fallback was not escaped by string decode API\n");
+            ++failures;
+        }
+        tokenizer_free_string(escaped);
     }
 
     if (tokenizer_token_allowed_for_generation(TOK_BOS)

@@ -507,11 +507,39 @@ def save_checkpoint(path: Path, model: CasperModel, optimizer: torch.optim.Optim
     tmp.replace(path)
 
 
+def validate_checkpoint_payload(payload: object) -> dict:
+    if not isinstance(payload, dict):
+        raise ValueError("checkpoint payload must be a dictionary")
+    required = {"format", "epoch", "best_val", "dataset_sha256", "config", "model", "optimizer"}
+    missing = sorted(required.difference(payload))
+    if missing:
+        raise ValueError(f"checkpoint missing required fields: {', '.join(missing)}")
+    if payload.get("format") != "CASPER-TRAIN-CHECKPOINT-V1":
+        raise ValueError("unsupported checkpoint format")
+    epoch = payload.get("epoch")
+    if not isinstance(epoch, int) or isinstance(epoch, bool) or epoch < 0:
+        raise ValueError("checkpoint epoch must be a non-negative integer")
+    best_val = payload.get("best_val")
+    if not isinstance(best_val, (int, float)) or isinstance(best_val, bool) or not math.isfinite(float(best_val)):
+        raise ValueError("checkpoint best_val must be finite")
+    dataset_hash = payload.get("dataset_sha256")
+    if not isinstance(dataset_hash, str) or len(dataset_hash) != 64 or any(c not in "0123456789abcdef" for c in dataset_hash):
+        raise ValueError("checkpoint dataset_sha256 must be lowercase SHA-256 hex")
+    if not isinstance(payload.get("config"), dict):
+        raise ValueError("checkpoint config must be a dictionary")
+    if not isinstance(payload.get("model"), dict) or not isinstance(payload.get("optimizer"), dict):
+        raise ValueError("checkpoint model and optimizer states must be dictionaries")
+    return payload
+
+
 def load_checkpoint(path: Path, device: torch.device) -> dict:
     try:
-        return torch.load(path, map_location=device, weights_only=False)
-    except TypeError:
-        return torch.load(path, map_location=device)
+        payload = torch.load(path, map_location=device, weights_only=True)
+    except TypeError as exc:
+        raise RuntimeError(
+            "safe checkpoint resume requires a PyTorch version with weights_only support"
+        ) from exc
+    return validate_checkpoint_payload(payload)
 
 
 def parse_args() -> argparse.Namespace:
