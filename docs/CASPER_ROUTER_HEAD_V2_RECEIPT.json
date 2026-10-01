@@ -1,0 +1,47 @@
+{
+  "format": "CASPER-NATIVE-ROUTER-V2-RECEIPT",
+  "model": {
+    "artifact": "casper_ts_ot3_replay_6m_2048.bin",
+    "bytes": 27202624,
+    "sha256": "71091f8d00eb15dd74b53cfcd221d767f6034d2bc3225bc97fd937bd44ee22b2"
+  },
+  "head": {
+    "format": "NRT3/v1",
+    "classes": ["logic", "dialect", "code"],
+    "training_records": 480,
+    "training_class_counts": {"logic": 160, "dialect": 160, "code": 160},
+    "bytes": 21116,
+    "sha256": "963ef0bd51362b7686fbcbb3c8220048ddc70fa14b4daf6ba21b41f7d0d4c90c"
+  },
+  "evaluation": {
+    "cross_validation_mean": 1.0,
+    "unseen_tag_stripped": {
+      "records": 180,
+      "correct": 154,
+      "accuracy": 0.8555555555555555,
+      "confusion_logic_dialect_code": [[60,0,0],[26,34,0],[0,0,60]]
+    },
+    "raw_three_logit_baseline": {"correct": 91, "records": 180, "accuracy": 0.5055555555555555},
+    "note": "Synthetic routing calibration; not a general language or dialect benchmark."
+  },
+  "routing": {
+    "fast_path_tags": ["<LOGIC>", "<NAJDI>", "<HIJAZI>", "<CODE>"],
+    "untagged_path": "frozen Casper logits -> 3-way calibrated linear C11 head",
+    "adapter_slots": {
+      "logic": "D:/ALLAMDATA/release/D3-logic-expert-v1/expert",
+      "dialect": "D:/ALLAMDATA/adapters/allam-dialect",
+      "code": "D:/ALLAMDATA/adapters/allam-code"
+    }
+  },
+  "build": {
+    "architecture": "x86_64 AVX2+FMA",
+    "build_smoke": "PASS",
+    "asan_ubsan_router": "PASS",
+    "niyah_router_binary_sha256": "a806b9acc1e658a3bf97e2694e1a52596617909a4da0826f3038a9f3f88657ac",
+    "router_source_sha256": "ead2e907a25ece2d0b23d39573602f36b42c8a97038b4c6b80e257fefb1a24a4",
+    "router_header_sha256": "ab19b8df915359aadfe1edd1876076ddec237ff2bb87d32b3f5f8287f7787841",
+    "router_main_sha256": "f427ec3a237f25842babb04e1f0d98182af1b9d172096adbb22aa7eb484f8a88",
+    "tokenizer_sha256": "357db7386c3dd22d6869804bfdba021c9c5078c6bc2d6a651cd63072067c1575"
+  },
+  "policy": "NO CLAIM BEYOND THE HASH"
+}

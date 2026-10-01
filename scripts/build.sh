@@ -134,7 +134,8 @@ if [[ "$RUN_LINT" == "1" ]]; then
         "$CORE/rule_parser.c"     "$CORE/rule_source_guard.c" \
         "$CORE/proof_generator.c" \
         "$CORE/constraint_solver.c" "$CORE/hybrid_reasoner.c" \
-        "$CORE/khz_q_svd.c"
+        "$CORE/khz_q_svd.c" \
+        "$CORE/niyah_router.c" "$CORE/niyah_router_main.c"
     echo "   cppcheck: clean"
 fi
 
@@ -167,6 +168,10 @@ build_target casper \
     "$CORE/casper_cli.c" "$CORE/casper_rag.c" "$CORE/rule_parser.c" \
     "$CORE/rule_source_guard.c" "$CORE/proof_generator.c" "$CORE/khz_q_svd.c"
 
+build_target niyah_router \
+    "$CORE/niyah_router_main.c" "$CORE/niyah_router.c" \
+    "$CORE/niyah_core.c" "$ROOT/tokenizer.c"
+
 if [[ -f "$CORE/bench_niyah.c" ]]; then
     build_target bench_niyah "$CORE/bench_niyah.c" "$CORE/niyah_core.c"
 fi
@@ -189,7 +194,7 @@ if [[ "$RUN_BENCH" == "1" && -x "$BUILD/bench_niyah" ]]; then
 fi
 
 echo "-- artifacts --------------------------------"
-for art in "$BUILD/niyah" "$BUILD/trainer" "$BUILD/niyah_hybrid" "$BUILD/casper"; do
+for art in "$BUILD/niyah" "$BUILD/trainer" "$BUILD/niyah_hybrid" "$BUILD/casper" "$BUILD/niyah_router"; do
     [[ -s "$art" ]] || { echo "[build] required artifact missing: $art" >&2; exit 1; }
     if command -v sha256sum >/dev/null 2>&1; then
         sha256sum "$art"

@@ -168,8 +168,9 @@ void tokenizer_init(void)
     (void)add_token("<UNK>");
 
     for (d = 0; d < 10; ++d) {
-        char buf[4];
-        (void)snprintf(buf, sizeof(buf), "%d", d);
+        char buf[2];
+        buf[0] = (char)('0' + d);
+        buf[1] = '\0';
         (void)add_token(buf);
     }
     for (p = punctuation; *p; ++p) {
