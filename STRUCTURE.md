@@ -47,14 +47,9 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── sources/
 │   │   ├── languages/
 │   │   │   └── en_ar.txt                 # 379922 B
-│   │   ├── programming/
-│   │   │   └── code_cpp_assembly.txt     # 123733 B
-│   │   ├── quran/
-│   │   │   └── test.txt                  # 17 B
-│   │   └── test.txt                      # 17 B
+│   │   └── programming/
+│   │       └── code_cpp_assembly.txt     # 123733 B
 │   └── sovereign_knowledge.txt           # 134 B
-├── Math_ASM/
-│   └── avx_mult.asm              # 714 B, not referenced by scripts/build.sh
 ├── UI_CSharp/
 │   ├── App.xaml
 │   ├── App.xaml.cs
@@ -152,13 +147,11 @@ deliberate decision.
 | Where | Defect |
 | --- | --- |
 | `Core_CPP/casper_rag.c` vs `Core_CPP/casper_cli.c` | two JSON serialisers. `casper_rag_to_json` emits `query, confidence, elapsed_ms, chain_hash, n_sources, n_steps`; the CLI emits those plus `answer`, `proof` and `sources[]` |
-| `Core_CPP/casper_rag.c` | `score_rel` uses `strtok`, which is not reentrant |
-| `Math_ASM/avx_mult.asm` | in no build target |
 
 
-## Security cleanup in progress
+## Legacy Node security boundary
 
-The legacy Node fetch endpoint now requires `CASPER_FETCH_ALLOW_HOSTS`, accepts only HTTP/HTTPS targets, rejects redirects, and CORS is allowlist-based through `CASPER_CORS_ORIGINS`. These changes are on `fix/legacy-fetch-boundary-20261007` pending CI/review.
+The legacy Node fetch endpoint requires `CASPER_FETCH_ALLOW_HOSTS`, accepts only HTTP/HTTPS targets, rejects redirects, and CORS is allowlist-based through `CASPER_CORS_ORIGINS`. These controls are present on `main`; repository CI passed after the security change was merged.
 
 
 ## Removed placeholder corpus files
