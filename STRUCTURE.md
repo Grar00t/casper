@@ -13,7 +13,6 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 
 ```text
 .
-├── .agents/
 ├── .github/
 ├── .vscode/
 │   └── settings.json
@@ -26,6 +25,8 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── constraint_solver.h
 │   ├── hybrid_reasoner.c
 │   ├── hybrid_reasoner.h
+│   ├── khz_q_ising.c
+│   ├── khz_q_ising.h
 │   ├── khz_q_svd.c
 │   ├── khz_q_svd.h
 │   ├── niyah_core.c
@@ -33,10 +34,14 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── niyah_hybrid_main.c
 │   ├── niyah_main.c
 │   ├── niyah_train.c
+│   ├── niyah_train_full.c
+│   ├── niyah_train_full.h
 │   ├── proof_generator.c
 │   ├── proof_generator.h
 │   ├── rule_parser.c
-│   └── rule_parser.h
+│   ├── rule_parser.h
+│   ├── rule_source_guard.c
+│   └── rule_source_guard.h
 ├── Data_Training/
 │   ├── safety.nrule                      # 1252 B
 │   ├── sources/
@@ -86,7 +91,6 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 ├── .gitattributes
 ├── .gitignore
 ├── AGENTS.md
-├── CLAUDE.md
 ├── README.md
 ├── STRUCTURE.md
 ├── get_real_data.py
@@ -151,6 +155,9 @@ deliberate decision.
 | --- | --- |
 | `Core_CPP/casper_rag.c` vs `Core_CPP/casper_cli.c` | two JSON serialisers. `casper_rag_to_json` emits `query, confidence, elapsed_ms, chain_hash, n_sources, n_steps`; the CLI emits those plus `answer`, `proof` and `sources[]` |
 | `Core_CPP/casper_rag.c` | `score_rel` uses `strtok`, which is not reentrant |
-| `niyah_engine_local/server.js` | `Access-Control-Allow-Origin: *` next to `GET /fetch?url=`, which is an open proxy if the service is ever exposed |
 | `Math_ASM/avx_mult.asm` | in no build target |
-| `README.md`, `AGENTS.md`, `CLAUDE.md` | still claim "no external runtime dependencies" beside an Express service, and still name the deleted `build_gcc.sh` |
+
+
+## Security cleanup in progress
+
+The legacy Node fetch endpoint now requires `CASPER_FETCH_ALLOW_HOSTS`, accepts only HTTP/HTTPS targets, rejects redirects, and CORS is allowlist-based through `CASPER_CORS_ORIGINS`. These changes are on `fix/legacy-fetch-boundary-20261007` pending CI/review.
