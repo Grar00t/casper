@@ -159,6 +159,22 @@ SEARXNG_HOST=search.example.test CASPER_BACKEND=searxng ./build/casper "example 
 
 On Windows the C RAG path uses WinHTTP. On POSIX it invokes the `curl` executable. Network-backed results are not deterministic because remote content and availability can change.
 
+## Optional Node Runtime Security
+
+The optional `niyah_engine_local/` service fails closed for browser CORS and the legacy URL fetch endpoint unless explicit allowlists are configured.
+
+- `CASPER_CORS_ORIGINS`: comma-separated exact browser origins allowed to receive CORS responses.
+- `CASPER_FETCH_ALLOW_HOSTS`: comma-separated exact hostnames permitted for `GET /fetch?url=`.
+- Redirects are rejected by the legacy fetch endpoint so an allowed host cannot redirect into an unapproved target.
+
+Example:
+
+```bash
+CASPER_CORS_ORIGINS=http://127.0.0.1:3000,http://localhost:3000 \
+CASPER_FETCH_ALLOW_HOSTS=example.com,www.example.com \
+node niyah_engine_local/server.js
+```
+
 ## Hybrid CLI and Audit Bridge
 
 ```bash
