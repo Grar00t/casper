@@ -97,6 +97,8 @@ jobs:
           node --check server.js
           node --check routes/niyah.js
           for file in lib/*.js; do node --check "$file"; done
+      - name: Unit tests
+        run: npm test
 
   windows-ui:
     runs-on: windows-latest

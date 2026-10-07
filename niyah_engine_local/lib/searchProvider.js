@@ -1,6 +1,10 @@
 'use strict';
 
+const dns = require('dns').promises;
+const net = require('net');
+
 const DEFAULT_TIMEOUT_MS = 8000;
+const MAX_PAGE_BYTES = 2 * 1024 * 1024;
 
 class SearchProvider {
   constructor(opts = {}) {
@@ -18,6 +22,107 @@ class SearchProvider {
     } finally {
       clearTimeout(t);
     }
+  }
+
+  _isUnsafeAddress(address) {
+    const ipVersion = net.isIP(address);
+    if (ipVersion === 4) {
+      const [a, b, c] = address.split('.').map(Number);
+      return a === 0
+        || a === 10
+        || a === 127
+        || (a === 100 && b >= 64 && b <= 127)
+        || (a === 169 && b === 254)
+        || (a === 172 && b >= 16 && b <= 31)
+        || (a === 192 && b === 0 && c === 0)
+        || (a === 192 && b === 0 && c === 2)
+        || (a === 192 && b === 168)
+        || (a === 198 && (b === 18 || b === 19))
+        || (a === 198 && b === 51 && c === 100)
+        || (a === 203 && b === 0 && c === 113)
+        || a >= 224;
+    }
+
+    if (ipVersion === 6) {
+      const lower = address.toLowerCase();
+      if (lower.startsWith('::ffff:')) return true; // reject IPv4-mapped IPv6 literals
+      if (lower === '::' || lower === '::1') return true;
+      if (lower === '2001:db8::' || lower.startsWith('2001:db8:')) return true;
+
+      const first = Number.parseInt(lower.split(':', 1)[0] || '0', 16);
+      if ((first & 0xfe00) === 0xfc00) return true; // unique local fc00::/7
+      if ((first & 0xffc0) === 0xfe80) return true; // link local fe80::/10
+      if ((first & 0xffc0) === 0xfec0) return true; // deprecated site local fec0::/10
+      if ((first & 0xff00) === 0xff00) return true; // multicast ff00::/8
+      return false;
+    }
+
+    return true;
+  }
+
+  async _validatePublicPageUrl(pageUrl) {
+    let parsed;
+    try {
+      parsed = new URL(pageUrl);
+    } catch {
+      throw new Error('invalid page URL');
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('page URL must use http or https');
+    }
+    if (parsed.username || parsed.password) {
+      throw new Error('page URL credentials are not allowed');
+    }
+
+    const hostname = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+    if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost')) {
+      throw new Error('page URL host is not public');
+    }
+
+    if (net.isIP(hostname)) {
+      if (this._isUnsafeAddress(hostname)) throw new Error('page URL resolves to a non-public address');
+      return parsed;
+    }
+
+    const addresses = await dns.lookup(hostname, { all: true, verbatim: true });
+    if (!addresses.length || addresses.some(({ address }) => this._isUnsafeAddress(address))) {
+      throw new Error('page URL resolves to a non-public address');
+    }
+
+    return parsed;
+  }
+
+  async _readTextLimited(res, maxBytes = MAX_PAGE_BYTES) {
+    const declared = Number.parseInt(res.headers?.get?.('content-length') || '', 10);
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      throw new Error(`page body exceeds ${maxBytes} bytes`);
+    }
+
+    if (!res.body || typeof res.body.getReader !== 'function') {
+      const text = await res.text();
+      if (Buffer.byteLength(text, 'utf8') > maxBytes) {
+        throw new Error(`page body exceeds ${maxBytes} bytes`);
+      }
+      return text;
+    }
+
+    const reader = res.body.getReader();
+    const chunks = [];
+    let total = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        try { await reader.cancel(); } catch (_) {}
+        throw new Error(`page body exceeds ${maxBytes} bytes`);
+      }
+      chunks.push(Buffer.from(value));
+    }
+
+    return Buffer.concat(chunks, total).toString('utf8');
   }
 
   async search(query, maxResults = 8) {
@@ -126,20 +231,21 @@ class SearchProvider {
   }
 
   async fetchPageText(pageUrl) {
-    const res = await this._fetchWithTimeout(pageUrl, {
+    const safeUrl = await this._validatePublicPageUrl(pageUrl);
+    const res = await this._fetchWithTimeout(safeUrl.toString(), {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
       },
-      redirect: 'follow',
+      redirect: 'error',
     });
-    if (!res.ok) throw new Error(`fetchPageText HTTP ${res.status} for ${pageUrl}`);
+    if (!res.ok) throw new Error(`fetchPageText HTTP ${res.status} for ${safeUrl}`);
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('text/html') && !contentType.includes('text/plain')) {
       throw new Error(`unsupported content-type: ${contentType}`);
     }
-    const html = await res.text();
+    const html = await this._readTextLimited(res);
     return this._stripHtml(html);
   }
 
