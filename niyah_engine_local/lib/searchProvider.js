@@ -44,8 +44,7 @@ class SearchProvider {
 
     if (ipVersion === 6) {
       const lower = address.toLowerCase();
-      const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-      if (mapped) return this._isUnsafeAddress(mapped[1]);
+      if (lower.startsWith('::ffff:')) return true; // reject IPv4-mapped IPv6 literals
       if (lower === '::' || lower === '::1') return true;
       if (lower === '2001:db8::' || lower.startsWith('2001:db8:')) return true;
 
