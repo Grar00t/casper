@@ -404,10 +404,53 @@ static int parse_searxng(const char *json, RagResult *res, int max) {
 }
 
 static float score_rel(const char *query, const RagResult *r) {
-    char q[512]; size_t len=query?strlen(query):0u; if(len>=sizeof(q))len=sizeof(q)-1u;memcpy(q,query?query:"",len);q[len]='\0';for(size_t i=0;i<len;++i)q[i]=(char)tolower((unsigned char)q[i]);
-    int total=0,hits=0;char *tok=strtok(q," \t\r\n");
-    while(tok){if(strlen(tok)>=3u){++total;char title[RAG_TITLE_MAX],snippet[RAG_SNIPPET_MAX];strncpy(title,r->title,sizeof(title)-1u);title[sizeof(title)-1u]='\0';strncpy(snippet,r->snippet,sizeof(snippet)-1u);snippet[sizeof(snippet)-1u]='\0';for(char*c=title;*c;++c)*c=(char)tolower((unsigned char)*c);for(char*c=snippet;*c;++c)*c=(char)tolower((unsigned char)*c);if(strstr(title,tok)||strstr(snippet,tok))++hits;}tok=strtok(NULL," \t\r\n");}
-    return total?(float)hits/(float)total:0.0f;
+    char q[512];
+    char title[RAG_TITLE_MAX];
+    char snippet[RAG_SNIPPET_MAX];
+    char *cursor;
+    size_t len = query ? strlen(query) : 0u;
+    int total = 0;
+    int hits = 0;
+
+    if (len >= sizeof(q)) len = sizeof(q) - 1u;
+    memcpy(q, query ? query : "", len);
+    q[len] = '\0';
+
+    strncpy(title, r->title, sizeof(title) - 1u);
+    title[sizeof(title) - 1u] = '\0';
+    strncpy(snippet, r->snippet, sizeof(snippet) - 1u);
+    snippet[sizeof(snippet) - 1u] = '\0';
+
+    for (char *p = q; *p; ++p)
+        *p = (char)tolower((unsigned char)*p);
+    for (char *p = title; *p; ++p)
+        *p = (char)tolower((unsigned char)*p);
+    for (char *p = snippet; *p; ++p)
+        *p = (char)tolower((unsigned char)*p);
+
+    cursor = q;
+    while (*cursor) {
+        char *tok;
+
+        while (*cursor && strchr(" \t\r\n", *cursor) != NULL)
+            ++cursor;
+        if (!*cursor)
+            break;
+
+        tok = cursor;
+        while (*cursor && strchr(" \t\r\n", *cursor) == NULL)
+            ++cursor;
+        if (*cursor)
+            *cursor++ = '\0';
+
+        if (strlen(tok) >= 3u) {
+            ++total;
+            if (strstr(title, tok) || strstr(snippet, tok))
+                ++hits;
+        }
+    }
+
+    return total ? (float)hits / (float)total : 0.0f;
 }
 
 static int result_cmp(const void *a,const void *b){const RagResult*ra=(const RagResult*)a,*rb=(const RagResult*)b;if(ra->score<rb->score)return 1;if(ra->score>rb->score)return -1;int u=strcmp(ra->url,rb->url);if(u)return u;return strcmp(ra->title,rb->title);}
