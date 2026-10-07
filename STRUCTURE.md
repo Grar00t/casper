@@ -109,9 +109,7 @@ the top-level listing:
 | `Data_Training/sources/programming/code_cpp_assembly.txt` | 123733 |
 | `Data_Training/safety.nrule` | 1252 |
 | `Data_Training/sovereign_knowledge.txt` | 134 |
-| `Data_Training/sources/test.txt` | 17 |
-| `Data_Training/sources/quran/test.txt` | 17 |
-| **total** | **505075** |
+| **total** | **505041** |
 
 It is raw text, not instruction pairs. It is enough to exercise the tokenizer and
 the byte-level path; it is not a supervised fine-tuning set.
@@ -161,3 +159,8 @@ deliberate decision.
 ## Security cleanup in progress
 
 The legacy Node fetch endpoint now requires `CASPER_FETCH_ALLOW_HOSTS`, accepts only HTTP/HTTPS targets, rejects redirects, and CORS is allowlist-based through `CASPER_CORS_ORIGINS`. These changes are on `fix/legacy-fetch-boundary-20261007` pending CI/review.
+
+
+## Removed placeholder corpus files
+
+`Data_Training/sources/test.txt` and `Data_Training/sources/quran/test.txt` were identical 17-byte `hello world test` placeholders. They were not representative training data and the latter path falsely implied Quranic content, so both were removed.
