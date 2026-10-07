@@ -20,11 +20,34 @@ const { NiyahEngine } = require('./lib/niyahEngine');
 
 const app = express();
 
+const allowedCorsOrigins = new Set(
+  (process.env.CASPER_CORS_ORIGINS || '')
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean),
+);
+
+const legacyFetchAllowHosts = new Set(
+  (process.env.CASPER_FETCH_ALLOW_HOSTS || '')
+    .split(',')
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean),
+);
+
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.get('Origin');
+  if (origin && allowedCorsOrigins.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  if (req.method === 'OPTIONS') {
+    if (origin && !allowedCorsOrigins.has(origin)) {
+      return res.status(403).json({ error: 'CORS origin not allowed' });
+    }
+    return res.sendStatus(200);
+  }
   next();
 });
 
@@ -52,11 +75,35 @@ app.get('/health', async (req, res) => {
 app.get('/fetch', async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).json({ ok: false, error: 'url param required' });
+  if (legacyFetchAllowHosts.size === 0) {
+    return res.status(403).json({
+      ok: false,
+      error: 'legacy fetch disabled; configure CASPER_FETCH_ALLOW_HOSTS',
+    });
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(targetUrl);
+  } catch {
+    return res.status(400).json({ ok: false, error: 'invalid url' });
+  }
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    return res.status(400).json({ ok: false, error: 'only http/https URLs are allowed' });
+  }
+
+  const host = parsedUrl.hostname.toLowerCase();
+  if (!legacyFetchAllowHosts.has(host)) {
+    return res.status(403).json({ ok: false, error: 'target host not allowed' });
+  }
+
   try {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 10000);
-    const resp = await fetch(targetUrl, {
+    const resp = await fetch(parsedUrl.toString(), {
       signal: controller.signal,
+      redirect: 'error',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
@@ -68,7 +115,7 @@ app.get('/fetch', async (req, res) => {
     const text = stripHtml(html);
     res.json({
       ok: true,
-      final_url: targetUrl,
+      final_url: parsedUrl.toString(),
       status: resp.status,
       html_bytes: html.length,
       text_chars: text.length,
