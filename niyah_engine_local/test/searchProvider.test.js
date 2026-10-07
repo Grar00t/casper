@@ -31,10 +31,14 @@ test('rejects credentials and non-http protocols', async () => {
   await assert.rejects(provider._validatePublicPageUrl('https://user:pass@93.184.216.34/'), /credentials/);
 });
 
-test('accepts a public literal address without DNS lookup', async () => {
-  const parsed = await provider._validatePublicPageUrl('https://93.184.216.34/path?q=1');
-  assert.equal(parsed.protocol, 'https:');
-  assert.equal(parsed.hostname, '93.184.216.34');
+test('accepts public literal addresses outside blocked special-purpose ranges', async () => {
+  for (const url of [
+    'https://93.184.216.34/path?q=1',
+    'https://192.0.1.1/',
+  ]) {
+    const parsed = await provider._validatePublicPageUrl(url);
+    assert.equal(parsed.protocol, 'https:');
+  }
 });
 
 test('bounded reader accepts content within the byte limit', async () => {
