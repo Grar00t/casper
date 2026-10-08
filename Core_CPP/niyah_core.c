@@ -131,10 +131,97 @@ int niyah_load(NiyahModel**out,const char*path){if(!out||!path)return -1;*out=NU
 
 float*niyah_forward(NiyahModel*m,uint32_t token,uint32_t pos){if(!m||!m->_pool||token>=m->cfg.vocab_size||pos>=m->cfg.ctx_len)return NULL;const NiyahConfig*c=&m->cfg;uint32_t d=c->embed_dim,hd=m->head_dim,nh=c->n_heads,nkv=c->n_kv_heads,xctx=c->ctx_len;float*x=SCR_X(m),*xb=SCR_XB(m),*xb2=SCR_XB2(m),*hb=SCR_HB(m),*hb2=SCR_HB2(m),*q=SCR_Q(m),*k=SCR_K(m),*v=SCR_V(m),*att=SCR_ATT(m);memcpy(x,m->token_embed+(size_t)token*d,d*sizeof(float));for(uint32_t l=0;l<c->n_layers;l++){const NiyahLayer*lw=&m->layers[l];rmsnorm(xb,x,lw->rms_att,d,c->rms_eps);matvec(q,lw->wq,xb,d,d);matvec(k,lw->wk,xb,m->kv_dim,d);matvec(v,lw->wv,xb,m->kv_dim,d);for(uint32_t h=0;h<nh;h++)rope(q+h*hd,pos,hd,c->rope_theta);for(uint32_t h=0;h<nkv;h++)rope(k+h*hd,pos,hd,c->rope_theta);size_t L=(size_t)nkv*xctx*hd;float*kc=m->kv_k+(size_t)l*L,*vc=m->kv_v+(size_t)l*L;for(uint32_t h=0;h<nkv;h++){float*dk=kc+(size_t)h*xctx*hd+(size_t)pos*hd;float*dv=vc+(size_t)h*xctx*hd+(size_t)pos*hd;memcpy(dk,k+h*hd,hd*sizeof(float));memcpy(dv,v+h*hd,hd*sizeof(float));}memset(att,0,(size_t)nh*xctx*sizeof(float));for(uint32_t h=0;h<nh;h++){uint32_t kvh=(h*nkv)/nh;float*ah=att+(size_t)h*xctx;for(uint32_t t=0;t<=pos;t++){float score=dot_f32(q+h*hd,kc+(size_t)kvh*xctx*hd+(size_t)t*hd,hd)/(sqrtf((float)hd));if(score>80.f)score=80.f;if(score<-80.f)score=-80.f;ah[t]=score;}float maxs=ah[0];for(uint32_t t=1;t<=pos;t++)if(ah[t]>maxs)maxs=ah[t];float den=0.f;for(uint32_t t=0;t<=pos;t++){ah[t]=expf(ah[t]-maxs);den+=ah[t];}den=den>0.f?den:1.f;for(uint32_t t=0;t<=pos;t++)ah[t]/=den;memset(xb2+h*hd,0,hd*sizeof(float));for(uint32_t t=0;t<=pos;t++){const float*vv=vc+(size_t)kvh*xctx*hd+(size_t)t*hd;axpy_f32(xb2+h*hd,vv,ah[t],hd);}}matvec(xb,lw->wo,xb2,d,d);for(uint32_t i=0;i<d;i++)x[i]+=xb[i];rmsnorm(xb,x,lw->rms_ffn,d,c->rms_eps);matvec(hb,lw->w_gate,xb,m->ffn_dim,d);matvec(hb2,lw->w_up,xb,m->ffn_dim,d);for(uint32_t i=0;i<m->ffn_dim;i++)hb[i]=silu(hb[i])*hb2[i];matvec(xb,lw->w_down,hb,d,m->ffn_dim);for(uint32_t i=0;i<d;i++)x[i]+=xb[i];}rmsnorm(xb,x,m->rms_final,d,c->rms_eps);matvec(m->_logits,m->lm_head,xb,c->vocab_size,d);return m->_logits;}
 
-uint32_t niyah_sample(const float*logits,uint32_t vocab_size,NiyahSampler*s){if(!logits||!s||vocab_size==0u)return 0u;if(!(s->temperature>=0.f)||!isfinite(s->temperature)||!isfinite(s->top_p))return 0u;if(s->temperature<=0.f){uint32_t best=0u;for(uint32_t i=1;i<vocab_size;i++)if(logits[i]>logits[best])best=i;return best;}float mx=logits[0];for(uint32_t i=1;i<vocab_size;i++)if(logits[i]>mx)mx=logits[i];float sm=0.f;for(uint32_t i=0;i<vocab_size;i++){float z=(logits[i]-mx)/s->temperature; if(z<-80.f)z=-80.f;sm+=expf(z);}if(!(sm>0.f)||!isfinite(sm))return 0u;s->seed=s->seed*6364136223846793005ULL+1442695040888963407ULL;float r=(float)((s->seed>>11)&0x0FFFFFFU)/(float)0x0FFFFFFU;float top=(s->top_p>0.f&&s->top_p<1.f)?s->top_p:1.f;float target=r*sm*top;float cum=0.f;for(uint32_t i=0;i<vocab_size;i++){float z=(logits[i]-mx)/s->temperature;if(z<-80.f)z=-80.f;cum+=expf(z);if(cum>=target)return i;}return vocab_size-1u;}
+/* Stable descending probability order; equal scores use vocabulary ID as tiebreak. */
+typedef struct {
+    double weight;
+    uint32_t token_id;
+} NiyahSampleCandidate;
+
+static int niyah_sample_candidate_compare(const void *lhs, const void *rhs)
+{
+    const NiyahSampleCandidate *a = (const NiyahSampleCandidate *)lhs;
+    const NiyahSampleCandidate *b = (const NiyahSampleCandidate *)rhs;
+    if (a->weight > b->weight) return -1;
+    if (a->weight < b->weight) return 1;
+    if (a->token_id < b->token_id) return -1;
+    if (a->token_id > b->token_id) return 1;
+    return 0;
+}
+
+/* Nucleus sampling: sort probabilities, choose the smallest prefix whose
+ * cumulative mass reaches top_p, then sample from that prefix's mass.
+ * This is O(vocab log vocab), with O(vocab) temporary memory. */
+uint32_t niyah_sample(const float *logits, uint32_t vocab_size, NiyahSampler *s)
+{
+    uint32_t best = 0u;
+    float max_logit;
+    NiyahSampleCandidate *candidates;
+    double total = 0.0, prefix_mass = 0.0, threshold, target, running;
+    size_t nucleus_size = 0u;
+    uint32_t chosen;
+
+    if (!logits || !s || vocab_size == 0u ||
+        !isfinite(s->temperature) || s->temperature < 0.0f ||
+        !isfinite(s->top_p)) return 0u;
+
+    /* Reject non-finite inputs rather than propagating NaN through softmax. */
+    if (!isfinite(logits[0])) return 0u;
+    max_logit = logits[0];
+    for (uint32_t i = 1u; i < vocab_size; ++i) {
+        if (!isfinite(logits[i])) return 0u;
+        if (logits[i] > max_logit) {
+            max_logit = logits[i];
+            best = i;
+        }
+    }
+    if (s->temperature == 0.0f) return best;
+
+    if ((size_t)vocab_size > SIZE_MAX / sizeof(*candidates)) return 0u;
+    candidates = (NiyahSampleCandidate *)malloc((size_t)vocab_size * sizeof(*candidates));
+    if (!candidates) return 0u;
+
+    for (uint32_t i = 0u; i < vocab_size; ++i) {
+        const double z = ((double)logits[i] - (double)max_logit) /
+                         (double)s->temperature;
+        const double weight = exp(z);
+        candidates[i].weight = weight;
+        candidates[i].token_id = i;
+        total += weight;
+    }
+    if (!(total > 0.0) || !isfinite(total)) {
+        free(candidates);
+        return 0u;
+    }
+
+    qsort(candidates, (size_t)vocab_size, sizeof(*candidates),
+          niyah_sample_candidate_compare);
+    /* Keep the legacy top_p <= 0 fallback: full-distribution sampling. */
+    threshold = (double)((s->top_p > 0.0f && s->top_p < 1.0f)
+                         ? s->top_p : 1.0f) * total;
+    do {
+        prefix_mass += candidates[nucleus_size].weight;
+        ++nucleus_size;
+    } while (nucleus_size < (size_t)vocab_size && prefix_mass < threshold);
+
+    s->seed = s->seed * UINT64_C(6364136223846793005) +
+              UINT64_C(1442695040888963407);
+    /* 53 high bits map deterministically into [0, 1). */
+    target = ((double)(s->seed >> 11) / 9007199254740992.0) * prefix_mass;
+    running = 0.0;
+    chosen = candidates[nucleus_size - 1u].token_id;
+    for (size_t i = 0u; i < nucleus_size; ++i) {
+        running += candidates[i].weight;
+        if (target < running) {
+            chosen = candidates[i].token_id;
+            break;
+        }
+    }
+    free(candidates);
+    return chosen;
+}
 
 NiyahAdam*niyah_adam_alloc(const NiyahModel*m){if(!m)return NULL;NiyahAdam*opt=xcalloc(1u,sizeof(*opt));opt->n_weights=weight_count(&m->cfg);opt->m=xcalloc(opt->n_weights,sizeof(float));opt->v=xcalloc(opt->n_weights,sizeof(float));opt->lr=3e-4f;opt->beta1=.9f;opt->beta2=.999f;opt->eps=1e-8f;opt->wd=.01f;return opt;}
 void niyah_adam_free(NiyahAdam*opt){if(!opt)return;free(opt->m);free(opt->v);free(opt);}
 
-float niyah_train_step(NiyahModel*m,NiyahAdam*opt,const uint32_t*tokens,uint32_t n){if(!m||!opt||!tokens||n<2u)return 0.f;for(uint32_t i=0;i<n;i++)if(tokens[i]>=m->cfg.vocab_size||tokens[i]>=m->cfg.ctx_len)return NAN;size_t nw=weight_count(&m->cfg);float*grad=xcalloc(nw,sizeof(float));float*dL=xmalloc((size_t)m->cfg.vocab_size*sizeof(float));float loss=0.f;uint32_t d=m->cfg.embed_dim;for(uint32_t t=0;t+1<n;t++){const float*logits=niyah_forward(m,tokens[t],t);if(!logits){free(dL);free(grad);return NAN;}uint32_t tgt=tokens[t+1];float mx=logits[0];for(uint32_t i=1;i<m->cfg.vocab_size;i++)if(logits[i]>mx)mx=logits[i];float lse_sum=0.f;for(uint32_t i=0;i<m->cfg.vocab_size;i++){float z=logits[i]-mx;if(z<-80.f)z=-80.f;lse_sum+=expf(z);}if(!(lse_sum>0.f)||!isfinite(lse_sum)){free(dL);free(grad);return NAN;}float lse=logf(lse_sum)+mx;loss+=lse-logits[tgt];for(uint32_t i=0;i<m->cfg.vocab_size;i++)dL[i]=expf(logits[i]-lse);dL[tgt]-=1.f;const float*xb=SCR_XB(m);size_t off=nw-(size_t)m->cfg.vocab_size*d;float*dW=grad+off;for(uint32_t i=0;i<m->cfg.vocab_size;i++){float dl=dL[i];for(uint32_t j=0;j<d;j++)dW[(size_t)i*d+j]+=dl*xb[j];}}
+float niyah_train_step(NiyahModel*m,NiyahAdam*opt,const uint32_t*tokens,uint32_t n){if(!m||!opt||!tokens||n<2u)return 0.f;if(n > m->cfg.ctx_len + 1u)return NAN;for(uint32_t i=0;i<n;i++)if(tokens[i]>=m->cfg.vocab_size)return NAN;size_t nw=weight_count(&m->cfg);float*grad=xcalloc(nw,sizeof(float));float*dL=xmalloc((size_t)m->cfg.vocab_size*sizeof(float));float loss=0.f;uint32_t d=m->cfg.embed_dim;for(uint32_t t=0;t+1<n;t++){const float*logits=niyah_forward(m,tokens[t],t);if(!logits){free(dL);free(grad);return NAN;}uint32_t tgt=tokens[t+1];float mx=logits[0];for(uint32_t i=1;i<m->cfg.vocab_size;i++)if(logits[i]>mx)mx=logits[i];float lse_sum=0.f;for(uint32_t i=0;i<m->cfg.vocab_size;i++){float z=logits[i]-mx;if(z<-80.f)z=-80.f;lse_sum+=expf(z);}if(!(lse_sum>0.f)||!isfinite(lse_sum)){free(dL);free(grad);return NAN;}float lse=logf(lse_sum)+mx;loss+=lse-logits[tgt];for(uint32_t i=0;i<m->cfg.vocab_size;i++)dL[i]=expf(logits[i]-lse);dL[tgt]-=1.f;const float*xb=SCR_XB(m);size_t off=nw-(size_t)m->cfg.vocab_size*d;float*dW=grad+off;for(uint32_t i=0;i<m->cfg.vocab_size;i++){float dl=dL[i];for(uint32_t j=0;j<d;j++)dW[(size_t)i*d+j]+=dl*xb[j];}}
     loss/=(float)(n-1u);opt->step++;float bc1=1.f-powf(opt->beta1,(float)opt->step),bc2=1.f-powf(opt->beta2,(float)opt->step);if(!(bc1>0.f&&bc2>0.f)){free(dL);free(grad);return NAN;}size_t off=nw-(size_t)m->cfg.vocab_size*d;float*W=(float*)m->_pool+off;const float*gW=grad+off;float*mW=opt->m+off,*vW=opt->v+off;size_t cnt=(size_t)m->cfg.vocab_size*d;for(size_t i=0;i<cnt;i++){float g=gW[i]+opt->wd*W[i];mW[i]=opt->beta1*mW[i]+(1.f-opt->beta1)*g;vW[i]=opt->beta2*vW[i]+(1.f-opt->beta2)*g*g;float mh=mW[i]/bc1,vh=vW[i]/bc2;if(!isfinite(mh)||!isfinite(vh)){free(dL);free(grad);return NAN;}W[i]-=opt->lr*mh/(sqrtf(vh)+opt->eps);}free(dL);free(grad);return isfinite(loss)?loss:NAN;}
