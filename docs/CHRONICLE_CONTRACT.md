@@ -86,7 +86,9 @@ truth certificate, legal conclusion, or authenticity proof.
 
 ## Resource limits
 
-Fields are limited to 127 bytes and event count to 100,000. The store embeds the
-original document, so ingestion memory is proportional to input size. The
-million-word benchmark reports observed wall time and tracked input allocation
-without a pass/fail performance threshold.
+Fields are limited to 127 bytes and event count to 100,000. Initial ingestion
+hashes, validates, extracts, and copies the source in streaming passes; memory
+is bounded by the longest input line plus extracted events. Query loading is
+currently proportional to store size. The million-word benchmark reports
+observed wall time, tracked input allocation, and process peak RSS where the
+platform exposes it, without a pass/fail performance threshold.
