@@ -15,6 +15,9 @@ int casper_chronicle_ingest(const char *input_path, char **store_path_out,
                             char **receipt_path_out);
 int casper_chronicle_query(const char *store_path, const char *question,
                            char **json_out, char **receipt_path_out);
+/* Lexical-only search in source text, not semantic reasoning. */
+int casper_chronicle_find(const char *store_path, const char *query,
+                          char **json_out, char **receipt_path_out);
 int casper_chronicle_verify(const char *receipt_path);
 int casper_chronicle_self_test(void);
 int casper_chronicle_benchmark(void);
