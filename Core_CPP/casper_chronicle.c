@@ -194,22 +194,28 @@ static int get_text(FILE *f, char out[CHR_FIELD_MAX]) {
     if (n && fread(out, 1u, n, f) != n) return -1;
     out[n] = '\0'; return 0;
 }
-static void hash_event_ids(const uint8_t doc[32], uint64_t start, uint64_t end,
-                           const uint8_t *line, size_t line_len, uint8_t event_id[32], uint8_t span_id[32]) {
-    uint8_t *m = (uint8_t *)malloc(56u + line_len); size_t i;
-    if (!m) { memset(event_id, 0, 32u); memset(span_id, 0, 32u); return; }
+typedef void *(*ChrHashAlloc)(size_t);
+static int hash_event_ids(const uint8_t doc[32], uint64_t start, uint64_t end,
+                          const uint8_t *line, size_t line_len, uint8_t event_id[32],
+                          uint8_t span_id[32], ChrHashAlloc hash_alloc) {
+    uint8_t *m; size_t i;
+    if (line_len > SIZE_MAX - 56u) return -1;
+    m = (uint8_t *)hash_alloc(56u + line_len);
+    if (!m) return -1;
     memcpy(m, "event-v1", 8u); memcpy(m + 8u, doc, 32u);
     for (i = 0u; i < 8u; ++i) m[40u + i] = (uint8_t)(start >> (8u * i));
     for (i = 0u; i < 8u; ++i) m[48u + i] = (uint8_t)(end >> (8u * i));
     memcpy(m + 56u, line, line_len); niyah_sha256(m, 56u + line_len, event_id);
-    memcpy(m, "span-v1 ", 8u); niyah_sha256(m, 56u + line_len, span_id); free(m);
+    memcpy(m, "span-v1 ", 8u); niyah_sha256(m, 56u + line_len, span_id);
+    free(m); return 0;
 }
 static int field_copy(char out[CHR_FIELD_MAX], const char *s, size_t n) {
     if (n == 0u || n >= CHR_FIELD_MAX) return -1;
     memcpy(out, s, n); out[n] = '\0'; return 0;
 }
 static int parse_event_line(const uint8_t *line, size_t len, uint64_t start,
-                            uint64_t line_no, const uint8_t doc[32], ChrEvent *e) {
+                            uint64_t line_no, const uint8_t doc[32], ChrEvent *e,
+                            ChrHashAlloc hash_alloc) {
     const char prefix[] = "@chronicle\t"; const char *fields[9]; size_t sizes[9], i;
     size_t pos = sizeof(prefix) - 1u;
     if (len < 10u || memcmp(line, "@chronicle", 10u) != 0 ||
@@ -245,7 +251,7 @@ static int parse_event_line(const uint8_t *line, size_t len, uint64_t start,
     }
     e->byte_start = start; e->byte_end = start + len; e->line_start = line_no; e->line_end = line_no;
     niyah_sha256(line, len, e->span_hash);
-    hash_event_ids(doc, e->byte_start, e->byte_end, line, len, e->event_id, e->span_id); return 0;
+    return hash_event_ids(doc, e->byte_start, e->byte_end, line, len, e->event_id, e->span_id, hash_alloc);
 }
 static int source_size(const char *path, uint64_t *size) {
     FILE *f = fopen(path, "rb"); long end;
@@ -253,7 +259,7 @@ static int source_size(const char *path, uint64_t *size) {
     if (fseek(f, 0, SEEK_END) != 0 || (end = ftell(f)) < 0 || fclose(f) != 0) return -1;
     *size = (uint64_t)end; return 0;
 }
-static int extract_events_file(const char *path, ChrStore *s) {
+static int extract_events_file(const char *path, ChrStore *s, ChrHashAlloc hash_alloc) {
     FILE *f = fopen(path, "rb"); uint8_t *line = NULL; size_t len = 0u, cap = 0u;
     uint64_t offset = 0u, line_start = 0u, line_no = 1u; uint32_t count = 0u; int ch, rc = 0;
     if (!f) return -1;
@@ -263,7 +269,7 @@ static int extract_events_file(const char *path, ChrStore *s) {
             ChrEvent parsed;
             if (event_len && line[event_len - 1u] == '\r') --event_len;
             if (!utf8_valid(line, event_len)) { rc = -1; break; }
-            rc = parse_event_line(line, event_len, line_start, line_no, s->document_hash, &parsed);
+            rc = parse_event_line(line, event_len, line_start, line_no, s->document_hash, &parsed, hash_alloc);
             if (rc < 0) break;
             if (rc == 0) {
                 ChrEvent *next;
@@ -290,7 +296,7 @@ static int extract_events_file(const char *path, ChrStore *s) {
         if (event_len && line[event_len - 1u] == '\r') --event_len;
         if (!utf8_valid(line, event_len)) rc = -1;
         else {
-            rc = parse_event_line(line, event_len, line_start, line_no, s->document_hash, &parsed);
+            rc = parse_event_line(line, event_len, line_start, line_no, s->document_hash, &parsed, hash_alloc);
             if (rc == 0) {
                 ChrEvent *next = (ChrEvent *)realloc(s->events, ((size_t)count + 1u) * sizeof(*next));
                 if (!next || count >= CHR_MAX_EVENTS) rc = -1;
@@ -400,7 +406,7 @@ static int store_load(const char *path, ChrStore *s) {
                    s->source[e->byte_end + 1u] == '\n')) ||
                 parse_event_line(s->source + e->byte_start,
                                  (size_t)(e->byte_end - e->byte_start), e->byte_start,
-                                 e->line_start, s->document_hash, &parsed) != 0 ||
+                                 e->line_start, s->document_hash, &parsed, malloc) != 0 ||
                 memcmp(parsed.event_id, e->event_id, 32u) != 0 ||
                 memcmp(parsed.span_id, e->span_id, 32u) != 0 ||
                 parsed.amount_present != e->amount_present ||
@@ -714,7 +720,8 @@ error:
     free(b.data); return -1;
 }
 
-int casper_chronicle_ingest(const char *input_path, char **store_path_out, char **receipt_path_out) {
+static int ingest_with_hash_allocator(const char *input_path, char **store_path_out,
+                                      char **receipt_path_out, ChrHashAlloc hash_alloc) {
     ChrStore s, old; char *store_path = NULL, *receipt_path = NULL;
     uint8_t result_hash[32]; int same = 0;
     if (!input_path || !store_path_out || !receipt_path_out) return 2;
@@ -728,13 +735,16 @@ int casper_chronicle_ingest(const char *input_path, char **store_path_out, char 
         same = old.source_size == s.source_size && memcmp(old.document_hash, s.document_hash, 32u) == 0;
         store_free(&old);
     }
-    if (!same && (extract_events_file(input_path, &s) != 0 ||
+    if (!same && (extract_events_file(input_path, &s, hash_alloc) != 0 ||
                   store_save_from_file(store_path, input_path, &s) != 0)) goto fail;
     if (!niyah_sha256_file(store_path, result_hash) ||
         write_receipt(receipt_path, "INGEST", store_path, "", result_hash, s.document_hash) != 0) goto fail;
     store_free(&s); *store_path_out = store_path; *receipt_path_out = receipt_path; return 0;
 fail:
     store_free(&s); store_free(&old); free(store_path); free(receipt_path); return 1;
+}
+int casper_chronicle_ingest(const char *input_path, char **store_path_out, char **receipt_path_out) {
+    return ingest_with_hash_allocator(input_path, store_path_out, receipt_path_out, malloc);
 }
 int casper_chronicle_query(const char *store_path, const char *question,
                            char **json_out, char **receipt_path_out) {
@@ -872,6 +882,8 @@ static int check_story_case(const char *tag, const char *story,
     free(store); free(receipt); free(json); free(qreceipt);
     return failures;
 }
+/* Test-only allocator failure is injected through a local parameter, not global state. */
+static void *chronicle_reject_hash_alloc(size_t n) { (void)n; return NULL; }
 int casper_chronicle_self_test(void) {
     static const char story[] =
         "بداية القصة عن أحمد وخالد.\r\n"
@@ -899,6 +911,25 @@ int casper_chronicle_self_test(void) {
     uint8_t *bytes = NULL; size_t n = 0u; ChrStore loaded; int fail = 0;
     uint8_t before[32], after[32];
     memset(&loaded, 0, sizeof(loaded));
+    /* Hashing allocation failure must abort ingestion without zero-ID artifacts. */
+    {
+        const char *input = "chronicle-oom-self-test.txt";
+        const char *output = "chronicle-oom-self-test.txt.chronicle";
+        const char *proof = "chronicle-oom-self-test.txt.chronicle.receipt";
+        const char record[] = "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n";
+        char *bad_store = NULL, *bad_receipt = NULL;
+        FILE *leftover;
+        remove(output); remove(proof);
+        if (write_bytes(input, (const uint8_t *)record, sizeof(record) - 1u) != 0 ||
+            ingest_with_hash_allocator(input, &bad_store, &bad_receipt, chronicle_reject_hash_alloc) == 0 ||
+            bad_store != NULL || bad_receipt != NULL) ++fail;
+        leftover = fopen(output, "rb");
+        if (leftover) { fclose(leftover); ++fail; }
+        leftover = fopen(proof, "rb");
+        if (leftover) { fclose(leftover); ++fail; }
+        free(bad_store); free(bad_receipt);
+        remove(input); remove(output); remove(proof);
+    }
     if (write_bytes(path, (const uint8_t *)story, sizeof(story) - 1u) != 0 ||
         casper_chronicle_ingest(path, &store, &receipt) != 0) return 1;
     if (casper_chronicle_verify(receipt) != 0) ++fail;
