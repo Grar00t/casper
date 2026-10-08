@@ -72,6 +72,8 @@ to solver variables and must preserve the outcomes below.
   when the summed known payments already equal the debt.
 
 PAID and FRAUD are not output states. A transfer counts only when CONFIRMED.
+A payment to an unrelated third party is ignored; its conflict, currency, or
+uncertainty cannot invalidate a separate confirmed debt settlement.
 A payment to a third party counts only when an explicit positive, CONFIRMED,
 and uncontradicted INTERMEDIARY_FOR event links that exact party to the lender.
 Neither ASSERTED nor PENDING amounts settle a debt, even if their polarity is
@@ -90,6 +92,22 @@ UNKNOWN instead of asserting full settlement.
 separate check that a payment occurred in the world.
 
 Every used reasoning step is returned with its event ID and exact evidence span.
+
+## Lexical source retrieval
+
+The `find STORE "TERMS"` command searches *ordinary original UTF-8 text*,
+whether or not the document contains `@chronicle` records. It is a deterministic
+lexical search, **not** event extraction, entity linking, causal reasoning, or
+a language model. It matches byte-exact query terms split at ASCII whitespace
+and basic ASCII punctuation; it does not stem Arabic or strip Arabic punctuation.
+
+- Query length: 1–1024 UTF-8 bytes, maximum 16 query terms.
+- Returns up to eight source lines, sorted by matched-term count (then source order).
+- Each line includes exact text, half-open byte offsets, one-based line number,
+  exact-span SHA-256, matched-term count, and the source document SHA-256.
+- The `FIND` receipt replays the search and checks byte/result integrity.
+- The current query path loads the whole Chronicle store into memory. This
+  is not yet a low-memory streaming query engine.
 
 ## Integrity receipt
 
@@ -111,7 +129,8 @@ integrity and factual truth are distinct.
 
 ## Resource limits
 
-Fields are limited to 127 bytes and event count to 100,000. Initial ingestion
+Structured event fields are limited to 127 bytes and event count to 100,000.
+Lexical `find` does not turn unstructured text into validated events. Initial ingestion
 hashes, validates, extracts, and copies the source in streaming passes; memory
 is bounded by the longest input line plus extracted events. Query loading is
 currently proportional to store size. The million-word benchmark reports
