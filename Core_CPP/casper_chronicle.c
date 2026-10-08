@@ -1055,9 +1055,9 @@ int casper_chronicle_self_test(void) {
         "",
         "هل سدد أحمد دين خالد؟", "SUPPORTED", "\"settled\":{\"num\":100,\"den\":1}");
     fail += check_story_case("unterminated_last_line",
-        "@chronicle\\tأحمد\\tBORROWED_FROM\\tخالد\\t100\\tSAR\\tT1\\tASSERTED\\tPOSITIVE\\tCONFIRMED\\n"
-        "@chronicle\\tأحمد\\tPAID_TO\\tخالد\\t100\\tSAR\\tT2\\tASSERTED\\tPOSITIVE\\tCONFIRMED",
-        "هل سدد أحمد دين خالد؟", "SUPPORTED", "\\"settled\\":{\\"num\\":100,\\"den\\":1}");
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED",
+        "هل سدد أحمد دين خالد؟", "SUPPORTED", "\"settled\":{\"num\":100,\"den\":1}");
     fail += check_story_case("currency_mismatch",
         "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
         "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tUSD\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
