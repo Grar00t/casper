@@ -135,22 +135,24 @@ static int parse_rat(const char *s, ChrRat *out) {
     if (slash) { errno = 0; d = strtoll(slash, &end2, 10); if (errno || *end2 != '\0' || d <= 0) return -1; }
     g = gcd64((int64_t)n, (int64_t)d); out->num = (int64_t)n / g; out->den = (int64_t)d / g; return 0;
 }
+/* Exact nonnegative rational ordering without 128-bit arithmetic or float fallback. */
 static int rat_cmp(ChrRat a, ChrRat b) {
-#if defined(__SIZEOF_INT128__)
-#  if defined(__GNUC__)
-#    pragma GCC diagnostic push
-#    pragma GCC diagnostic ignored "-Wpedantic"
-#  endif
-    __int128 left = (__int128)a.num * b.den;
-    __int128 right = (__int128)b.num * a.den;
-#  if defined(__GNUC__)
-#    pragma GCC diagnostic pop
-#  endif
-    return left < right ? -1 : left > right ? 1 : 0;
-#else
-    if (a.den == b.den) return a.num < b.num ? -1 : a.num > b.num ? 1 : 0;
-    return 0;
-#endif
+    uint64_t an = (uint64_t)a.num, ad = (uint64_t)a.den;
+    uint64_t bn = (uint64_t)b.num, bd = (uint64_t)b.den;
+    int inverted = 0;
+    for (;;) {
+        uint64_t aq = an / ad, bq = bn / bd, ar = an % ad, br = bn % bd;
+        int cmp;
+        if (aq != bq) cmp = aq < bq ? -1 : 1;
+        else if (ar == 0u || br == 0u)
+            cmp = ar == br ? 0 : ar == 0u ? -1 : 1;
+        else {
+            an = ad; ad = ar; bn = bd; bd = br;
+            inverted = !inverted;
+            continue;
+        }
+        return inverted ? -cmp : cmp;
+    }
 }
 static int rat_add(ChrRat a, ChrRat b, ChrRat *out) {
     int64_t g = gcd64(a.den, b.den), x = b.den / g, y = a.den / g;
@@ -373,6 +375,46 @@ static int store_load(const char *path, ChrStore *s) {
         niyah_sha256(s->source + e->byte_start, (size_t)(e->byte_end - e->byte_start), actual);
         if (memcmp(actual, e->span_hash, 32u) != 0) { store_free(s); return -1; }
     }
+    /* Reconstruct every typed event from the exact source bytes before it may be used. */
+    {
+        uint64_t scan = 0u, line_no = 1u, previous_end = 0u;
+        for (i = 0u; i < s->event_count; ++i) {
+            const ChrEvent *e = &s->events[i];
+            ChrEvent parsed;
+            if (e->byte_start < previous_end || e->line_start == 0u ||
+                e->line_start != e->line_end || e->amount.num < 0 || e->amount.den <= 0) {
+                store_free(s); return -1;
+            }
+            while (scan < e->byte_start) {
+                if (s->source[scan] == '\n') ++line_no;
+                ++scan;
+            }
+            if (e->line_start != line_no ||
+                (e->byte_start > 0u && s->source[e->byte_start - 1u] != '\n') ||
+                (e->byte_end < s->source_size &&
+                 s->source[e->byte_end] != '\n' &&
+                 !(s->source[e->byte_end] == '\r' && e->byte_end + 1u < s->source_size &&
+                   s->source[e->byte_end + 1u] == '\n')) ||
+                parse_event_line(s->source + e->byte_start,
+                                 (size_t)(e->byte_end - e->byte_start), e->byte_start,
+                                 e->line_start, s->document_hash, &parsed) != 0 ||
+                memcmp(parsed.event_id, e->event_id, 32u) != 0 ||
+                memcmp(parsed.span_id, e->span_id, 32u) != 0 ||
+                parsed.amount_present != e->amount_present ||
+                parsed.amount.num != e->amount.num || parsed.amount.den != e->amount.den ||
+                strcmp(parsed.subject, e->subject) != 0 ||
+                strcmp(parsed.predicate, e->predicate) != 0 ||
+                strcmp(parsed.object, e->object) != 0 ||
+                strcmp(parsed.currency, e->currency) != 0 ||
+                strcmp(parsed.time_expr, e->time_expr) != 0 ||
+                strcmp(parsed.modality, e->modality) != 0 ||
+                strcmp(parsed.polarity, e->polarity) != 0 ||
+                strcmp(parsed.status, e->status) != 0) {
+                store_free(s); return -1;
+            }
+            previous_end = e->byte_end;
+        }
+    }
     return 0;
 }
 static char *path_suffix(const char *path, const char *suffix) {
@@ -420,10 +462,13 @@ static int write_receipt(const char *path, const char *kind, const char *store_p
     if (!ok) remove(path);
     return ok ? 0 : -1;
 }
+/* A claim at a different time may describe a different transaction. */
 static int same_tuple(const ChrEvent *a, const ChrEvent *b) {
     return strcmp(a->subject, b->subject) == 0 && strcmp(a->predicate, b->predicate) == 0 &&
            strcmp(a->object, b->object) == 0 && a->amount_present == b->amount_present &&
-           (!a->amount_present || rat_cmp(a->amount, b->amount) == 0) && strcmp(a->currency, b->currency) == 0;
+           (!a->amount_present || rat_cmp(a->amount, b->amount) == 0) &&
+           strcmp(a->currency, b->currency) == 0 &&
+           strcmp(a->time_expr, b->time_expr) == 0;
 }
 static int opposite_conflict(const ChrStore *s, const ChrEvent *focus) {
     uint32_t i;
@@ -433,15 +478,16 @@ static int opposite_conflict(const ChrStore *s, const ChrEvent *focus) {
     }
     return 0;
 }
+/* Positive polarity alone is an allegation, not a confirmed payment or role. */
 static int is_positive(const ChrEvent *e) {
-    return strcmp(e->polarity, "POSITIVE") == 0 && strcmp(e->status, "DENIED") != 0;
+    return strcmp(e->polarity, "POSITIVE") == 0 && strcmp(e->status, "CONFIRMED") == 0;
 }
 static int is_intermediary(const ChrStore *s, const char *person, const char *lender, uint32_t *index) {
     uint32_t i;
     for (i = 0u; i < s->event_count; ++i) {
         const ChrEvent *e = &s->events[i];
         if (strcmp(e->predicate, "INTERMEDIARY_FOR") == 0 && strcmp(e->subject, person) == 0 &&
-            strcmp(e->object, lender) == 0 && is_positive(e)) {
+            strcmp(e->object, lender) == 0 && is_positive(e) && !opposite_conflict(s, e)) {
             if (index) *index = i;
             return 1;
         }
@@ -485,41 +531,52 @@ static int add_evidence_json(ChrBuf *b, const ChrStore *s, const ChrEvent *e, in
     return 0;
 }
 static int reason_json(const ChrStore *s, const char *question, char **out) {
-    const ChrEvent *debt = NULL; uint32_t debt_i = 0u, i;
-    ChrRat settled = {0, 1}; int uncertain = 0, conflict = 0, evidence_count = 0;
+    const ChrEvent *debt = NULL; uint32_t i;
+    ChrRat settled = {0, 1};
+    int uncertain = 0, conflict = 0, debt_ambiguous = 0, evidence_count = 0;
     uint8_t *used = (uint8_t *)calloc(s->event_count ? s->event_count : 1u, 1u);
     const char *status; ChrBuf b = {0};
     if (!used) return -1;
+
+    /* More than one matching confirmed debt is ambiguous, not the first debt. */
     for (i = 0u; i < s->event_count; ++i) {
         const ChrEvent *e = &s->events[i];
-        if (strcmp(e->predicate, "BORROWED_FROM") == 0 && is_positive(e) && e->amount_present &&
-            contains_entity(question, e->subject) && contains_entity(question, e->object)) {
-            debt = e; debt_i = i; break;
-        }
+        if (strcmp(e->predicate, "BORROWED_FROM") != 0 ||
+            !contains_entity(question, e->subject) ||
+            !contains_entity(question, e->object)) continue;
+        used[i] = 1u;
+        if (opposite_conflict(s, e)) conflict = 1;
+        if (is_positive(e) && e->amount_present) {
+            if (debt) debt_ambiguous = 1;
+            else debt = e;
+        } else uncertain = 1;
     }
-    if (debt) { used[debt_i] = 1u; conflict = opposite_conflict(s, debt); }
-    if (debt && !conflict) for (i = 0u; i < s->event_count; ++i) {
+    if (debt && !conflict && !debt_ambiguous) for (i = 0u; i < s->event_count; ++i) {
         const ChrEvent *e = &s->events[i]; uint32_t intermediary_i = 0u;
-        int direct, via_intermediary, eligible;
-        if (!is_positive(e) || !e->amount_present || strcmp(e->subject, debt->subject) != 0 ||
-            !(strcmp(e->predicate, "PAID_TO") == 0 || strcmp(e->predicate, "TRANSFER_TO") == 0)) continue;
+        int direct, via_intermediary;
+        if (strcmp(e->subject, debt->subject) != 0 ||
+            !(strcmp(e->predicate, "PAID_TO") == 0 ||
+              strcmp(e->predicate, "TRANSFER_TO") == 0)) continue;
+        used[i] = 1u;
+        if (opposite_conflict(s, e)) { conflict = 1; continue; }
+        /* Unconfirmed, unspecified or differently denominated sums never settle this debt. */
+        if (!is_positive(e) || !e->amount_present ||
+            strcmp(e->currency, debt->currency) != 0) {
+            uncertain = 1; continue;
+        }
         direct = strcmp(e->object, debt->object) == 0;
         via_intermediary = is_intermediary(s, e->object, debt->object, &intermediary_i);
-        eligible = strcmp(e->predicate, "PAID_TO") == 0
-                   ? strcmp(e->status, "PENDING") != 0
-                   : strcmp(e->status, "CONFIRMED") == 0;
-        if (opposite_conflict(s, e)) { conflict = 1; used[i] = 1u; continue; }
-        if (eligible && (direct || via_intermediary)) {
+        if (direct || via_intermediary) {
             if (rat_add(settled, e->amount, &settled) != 0) { conflict = 1; break; }
-            used[i] = 1u; if (via_intermediary) used[intermediary_i] = 1u;
-        } else { uncertain = 1; used[i] = 1u; }
+            if (via_intermediary) used[intermediary_i] = 1u;
+        } else uncertain = 1;
     }
     if (conflict) status = "CONFLICT";
-    else if (!debt) status = "UNKNOWN";
+    else if (!debt || debt_ambiguous) status = "UNKNOWN";
     else if (rat_cmp(settled, debt->amount) > 0) status = "CONFLICT";
-    else if (rat_cmp(settled, debt->amount) == 0) status = "SUPPORTED";
+    else if (rat_cmp(settled, debt->amount) == 0 && !uncertain) status = "SUPPORTED";
     else if (settled.num > 0) status = "PARTIAL";
-    else status = uncertain ? "UNKNOWN" : "UNKNOWN";
+    else status = "UNKNOWN";
     if (buf_add(&b, "{\"status\":\"") != 0 || buf_add(&b, status) != 0 ||
         buf_add(&b, "\",\"question\":") != 0 ||
         buf_add_json(&b, (const uint8_t *)question, strlen(question)) != 0 ||
@@ -533,7 +590,7 @@ static int reason_json(const ChrStore *s, const char *question, char **out) {
     } else if (buf_add(&b, "null") != 0) goto fail;
     if (buf_add(&b, ",\"settled\":{\"num\":") != 0 || buf_add_i64(&b, settled.num) != 0 ||
         buf_add(&b, ",\"den\":") != 0 || buf_add_i64(&b, settled.den) != 0 ||
-        buf_add(&b, "},\"limits\":\"explicit @chronicle records only; integrity is not truth\",\"evidence\":[") != 0)
+        buf_add(&b, "},\"limits\":\"confirmed exact-currency @chronicle records only; integrity is not truth\",\"evidence\":[") != 0)
         goto fail;
     for (i = 0u; i < s->event_count; ++i) if (used[i]) {
         if (add_evidence_json(&b, s, &s->events[i], evidence_count != 0) != 0) goto fail;
@@ -652,6 +709,31 @@ static void remove_query_receipt(const char *path, const char *question) {
     full = path_suffix(path, suffix);
     if (full) { remove(full); free(full); }
 }
+/* These scenarios are independent of the original Ahmed/Saud happy-path fixture. */
+static int check_story_case(const char *tag, const char *story,
+                            const char *question, const char *expected,
+                            const char *settled_marker) {
+    char path[128];
+    char *store = NULL, *receipt = NULL, *json = NULL, *qreceipt = NULL;
+    int failures = 0, n = snprintf(path, sizeof(path), "chronicle-case-%s.txt", tag);
+    if (n < 0 || (size_t)n >= sizeof(path)) return 1;
+    if (write_bytes(path, (const uint8_t *)story, strlen(story)) != 0 ||
+        casper_chronicle_ingest(path, &store, &receipt) != 0 ||
+        casper_chronicle_query(store, question, &json, &qreceipt) != 0 ||
+        !expect_status(json, expected) ||
+        (settled_marker && !strstr(json, settled_marker)) ||
+        casper_chronicle_verify(receipt) != 0 ||
+        casper_chronicle_verify(qreceipt) != 0) {
+        failures = 1;
+        fprintf(stderr, "Chronicle case failed: %s\n", tag);
+    }
+    if (qreceipt) remove(qreceipt);
+    if (receipt) remove(receipt);
+    if (store) remove(store);
+    remove(path);
+    free(store); free(receipt); free(json); free(qreceipt);
+    return failures;
+}
 int casper_chronicle_self_test(void) {
     static const char story[] =
         "بداية القصة عن أحمد وخالد.\r\n"
@@ -727,6 +809,48 @@ int casper_chronicle_self_test(void) {
     remove(path); remove("chronicle-self-test.txt.chronicle"); remove("chronicle-self-test.txt.chronicle.receipt");
     remove(conflict_path); remove("chronicle-conflict-test.txt.chronicle"); remove("chronicle-conflict-test.txt.chronicle.receipt");
     remove(missing_path); remove("chronicle-missing-test.txt.chronicle"); remove("chronicle-missing-test.txt.chronicle.receipt");
+    fail += check_story_case("currency_mismatch",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tUSD\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "UNKNOWN", "\"settled\":{\"num\":0,\"den\":1}");
+    fail += check_story_case("pending_payment",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tSAR\tT2\tASSERTED\tPOSITIVE\tPENDING\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "UNKNOWN", "\"settled\":{\"num\":0,\"den\":1}");
+    fail += check_story_case("asserted_payment",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tSAR\tT2\tASSERTED\tPOSITIVE\tASSERTED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "UNKNOWN", "\"settled\":{\"num\":0,\"den\":1}");
+    fail += check_story_case("unconfirmed_intermediary",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tسعود\tINTERMEDIARY_FOR\tخالد\t-\tSAR\tT2\tASSERTED\tPOSITIVE\tASSERTED\n"
+        "@chronicle\tأحمد\tPAID_TO\tسعود\t100\tSAR\tT3\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "UNKNOWN", "\"settled\":{\"num\":0,\"den\":1}");
+    fail += check_story_case("multiple_debts",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t200\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tSAR\tT3\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "UNKNOWN", "\"settled\":{\"num\":0,\"den\":1}");
+    fail += check_story_case("fractional_payment",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t1/2\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t1/3\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "PARTIAL", "\"settled\":{\"num\":1,\"den\":3}");
+    fail += check_story_case("confirmed_payment",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "SUPPORTED", "\"settled\":{\"num\":100,\"den\":1}");
+    fail += check_story_case("unconfirmed_debt",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tASSERTED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "UNKNOWN", "\"settled\":{\"num\":0,\"den\":1}");
     fprintf(stderr, "Chronicle self-check: %s (%d failures)\n", fail == 0 ? "PASS" : "FAIL", fail);
     return fail == 0 ? 0 : 1;
 }
