@@ -176,7 +176,7 @@ uint32_t niyah_sample(const float *logits, uint32_t vocab_size, NiyahSampler *s)
     }
     if (s->temperature == 0.0f) return best;
 
-    if ((size_t)vocab_size > SIZE_MAX / sizeof(*candidates)) return 0u;
+    if ((uint64_t)vocab_size * sizeof(*candidates) > (uint64_t)SIZE_MAX) return 0u;
     candidates = (NiyahSampleCandidate *)malloc((size_t)vocab_size * sizeof(*candidates));
     if (!candidates) return 0u;
 
