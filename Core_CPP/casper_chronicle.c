@@ -356,6 +356,22 @@ static int store_load(const char *path, ChrStore *s) {
         fread(s->document_hash, 1u, 32u, f) != 32u || get_u64(f, &s->source_size) != 0 ||
         get_u64(f, &s->imported_at) != 0 || get_u32(f, &s->event_count) != 0 || s->event_count > CHR_MAX_EVENTS ||
         s->source_size > SIZE_MAX - 1u) { if (f) fclose(f); return -1; }
+    /* Reject forged length/count metadata before allocating attacker-sized buffers.
+     * Each V1 serialized event needs at least 177 bytes, even with empty fields. */
+    {
+        long body_start = ftell(f), file_end;
+        const uint64_t min_event_bytes = 177u;
+        uint64_t remaining;
+        if (body_start < 0 || fseek(f, 0, SEEK_END) != 0 ||
+            (file_end = ftell(f)) < 0 || fseek(f, body_start, SEEK_SET) != 0 ||
+            file_end < body_start) { fclose(f); return -1; }
+        remaining = (uint64_t)(file_end - body_start);
+        if (s->source_size > remaining ||
+            (uint64_t)s->event_count >
+            (remaining - s->source_size) / min_event_bytes) {
+            fclose(f); return -1;
+        }
+    }
     s->source = (uint8_t *)malloc((size_t)s->source_size + 1u);
     s->events = s->event_count ? (ChrEvent *)calloc(s->event_count, sizeof(*s->events)) : NULL;
     if (!s->source || (s->event_count && !s->events) ||
@@ -1006,6 +1022,24 @@ int casper_chronicle_self_test(void) {
         bytes[48] ^= 1u;
         if (write_bytes(store, bytes, n) != 0 || casper_chronicle_verify(receipt) == 0) ++fail;
         bytes[48] ^= 1u; if (write_bytes(store, bytes, n) != 0) ++fail;
+    }
+    /* Forged store header must not trigger disproportionate source/event allocations. */
+    if (bytes && n > 68u) {
+        ChrStore forged = {0};
+        uint8_t size_saved[8], count_saved[4];
+        memcpy(size_saved, bytes + 48u, sizeof(size_saved));
+        memcpy(count_saved, bytes + 64u, sizeof(count_saved));
+        memset(bytes + 48u, 0xff, sizeof(size_saved));
+        if (write_bytes(store, bytes, n) != 0 || store_load(store, &forged) == 0) ++fail;
+        store_free(&forged);
+        memcpy(bytes + 48u, size_saved, sizeof(size_saved));
+        bytes[64u] = 0xa0u; bytes[65u] = 0x86u;
+        bytes[66u] = 0x01u; bytes[67u] = 0x00u; /* 100000 alleged events */
+        if (write_bytes(store, bytes, n) != 0 || store_load(store, &forged) == 0) ++fail;
+        store_free(&forged);
+        memcpy(bytes + 64u, count_saved, sizeof(count_saved));
+        if (write_bytes(store, bytes, n) != 0 ||
+            casper_chronicle_verify(receipt) != 0) ++fail;
     }
     /* Mutating only cached typed fields must fail even if original source still hashes. */
     if (bytes) {
