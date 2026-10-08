@@ -127,6 +127,7 @@ C build/run and `train-c` require `bash` plus GCC/Clang. Full-model `train` runs
 | `Core_CPP/khz_q_svd.c` | numerical text-shape/coherence heuristic |
 | `Core_CPP/casper_rag.c` | HTTP search transport, parsing, ranking, trace/context hashing |
 | `Core_CPP/casper_cli.c` | query/integrity-receipt CLI |
+| `Core_CPP/casper_chronicle.c` | offline UTF-8 evidence store and narrow debt/payment reasoner |
 | `Core_CPP/niyah_hybrid_main.c` | hybrid CLI and C11 audit bridge |
 | `niyah_engine_local/` | optional Node.js runtime |
 | `UI_CSharp/` | optional Windows WPF UI |
@@ -226,3 +227,27 @@ Constraint values use integer numerator/denominator representation. Where availa
 ## CI
 
 GitHub Actions builds and smokes the C runtime with GCC and Clang, runs the debug sanitizer smoke path, exercises the `--audit-stdin` safe/reject contract, syntax-checks the Python training tools and Node.js sources, and builds the WPF UI on Windows. The C smoke path includes the trainer overfit/backbone-update regression and proof receipt smoke checks. CI is repository-level evidence for the exercised build/test contracts; documentation claims are not implementation evidence.
+
+
+## Casper Chronicle MVP
+
+Chronicle is an offline, deterministic baseline for exact-source event evidence.
+It accepts explicit tab-separated `@chronicle` records embedded in a UTF-8
+document, preserves the original bytes, and returns only `SUPPORTED`,
+`PARTIAL`, `CONFLICT`, or `UNKNOWN`.
+
+```bash
+./build/casper-chronicle ingest tests/fixtures/chronicle_ahmed_ar.txt
+./build/casper-chronicle query tests/fixtures/chronicle_ahmed_ar.txt.chronicle "هل سدد أحمد دين خالد؟"
+./build/casper-chronicle verify tests/fixtures/chronicle_ahmed_ar.txt.chronicle.receipt
+./build/casper-chronicle --benchmark
+```
+
+The baseline uses no network, SaaS, runtime model download, KHZ_Q decision, or
+`.nrule` semantic extraction. Free prose is stored but does not create facts.
+Amounts are non-negative integer rationals; floating-point amounts are rejected.
+The generated receipt validates bytes and deterministic results only. It is not
+a truth, authenticity, or legal certificate. See
+[`docs/CHRONICLE_CONTRACT.md`](docs/CHRONICLE_CONTRACT.md) for the complete
+input grammar, reasoner states, evidence rules, resource limits, and integration
+boundary for any future extractor.

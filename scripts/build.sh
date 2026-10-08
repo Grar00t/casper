@@ -131,6 +131,7 @@ if [[ "$RUN_LINT" == "1" ]]; then
         "$CORE/niyah_train.c"     "$CORE/niyah_train_full.c" \
         "$CORE/niyah_hybrid_main.c" \
         "$CORE/casper_cli.c"      "$CORE/casper_rag.c" \
+        "$CORE/casper_chronicle.c" "$CORE/casper_chronicle_main.c" \
         "$CORE/rule_parser.c"     "$CORE/rule_source_guard.c" \
         "$CORE/proof_generator.c" \
         "$CORE/constraint_solver.c" "$CORE/hybrid_reasoner.c" \
@@ -167,6 +168,10 @@ build_target casper \
     "$CORE/casper_cli.c" "$CORE/casper_rag.c" "$CORE/rule_parser.c" \
     "$CORE/rule_source_guard.c" "$CORE/proof_generator.c" "$CORE/khz_q_svd.c"
 
+build_target casper-chronicle \
+    "$CORE/casper_chronicle_main.c" "$CORE/casper_chronicle.c" \
+    "$CORE/proof_generator.c"
+
 if [[ -f "$CORE/bench_niyah.c" ]]; then
     build_target bench_niyah "$CORE/bench_niyah.c" "$CORE/niyah_core.c"
 fi
@@ -181,15 +186,17 @@ if [[ "$RUN_SMOKE" == "1" ]]; then
     echo "-- smoke ------------------------------------"
     "$BUILD/niyah"
     "$BUILD/niyah_hybrid" --smoke
+    "$BUILD/casper-chronicle" --self-check
 fi
 
-if [[ "$RUN_BENCH" == "1" && -x "$BUILD/bench_niyah" ]]; then
+if [[ "$RUN_BENCH" == "1" ]]; then
     echo "-- bench ------------------------------------"
-    "$BUILD/bench_niyah"
+    [[ ! -x "$BUILD/bench_niyah" ]] || "$BUILD/bench_niyah"
+    "$BUILD/casper-chronicle" --benchmark
 fi
 
 echo "-- artifacts --------------------------------"
-for art in "$BUILD/niyah" "$BUILD/trainer" "$BUILD/niyah_hybrid" "$BUILD/casper"; do
+for art in "$BUILD/niyah" "$BUILD/trainer" "$BUILD/niyah_hybrid" "$BUILD/casper" "$BUILD/casper-chronicle"; do
     [[ -s "$art" ]] || { echo "[build] required artifact missing: $art" >&2; exit 1; }
     if command -v sha256sum >/dev/null 2>&1; then
         sha256sum "$art"

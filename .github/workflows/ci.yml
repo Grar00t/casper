@@ -66,6 +66,8 @@ jobs:
         run: |
           bash scripts/build.sh --debug --arch generic --smoke
           ./build/casper --self-check
+      - name: Chronicle raw million-word benchmark
+        run: ./build/casper-chronicle --benchmark
 
   python-training-syntax:
     runs-on: ubuntu-latest
