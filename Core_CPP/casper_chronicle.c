@@ -212,7 +212,10 @@ static int parse_event_line(const uint8_t *line, size_t len, uint64_t start,
                             uint64_t line_no, const uint8_t doc[32], ChrEvent *e) {
     const char prefix[] = "@chronicle\t"; const char *fields[9]; size_t sizes[9], i;
     size_t pos = sizeof(prefix) - 1u;
-    if (len < pos || memcmp(line, prefix, pos) != 0) return 1;
+    if (len < 10u || memcmp(line, "@chronicle", 10u) != 0 ||
+        (len > 10u && line[10u] != '\t' && line[10u] != ' ')) return 1;
+    /* Recognized directive with missing/wrong field delimiter is never free text. */
+    if (len < pos || memcmp(line, prefix, pos) != 0) return -1;
     for (i = 0u; i < 9u; ++i) {
         size_t begin = pos;
         while (pos < len && line[pos] != '\t') ++pos;
@@ -553,7 +556,7 @@ static int reason_json(const ChrStore *s, const char *question, char **out) {
     }
     if (debt && !conflict && !debt_ambiguous) for (i = 0u; i < s->event_count; ++i) {
         const ChrEvent *e = &s->events[i]; uint32_t intermediary_i = 0u;
-        int direct, via_intermediary;
+        int direct, via_intermediary; uint32_t j;
         if (strcmp(e->subject, debt->subject) != 0 ||
             !(strcmp(e->predicate, "PAID_TO") == 0 ||
               strcmp(e->predicate, "TRANSFER_TO") == 0)) continue;
@@ -564,6 +567,13 @@ static int reason_json(const ChrStore *s, const char *question, char **out) {
             strcmp(e->currency, debt->currency) != 0) {
             uncertain = 1; continue;
         }
+        /* Same transaction identity at the same time cannot be counted twice. */
+        for (j = 0u; j < i; ++j) {
+            const ChrEvent *earlier = &s->events[j];
+            if (same_tuple(earlier, e) && is_positive(earlier) &&
+                strcmp(earlier->status, e->status) == 0) break;
+        }
+        if (j < i) { uncertain = 1; continue; }
         direct = strcmp(e->object, debt->object) == 0;
         via_intermediary = is_intermediary(s, e->object, debt->object, &intermediary_i);
         if (direct || via_intermediary) {
@@ -574,7 +584,7 @@ static int reason_json(const ChrStore *s, const char *question, char **out) {
     if (conflict) status = "CONFLICT";
     else if (!debt || debt_ambiguous) status = "UNKNOWN";
     else if (rat_cmp(settled, debt->amount) > 0) status = "CONFLICT";
-    else if (rat_cmp(settled, debt->amount) == 0 && !uncertain) status = "SUPPORTED";
+    else if (rat_cmp(settled, debt->amount) == 0) status = uncertain ? "UNKNOWN" : "SUPPORTED";
     else if (settled.num > 0) status = "PARTIAL";
     else status = "UNKNOWN";
     if (buf_add(&b, "{\"status\":\"") != 0 || buf_add(&b, status) != 0 ||
@@ -790,6 +800,33 @@ int casper_chronicle_self_test(void) {
         if (write_bytes(store, bytes, n) != 0 || casper_chronicle_verify(receipt) == 0) ++fail;
         bytes[48] ^= 1u; if (write_bytes(store, bytes, n) != 0) ++fail;
     }
+    /* Mutating only cached typed fields must fail even if original source still hashes. */
+    if (bytes) {
+        const size_t header_n = 16u + 32u + 8u + 8u + 4u;
+        const size_t typed_off = header_n + sizeof(story) - 1u +
+                                 32u + 32u + 32u + 32u + 1u + 8u + 8u + 4u;
+        if (n <= typed_off) ++fail;
+        else {
+            char *unexpected_json = NULL, *unexpected_receipt = NULL;
+            bytes[typed_off] ^= 1u;
+            if (write_bytes(store, bytes, n) != 0 ||
+                casper_chronicle_query(store, question, &unexpected_json, &unexpected_receipt) == 0) ++fail;
+            bytes[typed_off] ^= 1u;
+            if (write_bytes(store, bytes, n) != 0) ++fail;
+            free(unexpected_json); free(unexpected_receipt);
+        }
+    }
+    /* A malformed directive may not disappear silently as ordinary prose. */
+    {
+        const char *bad_path = "chronicle-malformed-test.txt";
+        char *bad_store = NULL, *bad_receipt = NULL;
+        if (write_bytes(bad_path, (const uint8_t *)"@chronicle\n", 11u) != 0 ||
+            casper_chronicle_ingest(bad_path, &bad_store, &bad_receipt) == 0) ++fail;
+        if (bad_store) remove(bad_store);
+        if (bad_receipt) remove(bad_receipt);
+        remove(bad_path);
+        free(bad_store); free(bad_receipt);
+    }
     if (write_bytes(conflict_path, (const uint8_t *)conflict_story, sizeof(conflict_story) - 1u) != 0 ||
         casper_chronicle_ingest(conflict_path, &store2, &receipt2) != 0 ||
         casper_chronicle_query(store2, question, &json2, &qreceipt2) != 0 ||
@@ -809,6 +846,24 @@ int casper_chronicle_self_test(void) {
     remove(path); remove("chronicle-self-test.txt.chronicle"); remove("chronicle-self-test.txt.chronicle.receipt");
     remove(conflict_path); remove("chronicle-conflict-test.txt.chronicle"); remove("chronicle-conflict-test.txt.chronicle.receipt");
     remove(missing_path); remove("chronicle-missing-test.txt.chronicle"); remove("chronicle-missing-test.txt.chronicle.receipt");
+    fail += check_story_case("duplicate_payment",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t50\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t50\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "PARTIAL", "\"settled\":{\"num\":50,\"den\":1}");
+    fail += check_story_case("duplicate_full",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "UNKNOWN", "\"settled\":{\"num\":100,\"den\":1}");
+    fail += check_story_case("distinct_payments",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t50\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t50\tSAR\tT3\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "SUPPORTED", "\"settled\":{\"num\":100,\"den\":1}");
     fail += check_story_case("currency_mismatch",
         "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
         "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tUSD\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
