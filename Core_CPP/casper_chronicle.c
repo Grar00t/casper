@@ -906,6 +906,21 @@ int casper_chronicle_self_test(void) {
         !expect_status(json, "PARTIAL") ||
         strstr(json, "\"settled\":{\"num\":40,\"den\":1}") == NULL ||
         strstr(json, "أحمدان") != NULL || casper_chronicle_verify(qreceipt) != 0) ++fail;
+    /* Ordinary UTF-8 source is searchable without invented event extraction. */
+    {
+        char *matches = NULL, *find_receipt = NULL, *absent = NULL, *absent_receipt = NULL;
+        if (casper_chronicle_find(store, "أحمد خالد", &matches, &find_receipt) != 0 ||
+            !matches || !strstr(matches, "\"status\":\"MATCHES\"") ||
+            !strstr(matches, "\"lexical_only\":true") ||
+            !strstr(matches, "بداية القصة") ||
+            casper_chronicle_verify(find_receipt) != 0) ++fail;
+        if (casper_chronicle_find(store, "زرافةحمراء", &absent, &absent_receipt) != 0 ||
+            !absent || !strstr(absent, "\"status\":\"NO_MATCH\"") ||
+            casper_chronicle_verify(absent_receipt) != 0) ++fail;
+        if (find_receipt) remove(find_receipt);
+        if (absent_receipt) remove(absent_receipt);
+        free(matches); free(find_receipt); free(absent); free(absent_receipt);
+    }
     if (!niyah_sha256_file(store, before) ||
         casper_chronicle_ingest(path, &repeat_store, &repeat_receipt) != 0 ||
         !niyah_sha256_file(store, after) || memcmp(before, after, 32u) != 0) ++fail;
