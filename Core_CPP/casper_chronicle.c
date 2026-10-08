@@ -259,19 +259,27 @@ static int source_size(const char *path, uint64_t *size) {
     if (fseek(f, 0, SEEK_END) != 0 || (end = ftell(f)) < 0 || fclose(f) != 0) return -1;
     *size = (uint64_t)end; return 0;
 }
-/* Enforce event-count bounds before realloc on BOTH newline and EOF paths. */
-static int append_event(ChrStore *s, uint32_t *count, const ChrEvent *event) {
-    ChrEvent *next;
+/* Amortized O(1) append, with a hard event cap checked before any allocation. */
+static int append_event(ChrStore *s, uint32_t *count, size_t *capacity,
+                        const ChrEvent *event) {
     if (*count >= CHR_MAX_EVENTS) return -1;
-    next = (ChrEvent *)realloc(s->events, ((size_t)*count + 1u) * sizeof(*next));
-    if (!next) return -1;
-    s->events = next;
+    if ((size_t)*count >= *capacity) {
+        size_t wanted = *capacity ? *capacity * 2u : 16u;
+        ChrEvent *next;
+        if (wanted > CHR_MAX_EVENTS) wanted = CHR_MAX_EVENTS;
+        if (wanted <= *capacity || wanted > SIZE_MAX / sizeof(*next)) return -1;
+        next = (ChrEvent *)realloc(s->events, wanted * sizeof(*next));
+        if (!next) return -1;
+        s->events = next;
+        *capacity = wanted;
+    }
     s->events[(*count)++] = *event;
     return 0;
 }
 static int extract_events_file(const char *path, ChrStore *s, ChrHashAlloc hash_alloc) {
     FILE *f = fopen(path, "rb"); uint8_t *line = NULL; size_t len = 0u, cap = 0u;
-    uint64_t offset = 0u, line_start = 0u, line_no = 1u; uint32_t count = 0u; int ch, rc = 0;
+    uint64_t offset = 0u, line_start = 0u, line_no = 1u; uint32_t count = 0u;
+    size_t capacity = 0u; int ch, rc = 0;
     if (!f) return -1;
     while ((ch = fgetc(f)) != EOF) {
         if (ch == '\n') {
@@ -281,7 +289,7 @@ static int extract_events_file(const char *path, ChrStore *s, ChrHashAlloc hash_
             if (!utf8_valid(line, event_len)) { rc = -1; break; }
             rc = parse_event_line(line, event_len, line_start, line_no, s->document_hash, &parsed, hash_alloc);
             if (rc < 0) break;
-            if (rc == 0 && append_event(s, &count, &parsed) != 0) { rc = -1; break; }
+            if (rc == 0 && append_event(s, &count, &capacity, &parsed) != 0) { rc = -1; break; }
             len = 0u; ++offset; line_start = offset; ++line_no; rc = 0; continue;
         }
         if (len == cap) {
@@ -301,7 +309,7 @@ static int extract_events_file(const char *path, ChrStore *s, ChrHashAlloc hash_
         if (!utf8_valid(line, event_len)) rc = -1;
         else {
             rc = parse_event_line(line, event_len, line_start, line_no, s->document_hash, &parsed, hash_alloc);
-            if (rc == 0 && append_event(s, &count, &parsed) != 0) rc = -1;
+            if (rc == 0 && append_event(s, &count, &capacity, &parsed) != 0) rc = -1;
             if (rc == 1) rc = 0;
         }
     }
@@ -916,9 +924,25 @@ int casper_chronicle_self_test(void) {
         ChrStore at_capacity = {0};
         ChrEvent event = {0};
         uint32_t count = CHR_MAX_EVENTS;
-        if (append_event(&at_capacity, &count, &event) == 0 ||
-            count != CHR_MAX_EVENTS || at_capacity.events != NULL) ++fail;
+        size_t capacity = CHR_MAX_EVENTS;
+        if (append_event(&at_capacity, &count, &capacity, &event) == 0 ||
+            count != CHR_MAX_EVENTS || capacity != CHR_MAX_EVENTS ||
+            at_capacity.events != NULL) ++fail;
         store_free(&at_capacity);
+    }
+    /* Growth across 16 elements must preserve previously appended events. */
+    {
+        ChrStore growing = {0};
+        ChrEvent event = {0};
+        uint32_t count = 0u, i; size_t capacity = 0u;
+        for (i = 0u; i < 20u; ++i) {
+            event.byte_start = (uint64_t)i;
+            if (append_event(&growing, &count, &capacity, &event) != 0) { ++fail; break; }
+        }
+        if (count != 20u || capacity < count || !growing.events) ++fail;
+        else for (i = 0u; i < count; ++i)
+            if (growing.events[i].byte_start != (uint64_t)i) { ++fail; break; }
+        store_free(&growing);
     }
     /* Hashing allocation failure must abort ingestion without zero-ID artifacts. */
     {
