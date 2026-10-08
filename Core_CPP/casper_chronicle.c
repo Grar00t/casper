@@ -560,6 +560,10 @@ static int reason_json(const ChrStore *s, const char *question, char **out) {
         if (strcmp(e->subject, debt->subject) != 0 ||
             !(strcmp(e->predicate, "PAID_TO") == 0 ||
               strcmp(e->predicate, "TRANSFER_TO") == 0)) continue;
+        direct = strcmp(e->object, debt->object) == 0;
+        via_intermediary = is_intermediary(s, e->object, debt->object, &intermediary_i);
+        /* A payment to an unrelated party says nothing about the selected loan. */
+        if (!direct && !via_intermediary) continue;
         used[i] = 1u;
         if (opposite_conflict(s, e)) { conflict = 1; continue; }
         /* Unconfirmed, unspecified or differently denominated sums never settle this debt. */
@@ -574,12 +578,8 @@ static int reason_json(const ChrStore *s, const char *question, char **out) {
                 strcmp(earlier->status, e->status) == 0) break;
         }
         if (j < i) { uncertain = 1; continue; }
-        direct = strcmp(e->object, debt->object) == 0;
-        via_intermediary = is_intermediary(s, e->object, debt->object, &intermediary_i);
-        if (direct || via_intermediary) {
-            if (rat_add(settled, e->amount, &settled) != 0) { conflict = 1; break; }
-            if (via_intermediary) used[intermediary_i] = 1u;
-        } else uncertain = 1;
+        if (rat_add(settled, e->amount, &settled) != 0) { conflict = 1; break; }
+        if (via_intermediary) used[intermediary_i] = 1u;
     }
     if (conflict) status = "CONFLICT";
     else if (!debt || debt_ambiguous) status = "UNKNOWN";
@@ -591,7 +591,7 @@ static int reason_json(const ChrStore *s, const char *question, char **out) {
         buf_add(&b, "\",\"question\":") != 0 ||
         buf_add_json(&b, (const uint8_t *)question, strlen(question)) != 0 ||
         buf_add(&b, ",\"debt\":") != 0) goto fail;
-    if (debt) {
+    if (debt && !debt_ambiguous && !conflict) {
         if (buf_add(&b, "{\"num\":") != 0 || buf_add_i64(&b, debt->amount.num) != 0 ||
             buf_add(&b, ",\"den\":") != 0 || buf_add_i64(&b, debt->amount.den) != 0 ||
             buf_add(&b, ",\"currency\":") != 0 ||
@@ -862,6 +862,13 @@ int casper_chronicle_self_test(void) {
         "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
         "@chronicle\tأحمد\tPAID_TO\tخالد\t50\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
         "@chronicle\tأحمد\tPAID_TO\tخالد\t50\tSAR\tT3\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "",
+        "هل سدد أحمد دين خالد؟", "SUPPORTED", "\"settled\":{\"num\":100,\"den\":1}");
+    fail += check_story_case("unrelated_payment_conflict",
+        "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tSAR\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tعلي\t500\tUSD\tT3\tASSERTED\tPOSITIVE\tCONFIRMED\n"
+        "@chronicle\tأحمد\tPAID_TO\tعلي\t500\tUSD\tT3\tASSERTED\tNEGATIVE\tCONFIRMED\n"
         "",
         "هل سدد أحمد دين خالد؟", "SUPPORTED", "\"settled\":{\"num\":100,\"den\":1}");
     fail += check_story_case("currency_mismatch",
