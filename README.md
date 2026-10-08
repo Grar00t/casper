@@ -239,6 +239,7 @@ document, preserves the original bytes, and returns only `SUPPORTED`,
 ```bash
 ./build/casper-chronicle ingest tests/fixtures/chronicle_ahmed_ar.txt
 ./build/casper-chronicle query tests/fixtures/chronicle_ahmed_ar.txt.chronicle "هل سدد أحمد دين خالد؟"
+./build/casper-chronicle find tests/fixtures/chronicle_ahmed_ar.txt.chronicle "أحمد خالد"
 ./build/casper-chronicle verify tests/fixtures/chronicle_ahmed_ar.txt.chronicle.receipt
 ./build/casper-chronicle --benchmark
 ```
@@ -250,6 +251,9 @@ Confirmed payments must match the debt currency; duplicates cannot silently
 count twice, and queries matching multiple confirmed debts return UNKNOWN.
 Chronicle re-parses stored events against their original source bytes on load.
 These are explicit input claims, not independently verified real-world payments.
+The `find` command now retrieves up to eight highest matching original source
+lines from **ordinary UTF-8 prose** with exact offsets, line numbers and SHA-256.
+It is literal term matching, not Arabic semantic comprehension or inference.
 The generated receipt validates bytes and deterministic results only. It is not
 a truth, authenticity, or legal certificate. See
 [`docs/CHRONICLE_CONTRACT.md`](docs/CHRONICLE_CONTRACT.md) for the complete
