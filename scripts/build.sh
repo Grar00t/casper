@@ -171,6 +171,10 @@ if [[ -f "$CORE/bench_niyah.c" ]]; then
     build_target bench_niyah "$CORE/bench_niyah.c" "$CORE/niyah_core.c"
 fi
 
+# Run sampler regression in both release and sanitizer-enabled debug builds.
+build_target niyah_sampler_test "$CORE/niyah_core.c" "$ROOT/tests/test_niyah_sampler.c"
+"$BUILD/niyah_sampler_test"
+
 printf '%-16s' "tokenizer_test"
 # shellcheck disable=SC2086
 "$CC" $CFLAGS -DTOKENIZER_TEST "$ROOT/tokenizer.c" -o "$BUILD/tokenizer_test" $LDFLAGS
