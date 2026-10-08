@@ -246,6 +246,10 @@ document, preserves the original bytes, and returns only `SUPPORTED`,
 The baseline uses no network, SaaS, runtime model download, KHZ_Q decision, or
 `.nrule` semantic extraction. Free prose is stored but does not create facts.
 Amounts are non-negative integer rationals; floating-point amounts are rejected.
+Confirmed payments must match the debt currency; duplicates cannot silently
+count twice, and queries matching multiple confirmed debts return UNKNOWN.
+Chronicle re-parses stored events against their original source bytes on load.
+These are explicit input claims, not independently verified real-world payments.
 The generated receipt validates bytes and deterministic results only. It is not
 a truth, authenticity, or legal certificate. See
 [`docs/CHRONICLE_CONTRACT.md`](docs/CHRONICLE_CONTRACT.md) for the complete
