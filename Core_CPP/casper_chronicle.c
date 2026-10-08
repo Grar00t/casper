@@ -527,17 +527,32 @@ static int is_intermediary(const ChrStore *s, const char *person, const char *le
     }
     return 0;
 }
+/* UTF-8 entity matching is byte-exact; punctuation is a boundary, not a name. */
 static int entity_boundary(const unsigned char *p) {
     if (*p == '\0') return 1;
-    if (*p < 0x80u) return !((*p >= '0' && *p <= '9') || (*p >= 'A' && *p <= 'Z') ||
-                             (*p >= 'a' && *p <= 'z') || *p == '_');
-    return (p[0] == 0xd8u && (p[1] == 0x8cu || p[1] == 0x9bu || p[1] == 0x9fu));
+    if (*p < 0x80u)
+        return !((*p >= '0' && *p <= '9') || (*p >= 'A' && *p <= 'Z') ||
+                 (*p >= 'a' && *p <= 'z') || *p == '_');
+    /* Arabic comma, semicolon, question mark, full stop; NBSP. */
+    if ((p[0] == 0xd8u && (p[1] == 0x8cu || p[1] == 0x9bu || p[1] == 0x9fu)) ||
+        (p[0] == 0xdbu && p[1] == 0x94u) ||
+        (p[0] == 0xc2u && p[1] == 0xa0u)) return 1;
+    /* Unicode dash, typographic quotes, ellipsis. */
+    return p[0] == 0xe2u && p[1] == 0x80u &&
+           ((p[2] >= 0x90u && p[2] <= 0x95u) ||
+            (p[2] >= 0x98u && p[2] <= 0x9du) || p[2] == 0xa6u);
 }
 static int contains_entity(const char *text, const char *entity) {
     const char *p = text; size_t n = strlen(entity);
     while ((p = strstr(p, entity)) != NULL) {
-        int left = p == text || entity_boundary((const unsigned char *)p - 1u);
-        int right = entity_boundary((const unsigned char *)p + n);
+        int left = 1, right;
+        if (p > text) {
+            const unsigned char *prev = (const unsigned char *)p - 1u;
+            while (prev > (const unsigned char *)text && (*prev & 0xc0u) == 0x80u)
+                --prev;
+            left = entity_boundary(prev);
+        }
+        right = entity_boundary((const unsigned char *)p + n);
         if (left && right) return 1;
         ++p;
     }
@@ -1006,6 +1021,16 @@ int casper_chronicle_self_test(void) {
         !niyah_sha256_file(store, after) || memcmp(before, after, 32u) != 0) ++fail;
     if (casper_chronicle_query(store, "هل سدد أحمدان دين خالد؟", &similar_json, &similar_receipt) != 0 ||
         !expect_status(similar_json, "UNKNOWN")) ++fail;
+    /* Arabic punctuation before a name must not hide an otherwise exact entity. */
+    {
+        const char *punct_question = "هل،أحمد سدد دين خالد؟";
+        char *punct_json = NULL, *punct_receipt = NULL;
+        if (casper_chronicle_query(store, punct_question, &punct_json, &punct_receipt) != 0 ||
+            !punct_json || !expect_status(punct_json, "PARTIAL") ||
+            !punct_receipt || casper_chronicle_verify(punct_receipt) != 0) ++fail;
+        if (punct_receipt) remove(punct_receipt);
+        free(punct_json); free(punct_receipt);
+    }
     if (store_load(store, &loaded) != 0) ++fail;
     else {
         uint32_t i;
