@@ -60,17 +60,34 @@ to solver variables and must preserve the outcomes below.
 
 ## Outputs
 
-- SUPPORTED: confirmed/eligible payments equal the stated debt exactly.
-- PARTIAL: confirmed/eligible payments are greater than zero and less than
-  the stated debt.
-- CONFLICT: opposite-polarity duplicate records exist, rational aggregation
-  overflows, or eligible payments exceed the debt.
-- UNKNOWN: the debt cannot be selected exactly, no eligible payment is
-  established, or an intermediary/receipt link is missing.
+- SUPPORTED: one confirmed debt is selected, confirmed payments in its
+  exact currency equal the debt, and no related payment ambiguity remains.
+- PARTIAL: confirmed eligible payments exceed zero but remain below the
+  selected debt; pending or unrelated evidence cannot be silently counted.
+- CONFLICT: opposite-polarity records describe the same claim at the same
+  time, rational aggregation overflows, or confirmed eligible payments
+  exceed the selected debt.
+- UNKNOWN: zero or multiple matching confirmed debts, missing or unconfirmed
+  intermediary/receipt links, no eligible payment, or unresolved ambiguity
+  when the summed known payments already equal the debt.
 
 PAID and FRAUD are not output states. A transfer counts only when CONFIRMED.
-A payment to a third party counts only when an explicit positive
-INTERMEDIARY_FOR event links that exact party to the lender.
+A payment to a third party counts only when an explicit positive, CONFIRMED,
+and uncontradicted INTERMEDIARY_FOR event links that exact party to the lender.
+Neither ASSERTED nor PENDING amounts settle a debt, even if their polarity is
+POSITIVE. Payments in currencies other than the selected debt currency do not
+reduce the displayed settled amount. Exact borrower/lender matches that select
+multiple confirmed debts are UNKNOWN, never the first encountered debt.
+
+Repeated payments with the same payer, receiver, predicate, amount, currency,
+time expression, polarity and confirmation status have no unique transaction
+identifier. Chronicle counts at most one and marks the remainder unresolved
+instead of silently double-counting. Separate times are distinct records.
+A fully covered sum accompanied by unresolved duplicate/payment claims is
+UNKNOWN instead of asserting full settlement.
+
+`CONFIRMED` is only a status *supplied by the input document*, not a
+separate check that a payment occurred in the world.
 
 Every used reasoning step is returned with its event ID and exact evidence span.
 
@@ -81,8 +98,16 @@ question bytes for queries, and canonical result bytes. verify reopens the
 store, validates document and span hashes, reruns the deterministic query, and
 compares the result hash.
 
+On loading the binary store, Chronicle checks source hashes, exact event
+span offsets and line numbers, re-parses each event from its original UTF-8
+source line, and rejects mismatching cached event fields, IDs, and spans.
+Incomplete or malformed lines starting with a recognized `@chronicle`
+directive fail ingestion rather than disappearing as ordinary prose.
+
 The receipt is an integrity checksum, not a signature, provenance guarantee,
-truth certificate, legal conclusion, or authenticity proof.
+truth certificate, legal conclusion, or authenticity proof. A malicious author
+can intentionally provide a false but internally consistent CONFIRMED claim;
+integrity and factual truth are distinct.
 
 ## Resource limits
 
