@@ -259,6 +259,16 @@ static int source_size(const char *path, uint64_t *size) {
     if (fseek(f, 0, SEEK_END) != 0 || (end = ftell(f)) < 0 || fclose(f) != 0) return -1;
     *size = (uint64_t)end; return 0;
 }
+/* Enforce event-count bounds before realloc on BOTH newline and EOF paths. */
+static int append_event(ChrStore *s, uint32_t *count, const ChrEvent *event) {
+    ChrEvent *next;
+    if (*count >= CHR_MAX_EVENTS) return -1;
+    next = (ChrEvent *)realloc(s->events, ((size_t)*count + 1u) * sizeof(*next));
+    if (!next) return -1;
+    s->events = next;
+    s->events[(*count)++] = *event;
+    return 0;
+}
 static int extract_events_file(const char *path, ChrStore *s, ChrHashAlloc hash_alloc) {
     FILE *f = fopen(path, "rb"); uint8_t *line = NULL; size_t len = 0u, cap = 0u;
     uint64_t offset = 0u, line_start = 0u, line_no = 1u; uint32_t count = 0u; int ch, rc = 0;
@@ -271,13 +281,7 @@ static int extract_events_file(const char *path, ChrStore *s, ChrHashAlloc hash_
             if (!utf8_valid(line, event_len)) { rc = -1; break; }
             rc = parse_event_line(line, event_len, line_start, line_no, s->document_hash, &parsed, hash_alloc);
             if (rc < 0) break;
-            if (rc == 0) {
-                ChrEvent *next;
-                if (count >= CHR_MAX_EVENTS) { rc = -1; break; }
-                next = (ChrEvent *)realloc(s->events, ((size_t)count + 1u) * sizeof(*next));
-                if (!next) { rc = -1; break; }
-                s->events = next; s->events[count++] = parsed;
-            }
+            if (rc == 0 && append_event(s, &count, &parsed) != 0) { rc = -1; break; }
             len = 0u; ++offset; line_start = offset; ++line_no; rc = 0; continue;
         }
         if (len == cap) {
@@ -297,11 +301,7 @@ static int extract_events_file(const char *path, ChrStore *s, ChrHashAlloc hash_
         if (!utf8_valid(line, event_len)) rc = -1;
         else {
             rc = parse_event_line(line, event_len, line_start, line_no, s->document_hash, &parsed, hash_alloc);
-            if (rc == 0) {
-                ChrEvent *next = (ChrEvent *)realloc(s->events, ((size_t)count + 1u) * sizeof(*next));
-                if (!next || count >= CHR_MAX_EVENTS) rc = -1;
-                else { s->events = next; s->events[count++] = parsed; }
-            }
+            if (rc == 0 && append_event(s, &count, &parsed) != 0) rc = -1;
             if (rc == 1) rc = 0;
         }
     }
@@ -911,6 +911,15 @@ int casper_chronicle_self_test(void) {
     uint8_t *bytes = NULL; size_t n = 0u; ChrStore loaded; int fail = 0;
     uint8_t before[32], after[32];
     memset(&loaded, 0, sizeof(loaded));
+    /* No reallocation may occur beyond the event cap, even at unterminated EOF. */
+    {
+        ChrStore at_capacity = {0};
+        ChrEvent event = {0};
+        uint32_t count = CHR_MAX_EVENTS;
+        if (append_event(&at_capacity, &count, &event) == 0 ||
+            count != CHR_MAX_EVENTS || at_capacity.events != NULL) ++fail;
+        store_free(&at_capacity);
+    }
     /* Hashing allocation failure must abort ingestion without zero-ID artifacts. */
     {
         const char *input = "chronicle-oom-self-test.txt";
@@ -1045,6 +1054,10 @@ int casper_chronicle_self_test(void) {
         "@chronicle\tأحمد\tPAID_TO\tعلي\t500\tUSD\tT3\tASSERTED\tNEGATIVE\tCONFIRMED\n"
         "",
         "هل سدد أحمد دين خالد؟", "SUPPORTED", "\"settled\":{\"num\":100,\"den\":1}");
+    fail += check_story_case("unterminated_last_line",
+        "@chronicle\\tأحمد\\tBORROWED_FROM\\tخالد\\t100\\tSAR\\tT1\\tASSERTED\\tPOSITIVE\\tCONFIRMED\\n"
+        "@chronicle\\tأحمد\\tPAID_TO\\tخالد\\t100\\tSAR\\tT2\\tASSERTED\\tPOSITIVE\\tCONFIRMED",
+        "هل سدد أحمد دين خالد؟", "SUPPORTED", "\\"settled\\":{\\"num\\":100,\\"den\\":1}");
     fail += check_story_case("currency_mismatch",
         "@chronicle\tأحمد\tBORROWED_FROM\tخالد\t100\tSAR\tT1\tASSERTED\tPOSITIVE\tCONFIRMED\n"
         "@chronicle\tأحمد\tPAID_TO\tخالد\t100\tUSD\tT2\tASSERTED\tPOSITIVE\tCONFIRMED\n"
