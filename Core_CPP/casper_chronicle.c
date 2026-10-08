@@ -387,50 +387,50 @@ static int store_load(const char *path, ChrStore *s) {
     }
     niyah_sha256(s->source, (size_t)s->source_size, actual);
     if (memcmp(actual, s->document_hash, 32u) != 0) { store_free(s); return -1; }
-    for (i = 0u; i < s->event_count; ++i) {
-        ChrEvent *e = &s->events[i];
-        niyah_sha256(s->source + e->byte_start, (size_t)(e->byte_end - e->byte_start), actual);
-        if (memcmp(actual, e->span_hash, 32u) != 0) { store_free(s); return -1; }
-    }
-    /* Reconstruct every typed event from the exact source bytes before it may be used. */
+    /* Fail closed if ANY directive in the original source was omitted, reordered,
+     * or mismatched by the cached event array. The source, not event_count,
+     * determines which events must exist. */
     {
-        uint64_t scan = 0u, line_no = 1u, previous_end = 0u;
-        for (i = 0u; i < s->event_count; ++i) {
-            const ChrEvent *e = &s->events[i];
+        size_t scan = 0u;
+        uint64_t line_no = 1u;
+        uint32_t seen = 0u;
+        const size_t source_n = (size_t)s->source_size;
+        while (scan < source_n) {
+            size_t start = scan, end;
             ChrEvent parsed;
-            if (e->byte_start < previous_end || e->line_start == 0u ||
-                e->line_start != e->line_end || e->amount.num < 0 || e->amount.den <= 0) {
-                store_free(s); return -1;
+            int parse_rc;
+            while (scan < source_n && s->source[scan] != '\n') ++scan;
+            end = scan;
+            if (end > start && s->source[end - 1u] == '\r') --end;
+            parse_rc = parse_event_line(s->source + start, end - start, (uint64_t)start,
+                                        line_no, s->document_hash, &parsed, malloc);
+            if (parse_rc < 0) { store_free(s); return -1; }
+            if (parse_rc == 0) {
+                const ChrEvent *e;
+                if (seen >= s->event_count) { store_free(s); return -1; }
+                e = &s->events[seen++];
+                if (memcmp(parsed.event_id, e->event_id, 32u) != 0 ||
+                    memcmp(parsed.span_id, e->span_id, 32u) != 0 ||
+                    memcmp(parsed.span_hash, e->span_hash, 32u) != 0 ||
+                    parsed.byte_start != e->byte_start || parsed.byte_end != e->byte_end ||
+                    parsed.line_start != e->line_start || parsed.line_end != e->line_end ||
+                    parsed.amount_present != e->amount_present ||
+                    parsed.amount.num != e->amount.num || parsed.amount.den != e->amount.den ||
+                    strcmp(parsed.subject, e->subject) != 0 ||
+                    strcmp(parsed.predicate, e->predicate) != 0 ||
+                    strcmp(parsed.object, e->object) != 0 ||
+                    strcmp(parsed.currency, e->currency) != 0 ||
+                    strcmp(parsed.time_expr, e->time_expr) != 0 ||
+                    strcmp(parsed.modality, e->modality) != 0 ||
+                    strcmp(parsed.polarity, e->polarity) != 0 ||
+                    strcmp(parsed.status, e->status) != 0) {
+                    store_free(s); return -1;
+                }
             }
-            while (scan < e->byte_start) {
-                if (s->source[scan] == '\n') ++line_no;
-                ++scan;
-            }
-            if (e->line_start != line_no ||
-                (e->byte_start > 0u && s->source[e->byte_start - 1u] != '\n') ||
-                (e->byte_end < s->source_size &&
-                 s->source[e->byte_end] != '\n' &&
-                 !(s->source[e->byte_end] == '\r' && e->byte_end + 1u < s->source_size &&
-                   s->source[e->byte_end + 1u] == '\n')) ||
-                parse_event_line(s->source + e->byte_start,
-                                 (size_t)(e->byte_end - e->byte_start), e->byte_start,
-                                 e->line_start, s->document_hash, &parsed, malloc) != 0 ||
-                memcmp(parsed.event_id, e->event_id, 32u) != 0 ||
-                memcmp(parsed.span_id, e->span_id, 32u) != 0 ||
-                parsed.amount_present != e->amount_present ||
-                parsed.amount.num != e->amount.num || parsed.amount.den != e->amount.den ||
-                strcmp(parsed.subject, e->subject) != 0 ||
-                strcmp(parsed.predicate, e->predicate) != 0 ||
-                strcmp(parsed.object, e->object) != 0 ||
-                strcmp(parsed.currency, e->currency) != 0 ||
-                strcmp(parsed.time_expr, e->time_expr) != 0 ||
-                strcmp(parsed.modality, e->modality) != 0 ||
-                strcmp(parsed.polarity, e->polarity) != 0 ||
-                strcmp(parsed.status, e->status) != 0) {
-                store_free(s); return -1;
-            }
-            previous_end = e->byte_end;
+            if (scan < source_n) ++scan; /* consume newline, if present */
+            ++line_no;
         }
+        if (seen != s->event_count) { store_free(s); return -1; }
     }
     return 0;
 }
@@ -1020,6 +1020,27 @@ int casper_chronicle_self_test(void) {
                 casper_chronicle_query(store, question, &unexpected_json, &unexpected_receipt) == 0) ++fail;
             bytes[typed_off] ^= 1u;
             if (write_bytes(store, bytes, n) != 0) ++fail;
+            free(unexpected_json); free(unexpected_receipt);
+        }
+    }
+    /* A store whose original source still has events must reject a forged
+     * zero event count, even when the remaining source/hash bytes are valid. */
+    if (bytes) {
+        const size_t header_n = 16u + 32u + 8u + 8u + 4u;
+        const size_t source_end = header_n + sizeof(story) - 1u;
+        if (n <= source_end || bytes[64] == 0u) ++fail;
+        else {
+            uint8_t count_before[4];
+            char *unexpected_json = NULL, *unexpected_receipt = NULL;
+            memcpy(count_before, bytes + 64u, 4u);
+            memset(bytes + 64u, 0, 4u); /* corrupt only metadata: hide ALL events */
+            if (write_bytes(store, bytes, source_end) != 0 ||
+                casper_chronicle_query(store, question, &unexpected_json,
+                                      &unexpected_receipt) == 0 ||
+                casper_chronicle_verify(receipt) == 0) ++fail;
+            memcpy(bytes + 64u, count_before, 4u);
+            if (write_bytes(store, bytes, n) != 0 ||
+                casper_chronicle_verify(receipt) != 0) ++fail;
             free(unexpected_json); free(unexpected_receipt);
         }
     }
