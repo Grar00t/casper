@@ -9,10 +9,11 @@ static void usage(const char *program) {
             "usage:\n"
             "  %s ingest FILE\n"
             "  %s query STORE \"QUESTION\"\n"
+            "  %s find STORE \"TERMS\"\n"
             "  %s verify RECEIPT\n"
             "  %s --self-check\n"
             "  %s --benchmark\n",
-            program, program, program, program, program);
+            program, program, program, program, program, program);
 }
 
 int main(int argc, char **argv) {
@@ -39,6 +40,13 @@ int main(int argc, char **argv) {
         if (rc == 0) {
             printf("%s\nreceipt=%s\n", output, receipt);
         }
+        casper_chronicle_free(output);
+        casper_chronicle_free(receipt);
+        return rc;
+    }
+    if (argc == 4 && strcmp(argv[1], "find") == 0) {
+        rc = casper_chronicle_find(argv[2], argv[3], &output, &receipt);
+        if (rc == 0) printf("%s\nreceipt=%s\n", output, receipt);
         casper_chronicle_free(output);
         casper_chronicle_free(receipt);
         return rc;
