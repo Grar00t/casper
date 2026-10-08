@@ -611,6 +611,109 @@ static int reason_json(const ChrStore *s, const char *question, char **out) {
 fail:
     free(used); free(b.data); return -1;
 }
+
+/* Bounded exact-byte lexical retrieval over unmodified UTF-8 source lines.
+ * This is NOT an inference or semantic comprehension layer. */
+typedef struct {
+    size_t start, end;
+    uint64_t line_no;
+    unsigned hits;
+} ChrFound;
+static int token_is_space(unsigned char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' ||
+           c == '.' || c == ',' || c == ';' || c == ':' || c == '?' || c == '!';
+}
+static int line_has_bytes(const uint8_t *line, size_t n, const char *needle, size_t len) {
+    size_t i;
+    if (!len || len > n) return 0;
+    for (i = 0u; i <= n - len; ++i)
+        if (line[i] == (uint8_t)needle[0] && memcmp(line + i, needle, len) == 0) return 1;
+    return 0;
+}
+static int find_json(const ChrStore *s, const char *query, char **out) {
+    struct { const char *p; size_t len; } terms[16];
+    ChrFound best[8]; size_t pos = 0u, nt = 0u, returned = 0u, total = 0u;
+    size_t qi = 0u, qlen = strlen(query), i, j; uint64_t line_no = 1u;
+    ChrBuf b = {0};
+    char hex[65]; 
+    if (!qlen || qlen > 1024u || !utf8_valid((const uint8_t *)query, qlen)) return -1;
+    while (qi < qlen) {
+        size_t begin;
+        while (qi < qlen && token_is_space((unsigned char)query[qi])) ++qi;
+        if (qi >= qlen) break;
+        begin = qi;
+        while (qi < qlen && !token_is_space((unsigned char)query[qi])) ++qi;
+        if (nt >= sizeof(terms) / sizeof(terms[0])) return -1;
+        terms[nt].p = query + begin; terms[nt].len = qi - begin; ++nt;
+    }
+    if (!nt) return -1;
+    while (pos < (size_t)s->source_size) {
+        size_t begin = pos, end; unsigned score = 0u;
+        while (pos < (size_t)s->source_size && s->source[pos] != '\n') ++pos;
+        end = pos;
+        if (end > begin && s->source[end - 1u] == '\r') --end;
+        if (pos < (size_t)s->source_size) ++pos;
+        if (end > begin) {
+            for (i = 0u; i < nt; ++i)
+                score += (unsigned)line_has_bytes(s->source + begin, end - begin,
+                                                  terms[i].p, terms[i].len);
+        }
+        if (score) {
+            ChrFound candidate = {begin, end, line_no, score};
+            ++total;
+            if (returned < sizeof(best) / sizeof(best[0])) best[returned++] = candidate;
+            else {
+                size_t worst = 0u;
+                for (i = 1u; i < returned; ++i)
+                    if (best[i].hits < best[worst].hits ||
+                        (best[i].hits == best[worst].hits && best[i].start > best[worst].start))
+                        worst = i;
+                if (score > best[worst].hits) best[worst] = candidate;
+            }
+        }
+        ++line_no;
+    }
+    for (i = 1u; i < returned; ++i) {
+        ChrFound cur = best[i]; j = i;
+        while (j > 0u && (best[j - 1u].hits < cur.hits ||
+               (best[j - 1u].hits == cur.hits && best[j - 1u].start > cur.start))) {
+            best[j] = best[j - 1u]; --j;
+        }
+        best[j] = cur;
+    }
+    niyah_hash_to_hex(s->document_hash, hex);
+    if (buf_add(&b, "{\"status\":\"") != 0 ||
+        buf_add(&b, total ? "MATCHES" : "NO_MATCH") != 0 ||
+        buf_add(&b, "\",\"query\":") != 0 ||
+        buf_add_json(&b, (const uint8_t *)query, qlen) != 0 ||
+        buf_add(&b, ",\"document_sha256\":\"") != 0 ||
+        buf_add(&b, hex) != 0 ||
+        buf_add(&b, "\",\"total_matching_lines\":") != 0 ||
+        buf_add_u64(&b, (uint64_t)total) != 0 ||
+        buf_add(&b, ",\"lexical_only\":true,\"matches\":[") != 0) goto error;
+    for (i = 0u; i < returned; ++i) {
+        uint8_t hash[32];
+        if (i && buf_add(&b, ",") != 0) goto error;
+        if (buf_add(&b, "{\"line\":") != 0 || buf_add_u64(&b, best[i].line_no) != 0 ||
+            buf_add(&b, ",\"byte_start\":") != 0 ||
+            buf_add_u64(&b, (uint64_t)best[i].start) != 0 ||
+            buf_add(&b, ",\"byte_end\":") != 0 ||
+            buf_add_u64(&b, (uint64_t)best[i].end) != 0 ||
+            buf_add(&b, ",\"matched_terms\":") != 0 ||
+            buf_add_u64(&b, best[i].hits) != 0) goto error;
+        niyah_sha256(s->source + best[i].start, best[i].end - best[i].start, hash);
+        niyah_hash_to_hex(hash, hex);
+        if (buf_add(&b, ",\"exact_span_sha256\":\"") != 0 || buf_add(&b, hex) != 0 ||
+            buf_add(&b, "\",\"text\":") != 0 ||
+            buf_add_json(&b, s->source + best[i].start, best[i].end - best[i].start) != 0 ||
+            buf_add(&b, "}") != 0) goto error;
+    }
+    if (buf_add(&b, "]}") != 0) goto error;
+    *out = b.data; return 0;
+error:
+    free(b.data); return -1;
+}
+
 int casper_chronicle_ingest(const char *input_path, char **store_path_out, char **receipt_path_out) {
     ChrStore s, old; char *store_path = NULL, *receipt_path = NULL;
     uint8_t result_hash[32]; int same = 0;
@@ -653,6 +756,28 @@ int casper_chronicle_query(const char *store_path, const char *question,
     }
     free(suffix); store_free(&s); *json_out = json; *receipt_path_out = receipt; return 0;
 }
+
+int casper_chronicle_find(const char *store_path, const char *query,
+                          char **json_out, char **receipt_path_out) {
+    ChrStore s; char *json = NULL, *suffix = NULL, *receipt = NULL;
+    uint8_t qh[32], rh[32]; char qhex[65];
+    memset(&s, 0, sizeof(s));
+    if (!store_path || !query || !json_out || !receipt_path_out ||
+        !utf8_valid((const uint8_t *)query, strlen(query))) return 2;
+    if (store_load(store_path, &s) != 0 || find_json(&s, query, &json) != 0) {
+        store_free(&s); return 1;
+    }
+    niyah_sha256((const uint8_t *)query, strlen(query), qh); niyah_hash_to_hex(qh, qhex);
+    suffix = (char *)malloc(33u);
+    if (suffix) snprintf(suffix, 33u, ".find-%.16s.receipt", qhex);
+    if (suffix) receipt = path_suffix(store_path, suffix);
+    niyah_sha256((const uint8_t *)json, strlen(json), rh);
+    if (!suffix || !receipt || write_receipt(receipt, "FIND", store_path, query, rh, s.document_hash) != 0) {
+        free(json); free(suffix); free(receipt); store_free(&s); return 1;
+    }
+    free(suffix); store_free(&s); *json_out = json; *receipt_path_out = receipt; return 0;
+}
+
 static int line_value(char *line, const char *key, char **value) {
     size_t n = strlen(key);
     if (strncmp(line, key, n) != 0) return 0;
@@ -692,6 +817,9 @@ int casper_chronicle_verify(const char *receipt_path) {
     if (strcmp(kind, "INGEST") == 0) niyah_sha256_file((const char *)store_bytes, actual);
     else if (strcmp(kind, "QUERY") == 0 &&
              reason_json(&s, (const char *)question_bytes, &json) == 0)
+        niyah_sha256((const uint8_t *)json, strlen(json), actual);
+    else if (strcmp(kind, "FIND") == 0 &&
+             find_json(&s, (const char *)question_bytes, &json) == 0)
         niyah_sha256((const uint8_t *)json, strlen(json), actual);
     else goto done_store;
     niyah_hash_to_hex(actual, actual_hex); ok = strcmp(actual_hex, result_hex) == 0;
