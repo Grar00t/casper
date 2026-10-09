@@ -22,6 +22,10 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── casper_chronicle.c        # offline evidence store and reasoner
 │   ├── casper_chronicle.h        # Chronicle public C API
 │   ├── casper_chronicle_main.c   # Chronicle CLI entry point
+│   ├── chronicle_pool.c          # bounded aligned 16 MiB arena
+│   ├── chronicle_pool.h          # arena API and allocation metrics
+│   ├── chronicle_literal_parse.inc # bounded three-token input grammar
+│   ├── chronicle_literal_query.inc # exact literal evidence retrieval
 │   ├── casper_rag.c              # search transport, parser, ranker
 │   ├── casper_rag.h              # the live search contract
 │   ├── constraint_solver.c

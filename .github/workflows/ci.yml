@@ -68,6 +68,16 @@ jobs:
           ./build/casper --self-check
       - name: Chronicle raw million-word benchmark
         run: ./build/casper-chronicle --benchmark
+      - name: Chronicle strict acceptance and resource gates
+        run: python3 scripts/test_chronicle.py --compiler ${{ matrix.compiler }}
+      - name: Preserve Chronicle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chronicle-${{ matrix.compiler }}
+          path: |
+            build/chronicle-${{ matrix.compiler }}/*.txt
+            build/chronicle-${{ matrix.compiler }}/summary.json
 
   python-training-syntax:
     runs-on: ubuntu-latest

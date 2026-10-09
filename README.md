@@ -234,7 +234,9 @@ GitHub Actions builds and smokes the C runtime with GCC and Clang, runs the debu
 Chronicle is an offline, deterministic baseline for exact-source event evidence.
 It accepts explicit tab-separated `@chronicle` records embedded in a UTF-8
 document, preserves the original bytes, and returns only `SUPPORTED`,
-`PARTIAL`, `CONFLICT`, or `UNKNOWN`.
+`PARTIAL`, `CONFLICT`, or `UNKNOWN` for debt settlement. The separate `claim`
+command retrieves exact three-token statements such as `Alice knows Bob.` and
+returns `EXACT_STATED` or `UNRESOLVED` with byte-level evidence.
 
 ```bash
 ./build/casper-chronicle ingest tests/fixtures/chronicle_ahmed_ar.txt
@@ -242,10 +244,14 @@ document, preserves the original bytes, and returns only `SUPPORTED`,
 ./build/casper-chronicle find tests/fixtures/chronicle_ahmed_ar.txt.chronicle "أحمد خالد"
 ./build/casper-chronicle verify tests/fixtures/chronicle_ahmed_ar.txt.chronicle.receipt
 ./build/casper-chronicle --benchmark
+python3 scripts/test_chronicle.py --compiler gcc
+python3 scripts/test_chronicle.py --compiler clang
 ```
 
 The baseline uses no network, SaaS, runtime model download, KHZ_Q decision, or
-`.nrule` semantic extraction. Free prose is stored but does not create facts.
+`.nrule` semantic extraction. Prose outside the bounded literal grammar is
+stored without creating facts. Chronicle uses one 16 MiB static arena, with an
+8 MiB source ceiling and at most 4096 events; its API requires serial calls.
 Amounts are non-negative integer rationals; floating-point amounts are rejected.
 Confirmed payments must match the debt currency; duplicates cannot silently
 count twice, and queries matching multiple confirmed debts return UNKNOWN.
@@ -259,3 +265,5 @@ a truth, authenticity, or legal certificate. See
 [`docs/CHRONICLE_CONTRACT.md`](docs/CHRONICLE_CONTRACT.md) for the complete
 input grammar, reasoner states, evidence rules, resource limits, and integration
 boundary for any future extractor.
+See [`docs/CHRONICLE_LITERAL.md`](docs/CHRONICLE_LITERAL.md) for exact claim syntax
+and [`docs/CHRONICLE_VALIDATION.md`](docs/CHRONICLE_VALIDATION.md) for measured results.

@@ -9,7 +9,10 @@ extern "C" {
 
 /*
  * Chronicle v1 consumes explicit @chronicle event records embedded in UTF-8
- * source text. It does not infer facts from unrestricted prose.
+ * source text, plus bounded three-token literal statements (see CHRONICLE_LITERAL.md).
+ * One shared 16 MiB arena; serial calls only. Release successful outputs with
+ * casper_chronicle_free. Error returns do not transfer ownership of any output.
+ * It does not infer facts from unrestricted prose.
  */
 int casper_chronicle_ingest(const char *input_path, char **store_path_out,
                             char **receipt_path_out);

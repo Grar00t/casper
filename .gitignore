@@ -93,3 +93,4 @@ Architecture_Review.md
 Missing_Functions.md
 Refactor_Plan.md
 Roadmap.md
+tests/fixtures/*.chronicle
