@@ -194,7 +194,6 @@ printf '%s' '{"prompt":"hello","text":"candidate answer","rules":"Data_Training/
 The audit response separates the local KHZ_Q/text-rule gate from receipt verification. `verified` and `local_gate_verified` mean the local heuristic/rule checks passed and a receipt was created; `receipt_verified` remains false until a saved receipt is independently verified. This path explicitly reports `factual_truth_verified=false`.
 
 `--rag` currently uses the backend wired by `niyah_hybrid_main.c`; do not assume the standalone Casper CLI backend selection syntax applies to this command.
-```
 
 ## Integrity Receipt Verification
 
@@ -232,29 +231,33 @@ GitHub Actions builds and smokes the C runtime with GCC and Clang, runs the debu
 ## Casper Chronicle MVP
 
 Chronicle is an offline, deterministic baseline for exact-source event evidence.
-It accepts explicit tab-separated `@chronicle` records embedded in a UTF-8
-document, preserves the original bytes, and returns only `SUPPORTED`,
+It accepts explicit tab-separated `@chronicle` records and a documented set of
+complete Arabic debt/payment sentences embedded in a UTF-8 document, preserves
+the original bytes, and returns only `SUPPORTED`,
 `PARTIAL`, `CONFLICT`, or `UNKNOWN` for debt settlement. The separate `claim`
 command retrieves exact three-token statements such as `Alice knows Bob.` and
 returns `EXACT_STATED` or `UNRESOLVED` with byte-level evidence.
 
 ```bash
-./build/casper-chronicle ingest tests/fixtures/chronicle_ahmed_ar.txt
-./build/casper-chronicle query tests/fixtures/chronicle_ahmed_ar.txt.chronicle "هل سدد أحمد دين خالد؟"
-./build/casper-chronicle find tests/fixtures/chronicle_ahmed_ar.txt.chronicle "أحمد خالد"
-./build/casper-chronicle verify tests/fixtures/chronicle_ahmed_ar.txt.chronicle.receipt
+./build/casper-chronicle ingest tests/fixtures/chronicle_ahmed_prose_ar.txt
+./build/casper-chronicle query tests/fixtures/chronicle_ahmed_prose_ar.txt.chronicle "هل سدد أحمد دين خالد؟"
+./build/casper-chronicle find tests/fixtures/chronicle_ahmed_prose_ar.txt.chronicle "أحمد خالد"
+./build/casper-chronicle verify tests/fixtures/chronicle_ahmed_prose_ar.txt.chronicle.receipt
 ./build/casper-chronicle --benchmark
 python3 scripts/test_chronicle.py --compiler gcc
 python3 scripts/test_chronicle.py --compiler clang
 ```
 
 The baseline uses no network, SaaS, runtime model download, KHZ_Q decision, or
-`.nrule` semantic extraction. Prose outside the bounded literal grammar is
+`.nrule` semantic extraction. Prose outside the documented input grammars is
 stored without creating facts. Chronicle uses one 16 MiB static arena, with an
 8 MiB source ceiling and at most 4096 events; its API requires serial calls.
 Amounts are non-negative integer rationals; floating-point amounts are rejected.
 Confirmed payments must match the debt currency; duplicates cannot silently
 count twice, and queries matching multiple confirmed debts return UNKNOWN.
+Questions must match a complete supported form with exact full names; unrelated
+or negated questions do not select a debt. The included Arabic story returns
+`PARTIAL`: 40 SAR of 100 SAR, with an unconfirmed 60 SAR transfer excluded.
 Chronicle re-parses stored events against their original source bytes on load.
 These are explicit input claims, not independently verified real-world payments.
 The `find` command now retrieves up to eight highest matching original source
@@ -267,3 +270,14 @@ input grammar, reasoner states, evidence rules, resource limits, and integration
 boundary for any future extractor.
 See [`docs/CHRONICLE_LITERAL.md`](docs/CHRONICLE_LITERAL.md) for exact claim syntax
 and [`docs/CHRONICLE_VALIDATION.md`](docs/CHRONICLE_VALIDATION.md) for measured results.
+
+- [Arabic sentence grammar](docs/CHRONICLE_ARABIC.md)
+- [Exact question forms](docs/CHRONICLE_QUESTIONS.md)
+- [V1/V2 store and receipt compatibility](docs/CHRONICLE_COMPATIBILITY.md)
+- [Local Windows/Linux evidence UI](docs/LOCAL_CHRONICLE_APP.md)
+
+The optional local UI invokes the actual native CLI and verifies each result's
+receipt before displaying success. It runs on loopback with Gradio, without
+model weights or a network inference service. A missing or failed backend
+produces an error. New imports are isolated by executable and source hashes;
+previous stores are preserved when the executable changes.

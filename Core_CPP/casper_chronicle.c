@@ -1,6 +1,7 @@
 #include "casper_chronicle.h"
 #include "chronicle_pool.h"
 #include "proof_generator.h"
+#include "utf8_file.h"
 
 #include <errno.h>
 #include <inttypes.h>
@@ -15,7 +16,9 @@
 #define CHR_MAX_EVENTS 4096u
 #define CHR_MAX_SOURCE (8u * 1024u * 1024u)
 #define CHR_RECORD_BYTES (9u * CHR_FIELD_MAX + 16u)
-#define CHR_MAGIC "CASPER-CHRON-V1"
+#define CHR_READ_CHUNK (64u * 1024u)
+#define CHR_MAGIC "CASPER-CHRON-V2"
+#define CHR_MAGIC_V1 "CASPER-CHRON-V1"
 #define CHR_MAGIC_LEN 16u
 
 typedef struct { int64_t num; int64_t den; } ChrRat;
@@ -35,6 +38,7 @@ typedef struct {
     uint8_t *source;
     ChrEvent *events;
     uint32_t event_count;
+    unsigned version;
 } ChrStore;
 typedef struct { char *data; size_t len, cap; } ChrBuf;
 
@@ -110,16 +114,27 @@ static int utf8_valid(const uint8_t *s, size_t n) {
     }
     return 1;
 }
+static int read_chunks(FILE *f, uint8_t *data, size_t size) {
+    size_t offset = 0u;
+    while (offset < size) {
+        size_t count = size - offset;
+        if (count > CHR_READ_CHUNK) count = CHR_READ_CHUNK;
+        if (fread(data + offset, 1u, count, f) != count) return -1;
+        offset += count;
+    }
+    return 0;
+}
 static int read_file(const char *path, uint8_t **data, size_t *size) {
     FILE *f; long end; uint8_t *p; int ok;
     if (!path || !data || !size) return -1;
-    f = fopen(path, "rb"); if (!f) return -1;
+    f = niyah_fopen_utf8(path, "rb"); if (!f) return -1;
     if (fseek(f, 0, SEEK_END) != 0 || (end = ftell(f)) < 0 || fseek(f, 0, SEEK_SET) != 0) {
         fclose(f); return -1;
     }
-    if ((uint64_t)end > CHRONICLE_POOL_SIZE - 1u) { fclose(f); return -1; }
+    if ((uint64_t)end > CHR_MAX_SOURCE) { fclose(f); return -1; }
     p = (uint8_t *)chr_malloc((size_t)end + 1u); if (!p) { fclose(f); return -1; }
-    ok = (size_t)end == fread(p, 1u, (size_t)end, f);
+    ok = read_chunks(f, p, (size_t)end) == 0;
+    if (fgetc(f) != EOF || ferror(f)) ok = 0;
     if (fclose(f) != 0) ok = 0;
     if (!ok) { chr_free(p); return -1; }
     p[(size_t)end] = 0u; *data = p; *size = (size_t)end; return 0;
@@ -208,19 +223,22 @@ static int field_copy(char out[CHR_FIELD_MAX], const char *s, size_t n) {
     memcpy(out, s, n); out[n] = '\0'; return 0;
 }
 #include "chronicle_literal_parse.inc"
+#include "chronicle_arabic_parse.inc"
 static int parse_event_line(const uint8_t *line, size_t len, uint64_t start,
-                            uint64_t line_no, const uint8_t doc[32], ChrEvent *e) {
+                            uint64_t line_no, const ChrStore *store, ChrEvent *e) {
     const char prefix[] = "@chronicle\t"; const char *fields[9]; size_t sizes[9], i;
     size_t pos = sizeof(prefix) - 1u;
     if (len < pos || memcmp(line, prefix, pos) != 0) {
         int literal_rc;
         if (len >= 10u && memcmp(line, "@chronicle", 10u) == 0) return -1;
-        literal_rc = parse_literal_line(line, len, e);
+        if (store->version == 1u) return 1;
+        literal_rc = parse_arabic_line(line, len, e);
+        if (literal_rc == 1) literal_rc = parse_literal_line(line, len, e);
         if (literal_rc != 0) return literal_rc;
         e->byte_start = start; e->byte_end = start + len;
         e->line_start = line_no; e->line_end = line_no;
         niyah_sha256(line, len, e->span_hash);
-        return hash_event_ids(doc, start, start + len, line, len, e->event_id, e->span_id);
+        return hash_event_ids(store->document_hash, start, start + len, line, len, e->event_id, e->span_id);
     }
     for (i = 0u; i < 9u; ++i) {
         size_t begin = pos;
@@ -251,7 +269,7 @@ static int parse_event_line(const uint8_t *line, size_t len, uint64_t start,
     }
     e->byte_start = start; e->byte_end = start + len; e->line_start = line_no; e->line_end = line_no;
     niyah_sha256(line, len, e->span_hash);
-    return hash_event_ids(doc, e->byte_start, e->byte_end, line, len, e->event_id, e->span_id);
+    return hash_event_ids(store->document_hash, e->byte_start, e->byte_end, line, len, e->event_id, e->span_id);
 }
 static int extract_events(ChrStore *s) {
     size_t pos; uint64_t line_no; uint32_t count; unsigned pass;
@@ -261,7 +279,7 @@ static int extract_events(ChrStore *s) {
         size_t start = pos, end; ChrEvent parsed; int rc;
         while (pos < (size_t)s->source_size && s->source[pos] != '\n') ++pos;
         end = pos; if (end > start && s->source[end - 1u] == '\r') --end;
-        rc = parse_event_line(s->source + start, end - start, (uint64_t)start, line_no, s->document_hash, &parsed);
+        rc = parse_event_line(s->source + start, end - start, (uint64_t)start, line_no, s, &parsed);
         if (rc < 0) return -1;
         if (rc == 0) {
             if (count >= CHR_MAX_EVENTS) return -1;
@@ -279,9 +297,9 @@ static int extract_events(ChrStore *s) {
     s->event_count = count; return 0;
 }
 static int store_save(const char *path, const ChrStore *s) {
-    FILE *f = fopen(path, "wbx"); uint32_t i; int ok = f != NULL;
+    FILE *f = niyah_fopen_utf8(path, "wbx"); uint32_t i; int ok = f != NULL;
     if (!f) return -1;
-    if (fwrite(CHR_MAGIC, 1u, CHR_MAGIC_LEN, f) != CHR_MAGIC_LEN) ok = 0;
+    if (fwrite(s->version == 1u ? CHR_MAGIC_V1 : CHR_MAGIC, 1u, CHR_MAGIC_LEN, f) != CHR_MAGIC_LEN) ok = 0;
     if (ok && fwrite(s->document_hash, 1u, 32u, f) != 32u) ok = 0;
     put_u64(f, s->source_size, &ok); put_u64(f, s->imported_at, &ok); put_u32(f, s->event_count, &ok);
     if (ok && s->source_size && fwrite(s->source, 1u, (size_t)s->source_size, f) != (size_t)s->source_size) ok = 0;
@@ -298,7 +316,7 @@ static int store_save(const char *path, const ChrStore *s) {
         put_text(f, e->polarity, &ok); put_text(f, e->status, &ok);
     }
     if (fclose(f) != 0) ok = 0;
-    if (!ok) remove(path);
+    if (!ok) niyah_remove_utf8(path);
     return ok ? 0 : -1;
 }
 static int event_equal(const ChrEvent *a, const ChrEvent *b) {
@@ -325,7 +343,7 @@ static int store_matches_source(const ChrStore *s) {
         end = pos;
         if (end > start && s->source[end - 1u] == '\r') --end;
         parsed = parse_event_line(s->source + start, end - start, (uint64_t)start,
-                                  line_no, s->document_hash, &canonical);
+                                  line_no, s, &canonical);
         if (parsed < 0) return -1;
         if (parsed == 0) {
             if (count >= s->event_count || !event_equal(&canonical, &s->events[count])) return -1;
@@ -337,9 +355,12 @@ static int store_matches_source(const ChrStore *s) {
     return count == s->event_count ? 0 : -1;
 }
 static int store_load(const char *path, ChrStore *s) {
-    FILE *f = fopen(path, "rb"); char magic[CHR_MAGIC_LEN]; uint32_t i; uint8_t actual[32]; int tail;
+    FILE *f = niyah_fopen_utf8(path, "rb"); char magic[CHR_MAGIC_LEN]; uint32_t i; uint8_t actual[32]; int tail;
     memset(s, 0, sizeof(*s));
-    if (!f || fread(magic, 1u, sizeof(magic), f) != sizeof(magic) || memcmp(magic, CHR_MAGIC, CHR_MAGIC_LEN) != 0 ||
+    if (!f || fread(magic, 1u, sizeof(magic), f) != sizeof(magic)) { if (f) fclose(f); return -1; }
+    s->version = memcmp(magic, CHR_MAGIC_V1, CHR_MAGIC_LEN) == 0 ? 1u :
+                 memcmp(magic, CHR_MAGIC, CHR_MAGIC_LEN) == 0 ? 2u : 0u;
+    if (s->version == 0u ||
         fread(s->document_hash, 1u, 32u, f) != 32u || get_u64(f, &s->source_size) != 0 ||
         get_u64(f, &s->imported_at) != 0 || get_u32(f, &s->event_count) != 0 || s->event_count > CHR_MAX_EVENTS ||
         s->source_size > CHR_MAX_SOURCE || s->source_size > SIZE_MAX - 1u) { if (f) fclose(f); return -1; }
@@ -361,7 +382,7 @@ static int store_load(const char *path, ChrStore *s) {
     s->source = (uint8_t *)chr_malloc((size_t)s->source_size + 1u);
     s->events = s->event_count ? (ChrEvent *)chr_calloc(s->event_count, sizeof(*s->events)) : NULL;
     if (!s->source || (s->event_count && !s->events) ||
-        (s->source_size && fread(s->source, 1u, (size_t)s->source_size, f) != (size_t)s->source_size)) {
+        read_chunks(f, s->source, (size_t)s->source_size) != 0) {
         fclose(f); store_free(s); return -1;
     }
     s->source[s->source_size] = 0u;
@@ -430,7 +451,7 @@ static uint8_t *decode_hex(const char *s, size_t *n) {
 #define CHR_RECEIPT_LINE_MAX (CHR_RECEIPT_VALUE_MAX + 32u)
 #define CHR_RECEIPT_BYTES_MAX (2u * CHR_RECEIPT_VALUE_MAX + 512u)
 static int receipt_existing_matches(const char *path, const char *data, size_t size) {
-    FILE *f = fopen(path, "rb"); size_t pos = 0u; int ok = 1;
+    FILE *f = niyah_fopen_utf8(path, "rb"); size_t pos = 0u; int ok = 1;
     if (!f) return -1;
     while (ok && pos < size) {
         int c = fgetc(f);
@@ -442,16 +463,16 @@ static int receipt_existing_matches(const char *path, const char *data, size_t s
     return ok ? 0 : -1;
 }
 static int receipt_write_once(const char *path, const char *data, size_t size) {
-    FILE *f = fopen(path, "wbx"); int ok;
+    FILE *f = niyah_fopen_utf8(path, "wbx"); int ok;
     if (!f) return receipt_existing_matches(path, data, size);
     ok = fwrite(data, 1u, size, f) == size;
     if (fclose(f) != 0) ok = 0;
-    if (!ok) { if (remove(path) != 0) return -1; }
+    if (!ok) { if (niyah_remove_utf8(path) != 0) return -1; }
     return ok ? 0 : -1;
 }
 static int write_receipt(const char *path, const char *kind, const char *store_path,
                          const char *question, const uint8_t result_hash[32],
-                         const uint8_t document_hash[32]) {
+                         const ChrStore *store) {
     uint8_t store_hash[32]; char store_hex[65], doc_hex[65], result_hex[65]; int written;
     char path_hex[CHR_RECEIPT_VALUE_MAX], question_hex[CHR_RECEIPT_VALUE_MAX], data[CHR_RECEIPT_BYTES_MAX];
     size_t path_len = strlen(store_path), question_len = question ? strlen(question) : 0u;
@@ -462,9 +483,10 @@ static int write_receipt(const char *path, const char *kind, const char *store_p
     if (!niyah_sha256_file(store_path, store_hash)) return -1;
     encode_hex(path_hex, (const uint8_t *)store_path, path_len);
     encode_hex(question_hex, (const uint8_t *)(question ? question : ""), question_len);
-    niyah_hash_to_hex(store_hash, store_hex); niyah_hash_to_hex(document_hash, doc_hex); niyah_hash_to_hex(result_hash, result_hex);
-    written = snprintf(data, sizeof(data), "CASPER-CHRONICLE-INTEGRITY-RECEIPT-V1\nkind:%s\nstore_path_hex:%s\n"
+    niyah_hash_to_hex(store_hash, store_hex); niyah_hash_to_hex(store->document_hash, doc_hex); niyah_hash_to_hex(result_hash, result_hex);
+    written = snprintf(data, sizeof(data), "CASPER-CHRONICLE-INTEGRITY-RECEIPT-V%u\nkind:%s\nstore_path_hex:%s\n"
                        "question_hex:%s\nstore_sha256:%s\ndocument_sha256:%s\nresult_sha256:%s\n",
+                       strcmp(kind, "QUERY") == 0 ? 2u : store->version,
                        kind, path_hex, question_hex, store_hex, doc_hex, result_hex);
     if (written < 0 || (size_t)written >= sizeof(data)) return -1;
     return receipt_write_once(path, data, (size_t)written);
@@ -493,30 +515,7 @@ static int opposite_conflict(const ChrStore *s, const ChrEvent *focus, uint8_t *
 static int is_positive(const ChrEvent *e) {
     return strcmp(e->polarity, "POSITIVE") == 0 && strcmp(e->status, "DENIED") != 0;
 }
-static int entity_boundary(const unsigned char *p) {
-    if (*p == '\0') return 1;
-    if (*p < 0x80u) return !((*p >= '0' && *p <= '9') || (*p >= 'A' && *p <= 'Z') ||
-                             (*p >= 'a' && *p <= 'z') || *p == '_');
-    return (p[0] == 0xd8u && (p[1] == 0x8cu || p[1] == 0x9bu || p[1] == 0x9fu));
-}
-static int left_entity_boundary(const char *text, const char *p) {
-    const unsigned char *previous;
-    if (p == text) return 1;
-    previous = (const unsigned char *)p - 1u;
-    while (previous > (const unsigned char *)text && (*previous & 0xc0u) == 0x80u) --previous;
-    return entity_boundary(previous);
-}
-static int contains_entity(const char *text, const char *entity) {
-    const char *p = text; size_t n = strlen(entity);
-    if (n == 0u) return 0;
-    while ((p = strstr(p, entity)) != NULL) {
-        int left = left_entity_boundary(text, p);
-        int right = entity_boundary((const unsigned char *)p + n);
-        if (left && right) return 1;
-        ++p;
-    }
-    return 0;
-}
+#include "chronicle_question.inc"
 typedef struct {
     const ChrEvent *debt;
     ChrRat settled;
@@ -529,8 +528,7 @@ static void select_debt(const ChrStore *s, const char *question, ChrReason *r) {
         const ChrEvent *e = &s->events[i];
         if (strcmp(e->predicate, "BORROWED_FROM") != 0 || !is_positive(e) ||
             !e->amount_present || !is_established(e) ||
-            !contains_entity(question, e->subject) ||
-            !contains_entity(question, e->object)) continue;
+            !question_selects_pair(question, e->subject, e->object)) continue;
         r->used[i] = 1u;
         /* Repeated observations of the same exact debt tuple select one
          * claim, while keeping each source event in the evidence ledger.
@@ -655,7 +653,7 @@ static int reason_json(const ChrStore *s, const char *question, char **out) {
     } else if (buf_add(&b, "null") != 0) goto fail;
     if (buf_add(&b, ",\"settled\":{\"num\":") != 0 || buf_add_i64(&b, r.settled.num) != 0 ||
         buf_add(&b, ",\"den\":") != 0 || buf_add_i64(&b, r.settled.den) != 0 ||
-        buf_add(&b, "},\"limits\":\"explicit @chronicle records only; question selects exact entities; "
+        buf_add(&b, "},\"limits\":\"bounded source grammar; question selects exact entities; "
                     "status evaluates debt settlement, not question truth; integrity is not truth\",\"evidence\":[") != 0)
         goto fail;
     for (i = 0u; i < s->event_count; ++i) if (used[i]) {
@@ -774,12 +772,14 @@ int casper_chronicle_ingest(const char *input_path, char **store_path_out, char 
     uint8_t result_hash[32]; int same = 0;
     if (!input_path || !store_path_out || !receipt_path_out) return 2;
     memset(&s, 0, sizeof(s)); memset(&old, 0, sizeof(old));
+    s.version = 2u;
     store_path = path_suffix(input_path, ".chronicle");
     if (store_path) receipt_path = path_suffix(store_path, ".receipt");
     if (!store_path || !receipt_path) goto fail;
     if (store_load(store_path, &old) == 0) {
         if (!niyah_sha256_file(input_path, s.document_hash)) goto fail;
         same = memcmp(old.document_hash, s.document_hash, 32u) == 0;
+        s.version = old.version;
         store_free(&old);
         if (!same) goto fail;
     }
@@ -791,7 +791,7 @@ int casper_chronicle_ingest(const char *input_path, char **store_path_out, char 
         if (extract_events(&s) != 0 || store_save(store_path, &s) != 0) goto fail;
     }
     if (!niyah_sha256_file(store_path, result_hash) ||
-        write_receipt(receipt_path, "INGEST", store_path, "", result_hash, s.document_hash) != 0) goto fail;
+        write_receipt(receipt_path, "INGEST", store_path, "", result_hash, &s) != 0) goto fail;
     store_free(&s); *store_path_out = store_path; *receipt_path_out = receipt_path; return 0;
 fail:
     store_free(&s); store_free(&old); chr_free(store_path); chr_free(receipt_path); return 1;
@@ -807,11 +807,11 @@ int casper_chronicle_query(const char *store_path, const char *question,
         store_free(&s); return 1;
     }
     niyah_sha256((const uint8_t *)question, strlen(question), qh); niyah_hash_to_hex(qh, qhex);
-    suffix = (char *)chr_malloc(34u);
-    if (suffix) snprintf(suffix, 34u, ".query-%.16s.receipt", qhex);
+    suffix = (char *)chr_malloc(40u);
+    if (suffix) snprintf(suffix, 40u, s.version == 1u ? ".query-v2-%.16s.receipt" : ".query-%.16s.receipt", qhex);
     if (suffix) receipt = path_suffix(store_path, suffix);
     niyah_sha256((const uint8_t *)json, strlen(json), rh);
-    if (!suffix || !receipt || write_receipt(receipt, "QUERY", store_path, question, rh, s.document_hash) != 0) {
+    if (!suffix || !receipt || write_receipt(receipt, "QUERY", store_path, question, rh, &s) != 0) {
         chr_free(json); chr_free(suffix); chr_free(receipt); store_free(&s); return 1;
     }
     chr_free(suffix); store_free(&s); *json_out = json; *receipt_path_out = receipt; return 0;
@@ -831,7 +831,7 @@ int casper_chronicle_find(const char *store_path, const char *query,
     if (suffix) snprintf(suffix, 33u, ".find-%.16s.receipt", qhex);
     if (suffix) receipt = path_suffix(store_path, suffix);
     niyah_sha256((const uint8_t *)json, strlen(json), rh);
-    if (!suffix || !receipt || write_receipt(receipt, "FIND", store_path, query, rh, s.document_hash) != 0) {
+    if (!suffix || !receipt || write_receipt(receipt, "FIND", store_path, query, rh, &s) != 0) {
         chr_free(json); chr_free(suffix); chr_free(receipt); store_free(&s); return 1;
     }
     chr_free(suffix); store_free(&s); *json_out = json; *receipt_path_out = receipt; return 0;
@@ -841,6 +841,7 @@ typedef struct {
     char kind[16], store_hex[CHR_RECEIPT_VALUE_MAX], question_hex[CHR_RECEIPT_VALUE_MAX];
     char store_hash_hex[65], doc_hex[65], result_hex[65];
     unsigned seen;
+    unsigned version;
 } ChrReceipt;
 static int receipt_read_line(FILE *f, char line[CHR_RECEIPT_LINE_MAX]) {
     size_t n = 0u; int c;
@@ -864,15 +865,23 @@ static int receipt_field(ChrReceipt *r, const char *line) {
         if (strncmp(line, keys[i], key_len) != 0) continue;
         value_len = strlen(line + key_len);
         if ((r->seen & bit) != 0u || value_len >= caps[i] || (i >= 3u && value_len != 64u)) return -1;
+        if (i >= 3u) {
+            size_t digit;
+            for (digit = 0u; digit < value_len; ++digit)
+                if (hex_nibble(line[key_len + digit]) < 0) return -1;
+        }
         memcpy(values[i], line + key_len, value_len + 1u); r->seen |= bit; return 0;
     }
     return -1;
 }
 static int receipt_read(const char *path, ChrReceipt *r) {
-    FILE *f = fopen(path, "rb"); char line[CHR_RECEIPT_LINE_MAX]; int rc, ok;
+    FILE *f = niyah_fopen_utf8(path, "rb"); char line[CHR_RECEIPT_LINE_MAX] = {0}; int rc, ok;
     if (!f) return -1;
     memset(r, 0, sizeof(*r));
-    ok = receipt_read_line(f, line) == 1 && strcmp(line, "CASPER-CHRONICLE-INTEGRITY-RECEIPT-V1") == 0;
+    ok = receipt_read_line(f, line) == 1;
+    r->version = strcmp(line, "CASPER-CHRONICLE-INTEGRITY-RECEIPT-V1") == 0 ? 1u :
+                 strcmp(line, "CASPER-CHRONICLE-INTEGRITY-RECEIPT-V2") == 0 ? 2u : 0u;
+    ok = ok && r->version != 0u;
     while (ok && (rc = receipt_read_line(f, line)) != 0) {
         if (rc < 0 || receipt_field(r, line) != 0) ok = 0;
     }
@@ -885,7 +894,7 @@ int casper_chronicle_verify(const char *receipt_path) {
     ChrReceipt receipt;
     uint8_t *store_bytes = NULL, *question_bytes = NULL;
     size_t store_n = 0u, question_n = 0u;
-    ChrStore s; uint8_t actual[32]; char actual_hex[65]; char *json = NULL; int ok = 0;
+    ChrStore s; uint8_t actual[32]; char actual_hex[65]; char *json = NULL; int ok = 0, unsupported = 0;
     memset(&s, 0, sizeof(s));
     if (!receipt_path || receipt_read(receipt_path, &receipt) != 0) return 1;
     store_bytes = decode_hex(receipt.store_hex, &store_n); question_bytes = decode_hex(receipt.question_hex, &question_n);
@@ -897,6 +906,10 @@ int casper_chronicle_verify(const char *receipt_path) {
     if (store_load((const char *)store_bytes, &s) != 0) goto done;
     niyah_hash_to_hex(s.document_hash, actual_hex);
     if (strcmp(actual_hex, receipt.doc_hex) != 0) goto done_store;
+    if (receipt.version == 1u && s.version != 1u) goto done_store;
+    if (receipt.version == 1u && strcmp(receipt.kind, "QUERY") == 0) {
+        unsupported = 1; goto done_store;
+    }
     if (strcmp(receipt.kind, "INGEST") == 0) {
         if (!niyah_sha256_file((const char *)store_bytes, actual)) goto done_store;
     } else if (strcmp(receipt.kind, "QUERY") == 0 &&
@@ -910,10 +923,10 @@ int casper_chronicle_verify(const char *receipt_path) {
 done_store:
     store_free(&s);
 done:
-    chr_free(store_bytes); chr_free(question_bytes); chr_free(json); return ok ? 0 : 1;
+    chr_free(store_bytes); chr_free(question_bytes); chr_free(json); return unsupported ? 3 : ok ? 0 : 1;
 }
 static int write_bytes(const char *path, const uint8_t *p, size_t n) {
-    FILE *f = fopen(path, "wb"); int ok;
+    FILE *f = niyah_fopen_utf8(path, "wb"); int ok;
     if (!f) return -1;
     ok = fwrite(p, 1u, n, f) == n;
     if (fclose(f) != 0) ok = 0;
@@ -929,10 +942,10 @@ static void remove_query_receipt(const char *path, const char *question) {
     niyah_sha256((const uint8_t *)question, strlen(question), hash); niyah_hash_to_hex(hash, hex);
     snprintf(suffix, sizeof(suffix), ".query-%.16s.receipt", hex);
     full = path_suffix(path, suffix);
-    if (full) { remove(full); chr_free(full); }
+    if (full) { niyah_remove_utf8(full); chr_free(full); }
 }
 static int path_available(const char *path) {
-    FILE *f = fopen(path, "rb");
+    FILE *f = niyah_fopen_utf8(path, "rb");
     if (f) { fclose(f); return 0; }
     return errno == ENOENT;
 }
@@ -1032,9 +1045,9 @@ int casper_chronicle_self_test(void) {
     remove_query_receipt("chronicle-self-test.txt.chronicle", "هل سدد أحمدان دين خالد؟");
     remove_query_receipt("chronicle-conflict-test.txt.chronicle", question);
     remove_query_receipt("chronicle-missing-test.txt.chronicle", question);
-    remove(path); remove("chronicle-self-test.txt.chronicle"); remove("chronicle-self-test.txt.chronicle.receipt");
-    remove(conflict_path); remove("chronicle-conflict-test.txt.chronicle"); remove("chronicle-conflict-test.txt.chronicle.receipt");
-    remove(missing_path); remove("chronicle-missing-test.txt.chronicle"); remove("chronicle-missing-test.txt.chronicle.receipt");
+    niyah_remove_utf8(path); niyah_remove_utf8("chronicle-self-test.txt.chronicle"); niyah_remove_utf8("chronicle-self-test.txt.chronicle.receipt");
+    niyah_remove_utf8(conflict_path); niyah_remove_utf8("chronicle-conflict-test.txt.chronicle"); niyah_remove_utf8("chronicle-conflict-test.txt.chronicle.receipt");
+    niyah_remove_utf8(missing_path); niyah_remove_utf8("chronicle-missing-test.txt.chronicle"); niyah_remove_utf8("chronicle-missing-test.txt.chronicle.receipt");
     fprintf(stderr, "Chronicle self-check: %s (%d failures)\n", fail == 0 ? "PASS" : "FAIL", fail);
     return fail == 0 ? 0 : 1;
 }
@@ -1045,7 +1058,7 @@ static int benchmark_corpus(const char *path, size_t *bytes_out) {
         "@chronicle\tAhmed\tPAID_TO\tSaud\t40\tSAR\tT3\tASSERTED\tPOSITIVE\tCONFIRMED\n",
         "@chronicle\tAhmed\tTRANSFER_TO\tSaud\t60\tSAR\tT4\tUNCERTAIN\tPOSITIVE\tPENDING\n"
     };
-    FILE *f = fopen(path, "wbx"); size_t i, gap; int ok = 1;
+    FILE *f = niyah_fopen_utf8(path, "wbx"); size_t i, gap; int ok = 1;
     if (!f) return -1;
     *bytes_out = 0u;
     for (i = 0u; ok && i < 4u; ++i) {
@@ -1100,10 +1113,10 @@ int casper_chronicle_benchmark(void) {
            query_s, verify_s, CHRONICLE_POOL_SIZE, chr_pool_peak(), corpus_hex, proof_hex);
     rc = 0;
 done:
-    if (qreceipt) remove(qreceipt);
-    if (receipt) remove(receipt);
-    if (store) remove(store);
-    remove(path);
+    if (qreceipt) niyah_remove_utf8(qreceipt);
+    if (receipt) niyah_remove_utf8(receipt);
+    if (store) niyah_remove_utf8(store);
+    niyah_remove_utf8(path);
     chr_free(json); chr_free(qreceipt); chr_free(receipt); chr_free(store);
     printf("arena_live_after_free=%zu\n", chr_pool_used());
     return rc || chr_pool_used() != 0u ? 1 : 0;

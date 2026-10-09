@@ -67,9 +67,9 @@ def main():
     case("utf8_left_boundary", arabic, "SUPPORTED", 100, 2, "،أحمد خالد؟")
     case("utf8_similar_name", arabic, "UNKNOWN", 0, 0, "أحمدان خالد؟")
     case("utf8_combining_suffix", arabic, "UNKNOWN", 0, 0, "أحمدُ خالد؟")
-    case("negative_question_scope", debt + full, "SUPPORTED", 100, 2,
+    case("negative_question_scope", debt + full, "UNKNOWN", 0, 0,
          "Did Alice not repay Bob?", True)
-    case("nondebt_question_scope", debt + full, "SUPPORTED", 100, 2,
+    case("nondebt_question_scope", debt + full, "UNKNOWN", 0, 0,
          "Are Alice and Bob astronauts?", True)
 
     failed = 0

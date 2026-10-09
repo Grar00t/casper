@@ -120,7 +120,14 @@ can compare deterministic query output.
 ## Windows command line
 
 The native Windows entry point converts UTF-16 command-line arguments to UTF-8;
-the build script adds `-municode` for that target. Arabic claim values and query
-text are covered by native executable tests. File I/O still uses narrow CRT
-paths: use ASCII filenames/directories on Windows. UTF-8 file contents are
-preserved independently of that filename limitation.
+the build script adds `-municode` for that target. Chronicle file operations and
+receipt hashing convert these UTF-8 paths back to UTF-16 at the filesystem
+boundary. Arabic and supplementary Unicode directory/file names are supported
+within the existing CLI, receipt, and operating-system path limits. Source
+bytes and the UTF-8 path bytes recorded in receipts are preserved without
+normalization. Native checks cover import, claim/find/query, UTF-8 stdout,
+repeat import, independent evidence hashes, and receipt tampering:
+
+```powershell
+python tests/test_chronicle_windows.py build/casper-chronicle.exe
+```

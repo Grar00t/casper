@@ -66,7 +66,7 @@ jobs:
         run: |
           bash scripts/build.sh --debug --arch generic --smoke
           ./build/casper --self-check
-      - name: Chronicle raw million-word benchmark
+      - name: Chronicle synthetic million-word benchmark
         run: ./build/casper-chronicle --benchmark
       - name: Chronicle strict acceptance and resource gates
         run: python3 scripts/test_chronicle.py --compiler ${{ matrix.compiler }}
@@ -90,6 +90,7 @@ jobs:
         run: |
           python -m py_compile tools/train_casper.py
           python -m py_compile tools/generate_teacher_dataset.py
+          python -m py_compile tools/casper_local_bridge.py tools/casper_local_app.py
 
   node-runtime:
     runs-on: ubuntu-latest
@@ -121,3 +122,25 @@ jobs:
           dotnet-version: 9.0.x
       - name: Build WPF UI
         run: dotnet build UI_CSharp/CasperUI.csproj -c Release
+
+  chronicle-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-python
+      - name: Native UTF-8 paths and acceptance gates
+        shell: msys2 {0}
+        run: python scripts/test_chronicle.py --compiler gcc --native-windows --output build/chronicle-windows
+      - name: Preserve native Windows evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chronicle-windows
+          path: |
+            build/chronicle-windows/*.txt
+            build/chronicle-windows/summary.json

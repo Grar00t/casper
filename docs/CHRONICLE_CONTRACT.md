@@ -1,9 +1,10 @@
-# Casper Chronicle v1 Contract
+# Casper Chronicle v2 Contract
 
 ## Scope
 
-Chronicle v1 is an offline evidence store and a narrow debt/payment reasoner.
-It preserves the exact UTF-8 input bytes and consumes explicit event records.
+Chronicle v2 is an offline evidence store and a narrow debt/payment reasoner.
+It preserves the exact UTF-8 input bytes and consumes explicit event records
+and complete Arabic sentences under [CHRONICLE_ARABIC.md](CHRONICLE_ARABIC.md).
 The separate bounded literal retrieval path accepts `Subject Predicate Object.`
 on one line; see [CHRONICLE_LITERAL.md](CHRONICLE_LITERAL.md).
 It does not claim to understand unrestricted prose, establish factual truth,
@@ -51,7 +52,7 @@ The reasoner receives:
 
 1. one validated Chronicle store;
 2. one UTF-8 question;
-3. an exact borrower/lender pair named in the question;
+3. an exact borrower/lender pair selected by a complete supported query form;
 4. only stored events whose evidence spans re-hash correctly.
 
 The current adapter does not invoke the repository's generic
@@ -94,6 +95,9 @@ certifying complete settlement. Distinct but otherwise
 identical payments need different time fields; transaction IDs and chronology
 reasoning are not implemented.
 
+The entire question must match [CHRONICLE_QUESTIONS.md](CHRONICLE_QUESTIONS.md),
+including full names and their borrower/lender roles. An unsupported, negated,
+or unrelated question returns `UNKNOWN` without selecting debt evidence.
 The question selects an exact entity pair. The JSON `assessment` value is
 `DEBT_SETTLEMENT`: it does not answer arbitrary or negated propositions. A zero
 debt without an established payment returns `UNKNOWN`.
@@ -118,11 +122,21 @@ and basic ASCII punctuation; it does not stem Arabic or strip Arabic punctuation
 
 ## Integrity receipt
 
-CASPER-CHRONICLE-INTEGRITY-RECEIPT-V1 binds the store bytes, document hash,
+CASPER-CHRONICLE-INTEGRITY-RECEIPT-V2 binds the store bytes, document hash,
 question bytes for queries, and canonical result bytes. verify reopens the
 store, reparses all original source records, compares the complete canonical
 event set and coordinates, validates document and span hashes, reruns the query, and
 compares the result hash.
+
+New stores use `CASPER-CHRON-V2`. Published V1 stores retain their original
+typed-record parser; they are never silently reinterpreted with the V2 grammar.
+Old INGEST and FIND receipts remain verifiable. Historical V1 QUERY results
+cannot be replayed under the changed evaluator and return `UNSUPPORTED`, exit
+3, after store/source integrity checks. Only exit 0 means `VALID`; malformed
+or corrupt input returns `INVALID`, exit 1. New queries on a V1 store use a
+separate V2 receipt filename. See
+[CHRONICLE_COMPATIBILITY.md](CHRONICLE_COMPATIBILITY.md) for exact profiles,
+the unpublished local V1 literal format, and recovery without overwriting.
 
 The receipt is an integrity checksum, not a signature, provenance guarantee,
 truth certificate, legal conclusion, or authenticity proof.
@@ -136,6 +150,9 @@ store for inspection; ingestion is not a multi-file transaction.
 ## Resource limits
 
 Fields are limited to 127 UTF-8 bytes, source to 8 MiB, and event count to 4096.
+File payloads are read in chunks of at most 64 KiB. The whole source is still
+retained in the arena for extraction and queries: chunked I/O does not remove
+the source ceiling or make memory use independent of document size.
 All Chronicle-managed dynamic storage uses one aligned static 16 MiB `_pool`:
 source bytes, typed events, working data and returned output. The ceilings apply
 together; allocation can fail before an individual ceiling if live outputs fill
@@ -147,11 +164,16 @@ SHA-256 uses the existing streaming implementation, including full test vectors.
 
 `python3 scripts/test_chronicle.py --compiler gcc` (or `clang`) runs strict C11
 O2 and O0 ASan/UBSan gates, adversarial store/receipt tests, exact literal and
-debt tests, preservation and resource boundaries, allocator tests and an API
-test intercepting direct heap calls. It compares deterministic result hashes
+debt tests, bounded Arabic sentences and questions, legacy compatibility,
+preservation and resource boundaries, allocator tests, an API test intercepting
+direct heap calls, and a read-size oracle. It compares deterministic result hashes
 across three runs and both optimization levels. ASan cannot distinguish the
 internal allocation boundaries of the static arena; dedicated allocator tests
 exercise alignment, overflow, exhaustion, reuse and coalescing.
+
+Native Windows gates use `--native-windows` with MinGW GCC/Clang and native
+Python. They run O2/O0 acceptance and Unicode path tests. This runner does not
+claim native sanitizer or heap-wrap coverage; the Linux jobs execute those gates.
 
 The benchmark generates exactly 1,000,000 whitespace-delimited words containing
 four debt/payment records separated by filler, and checks a 40/100 PARTIAL result.

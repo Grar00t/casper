@@ -75,7 +75,7 @@ static int chronicle_main(int argc, char **argv) {
     }
     if (argc == 3 && strcmp(argv[1], "verify") == 0) {
         rc = casper_chronicle_verify(argv[2]);
-        printf("%s\n", rc == 0 ? "VALID" : "INVALID");
+        printf("%s\n", rc == 0 ? "VALID" : rc == 3 ? "UNSUPPORTED" : "INVALID");
         return rc;
     }
     usage(argv[0]);
