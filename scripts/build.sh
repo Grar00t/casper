@@ -168,9 +168,13 @@ build_target casper \
     "$CORE/casper_cli.c" "$CORE/casper_rag.c" "$CORE/rule_parser.c" \
     "$CORE/rule_source_guard.c" "$CORE/proof_generator.c" "$CORE/khz_q_svd.c"
 
-build_target casper-chronicle \
+CHRONICLE_LINK_FLAGS=()
+if "$CC" -dM -E -x c - </dev/null | grep '^#define _WIN32 ' >/dev/null; then
+    CHRONICLE_LINK_FLAGS=(-municode)
+fi
+build_target casper-chronicle "${CHRONICLE_LINK_FLAGS[@]}" \
     "$CORE/casper_chronicle_main.c" "$CORE/casper_chronicle.c" \
-    "$CORE/proof_generator.c"
+    "$CORE/chronicle_pool.c" "$CORE/proof_generator.c"
 
 if [[ -f "$CORE/bench_niyah.c" ]]; then
     build_target bench_niyah "$CORE/bench_niyah.c" "$CORE/niyah_core.c"

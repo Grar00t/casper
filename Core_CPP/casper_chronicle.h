@@ -8,8 +8,12 @@ extern "C" {
 #endif
 
 /*
- * Chronicle v1 consumes explicit @chronicle event records embedded in UTF-8
- * source text. It does not infer facts from unrestricted prose.
+ * Chronicle v2 consumes explicit @chronicle event records, bounded Arabic debt
+ * sentences (CHRONICLE_ARABIC.md), and three-token literals (CHRONICLE_LITERAL.md).
+ * Existing v1 stores retain the original explicit-record grammar.
+ * One shared 16 MiB arena; serial calls only. Release successful outputs with
+ * casper_chronicle_free. Error returns do not transfer ownership of any output.
+ * It does not infer facts from unrestricted prose.
  */
 int casper_chronicle_ingest(const char *input_path, char **store_path_out,
                             char **receipt_path_out);
@@ -18,6 +22,7 @@ int casper_chronicle_query(const char *store_path, const char *question,
 /* Lexical-only search in source text, not semantic reasoning. */
 int casper_chronicle_find(const char *store_path, const char *query,
                           char **json_out, char **receipt_path_out);
+/* 0: VALID, 3: historical query result UNSUPPORTED, other nonzero: INVALID. */
 int casper_chronicle_verify(const char *receipt_path);
 int casper_chronicle_self_test(void);
 int casper_chronicle_benchmark(void);

@@ -1,6 +1,6 @@
 # Project Structure
 
-Generated from the tree, not written by hand. Regenerate after any file move:
+Selected source map. To generate a complete tracked-file tree:
 
 ```bash
 git ls-files | tree --fromfile -a --noreport
@@ -22,6 +22,13 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── casper_chronicle.c        # offline evidence store and reasoner
 │   ├── casper_chronicle.h        # Chronicle public C API
 │   ├── casper_chronicle_main.c   # Chronicle CLI entry point
+│   ├── chronicle_pool.c          # bounded aligned 16 MiB arena
+│   ├── chronicle_pool.h          # arena API and allocation metrics
+│   ├── chronicle_literal_parse.inc # bounded three-token input grammar
+│   ├── chronicle_literal_query.inc # exact literal evidence retrieval
+│   ├── chronicle_arabic_parse.inc # bounded complete Arabic sentences
+│   ├── chronicle_question.inc     # complete query forms and exact identities
+│   ├── utf8_file.h               # native Windows Unicode filesystem boundary
 │   ├── casper_rag.c              # search transport, parser, ranker
 │   ├── casper_rag.h              # the live search contract
 │   ├── constraint_solver.c
@@ -65,7 +72,13 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── app.manifest
 │   └── casper_workbench.html
 ├── docs/
-│   └── CHRONICLE_CONTRACT.md      # versioned input/reasoning/receipt contract
+│   ├── CHRONICLE_CONTRACT.md      # versioned input/reasoning/receipt contract
+│   ├── CHRONICLE_ARABIC.md        # bounded Arabic sentence grammar
+│   ├── CHRONICLE_QUESTIONS.md     # exact query grammar
+│   ├── CHRONICLE_COMPATIBILITY.md # V1/V2 behavior and immutable recovery
+│   ├── CHRONICLE_LITERAL.md       # exact three-token claims
+│   ├── LOCAL_CHRONICLE_APP.md     # local UI setup and backend boundary
+│   └── CHRONICLE_VALIDATION.md    # measured gates and capability limits
 ├── include/
 │   ├── casper_ffi.h
 │   └── tokenizer.h
@@ -83,13 +96,21 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── package.json
 │   └── server.js
 ├── tests/
+│   ├── test_chronicle_*.py        # acceptance, boundaries, corruption, compatibility
+│   ├── test_chronicle_*.c         # pool, API heap guard, read-size guard
+│   ├── test_local_bridge.py      # actual native subprocess integration
 │   └── fixtures/
-│       └── chronicle_ahmed_ar.txt
+│       ├── chronicle_ahmed_ar.txt
+│       └── chronicle_ahmed_prose_ar.txt
+├── tools/
+│   ├── casper_local_app.py        # optional loopback Gradio evidence UI
+│   └── casper_local_bridge.py     # native CLI execution and receipt verification
 ├── scripts/
 │   ├── build.sh                  # the only build entry point
 │   ├── build_corpus.ps1
 │   ├── build_trainer.ps1
 │   ├── niyah.ps1
+│   ├── test_chronicle.py          # strict reproducible Linux/Windows gates
 │   └── run_trainer.ps1
 ├── .gitattributes
 ├── .gitignore

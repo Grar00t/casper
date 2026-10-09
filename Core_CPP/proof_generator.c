@@ -1,5 +1,6 @@
 /* proof_generator.c — SHA-256 integrity receipts. C11. */
 #include "proof_generator.h"
+#include "utf8_file.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -65,7 +66,7 @@ bool niyah_sha256_file(const char *path,uint8_t out[32]){
     uint8_t buf[8192];
     size_t n;
     if(!path||!out)return false;
-    f=fopen(path,"rb");
+    f=niyah_fopen_utf8(path,"rb");
     if(!f)return false;
     sha256_init(&c);
     while((n=fread(buf,1u,sizeof(buf),f))>0u)sha256_update(&c,buf,n);
