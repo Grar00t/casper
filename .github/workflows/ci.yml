@@ -105,6 +105,8 @@ jobs:
           cache: npm
           cache-dependency-path: niyah_engine_local/package-lock.json
       - run: npm ci
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=moderate
       - name: Syntax check
         run: |
           node --check server.js
