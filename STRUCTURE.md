@@ -19,6 +19,9 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 ├── Core_CPP/
 │   ├── bench_niyah.c
 │   ├── casper_cli.c              # CLI entry point, emits the JSON contract
+│   ├── casper_chronicle.c        # offline evidence store and reasoner
+│   ├── casper_chronicle.h        # Chronicle public C API
+│   ├── casper_chronicle_main.c   # Chronicle CLI entry point
 │   ├── casper_rag.c              # search transport, parser, ranker
 │   ├── casper_rag.h              # the live search contract
 │   ├── constraint_solver.c
@@ -61,6 +64,8 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── PtyBridge.cs              # ConPTY session
 │   ├── app.manifest
 │   └── casper_workbench.html
+├── docs/
+│   └── CHRONICLE_CONTRACT.md      # versioned input/reasoning/receipt contract
 ├── include/
 │   ├── casper_ffi.h
 │   └── tokenizer.h
@@ -77,6 +82,9 @@ omitted 19 that do. It also claimed "6 directories, 37 files".
 │   ├── package-lock.json
 │   ├── package.json
 │   └── server.js
+├── tests/
+│   └── fixtures/
+│       └── chronicle_ahmed_ar.txt
 ├── scripts/
 │   ├── build.sh                  # the only build entry point
 │   ├── build_corpus.ps1

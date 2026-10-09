@@ -1,0 +1,10 @@
+بداية القصة عن أحمد وخالد.
+@chronicle	أحمد	BORROWED_FROM	خالد	100/1	SAR	اليوم الأول	ASSERTED	POSITIVE	CONFIRMED
+
+بعد صفحات كثيرة ظهر وسيط.
+@chronicle	سعود	INTERMEDIARY_FOR	خالد	-	SAR	لاحقًا	ASSERTED	POSITIVE	CONFIRMED
+
+@chronicle	أحمد	PAID_TO	سعود	40/1	SAR	اليوم الثاني	ASSERTED	POSITIVE	CONFIRMED
+
+ظهرت حوالة أخرى، لكن لم يثبت وصولها.
+@chronicle	أحمد	TRANSFER_TO	سعود	60/1	SAR	اليوم الثالث	UNCERTAIN	POSITIVE	PENDING
