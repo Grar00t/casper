@@ -38,6 +38,8 @@ def main():
         log = output / f"{label}.txt"
         log.write_text(normalized, encoding="utf-8")
         rows.append({"check": label, "exit_code": result.returncode,
+                     "command": [str(x).replace(str(ROOT), "<WORKTREE>") for x in command],
+                     "cwd": "<WORKTREE>" if cwd == ROOT else "<SCRATCH>",
                      "log": log.name, "sha256": hashlib.sha256(log.read_bytes()).hexdigest()})
         print(f"{label}: exit={result.returncode}", flush=True)
         if result.returncode or re.search(r"AddressSanitizer|runtime error:|LeakSanitizer", result.stdout):
@@ -60,19 +62,24 @@ def main():
             binary = output / f"chronicle-{mode}{suffix}"
             run(f"build-{mode}", [args.compiler, *flags, *extra,
                                     CORE / "casper_chronicle_main.c", *common, *link, "-o", binary])
-            for name in (("pool",) if args.native_windows else ("pool", "api", "stream")):
+            for name in (("pool",) if args.native_windows else ("pool", "api", "stream", "io", "alloc_fail")):
                 test = output / f"test-{name}-{mode}{suffix}"
                 sources = [CORE / "chronicle_pool.c"] if name == "pool" else common
                 wrap = [] if name == "pool" else ["-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free"]
                 if name == "stream":
                     wrap = ["-Wl,--wrap=fread"]
+                if name == "io":
+                    wrap = ["-Wl,--wrap=fopen,--wrap=fread,--wrap=fgetc,--wrap=fclose"]
+                if name == "alloc_fail":
+                    wrap = ["-Wl,--wrap=chr_malloc,--wrap=chr_calloc,--wrap=chr_realloc"]
                 run(f"build-{name}-{mode}", [args.compiler, *flags, *extra,
                     ROOT / "tests" / f"test_chronicle_{name}.c", *sources, *wrap, "-o", test])
                 with tempfile.TemporaryDirectory(prefix="chronicle-test-") as scratch:
                     run(f"{name}-{mode}", [test], Path(scratch))
             with tempfile.TemporaryDirectory(prefix="chronicle-self-") as scratch:
                 run(f"self-check-{mode}", [binary, "--self-check"], Path(scratch))
-            suites = ("integrity", "reasoner", "literal", "preservation", "resources", "arabic", "compatibility", "questions")
+            suites = ("integrity", "reasoner", "literal", "preservation", "resources", "arabic", "compatibility", "questions",
+                      "store_hardening", "utf8_hardening")
             if args.native_windows:
                 suites += ("windows",)
             for suite in suites:

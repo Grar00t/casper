@@ -15,6 +15,7 @@
 #define CHR_FIELD_MAX 128u
 #define CHR_MAX_EVENTS 4096u
 #define CHR_MAX_SOURCE (8u * 1024u * 1024u)
+#define CHR_STORE_PATH_MAX 2047u
 #define CHR_RECORD_BYTES (9u * CHR_FIELD_MAX + 16u)
 #define CHR_READ_CHUNK (64u * 1024u)
 #define CHR_MAGIC "CASPER-CHRON-V2"
@@ -114,6 +115,12 @@ static int utf8_valid(const uint8_t *s, size_t n) {
     }
     return 1;
 }
+static int utf8_path_valid(const char *path, size_t maximum) {
+    size_t len;
+    if (!path) return 0;
+    len = strlen(path);
+    return len != 0u && len <= maximum && utf8_valid((const uint8_t *)path, len);
+}
 static int read_chunks(FILE *f, uint8_t *data, size_t size) {
     size_t offset = 0u;
     while (offset < size) {
@@ -134,7 +141,7 @@ static int read_file(const char *path, uint8_t **data, size_t *size) {
     if ((uint64_t)end > CHR_MAX_SOURCE) { fclose(f); return -1; }
     p = (uint8_t *)chr_malloc((size_t)end + 1u); if (!p) { fclose(f); return -1; }
     ok = read_chunks(f, p, (size_t)end) == 0;
-    if (fgetc(f) != EOF || ferror(f)) ok = 0;
+    if (ok && (fgetc(f) != EOF || ferror(f))) ok = 0;
     if (fclose(f) != 0) ok = 0;
     if (!ok) { chr_free(p); return -1; }
     p[(size_t)end] = 0u; *data = p; *size = (size_t)end; return 0;
@@ -206,6 +213,7 @@ static int get_text(FILE *f, char out[CHR_FIELD_MAX]) {
     uint32_t n;
     if (get_u32(f, &n) != 0 || n >= CHR_FIELD_MAX) return -1;
     if (n && fread(out, 1u, n, f) != n) return -1;
+    if (!utf8_valid((const uint8_t *)out, n)) return -1;
     out[n] = '\0'; return 0;
 }
 static int hash_event_ids(const uint8_t doc[32], uint64_t start, uint64_t end,
@@ -458,7 +466,7 @@ static int receipt_existing_matches(const char *path, const char *data, size_t s
         if (c == EOF || (unsigned char)c != (unsigned char)data[pos]) ok = 0;
         ++pos;
     }
-    if (fgetc(f) != EOF || ferror(f)) ok = 0;
+    if (ok && (fgetc(f) != EOF || ferror(f))) ok = 0;
     if (fclose(f) != 0) ok = 0;
     return ok ? 0 : -1;
 }
@@ -476,7 +484,7 @@ static int write_receipt(const char *path, const char *kind, const char *store_p
     uint8_t store_hash[32]; char store_hex[65], doc_hex[65], result_hex[65]; int written;
     char path_hex[CHR_RECEIPT_VALUE_MAX], question_hex[CHR_RECEIPT_VALUE_MAX], data[CHR_RECEIPT_BYTES_MAX];
     size_t path_len = strlen(store_path), question_len = question ? strlen(question) : 0u;
-    if (path_len == 0u || path_len > (CHR_RECEIPT_VALUE_MAX - 1u) / 2u ||
+    if (!utf8_path_valid(store_path, CHR_STORE_PATH_MAX) ||
         question_len > (CHR_RECEIPT_VALUE_MAX - 1u) / 2u ||
         (strcmp(kind, "INGEST") != 0 && strcmp(kind, "QUERY") != 0 && strcmp(kind, "FIND") != 0) ||
         (strcmp(kind, "INGEST") == 0 && question_len != 0u)) return -1;
@@ -770,7 +778,8 @@ error:
 int casper_chronicle_ingest(const char *input_path, char **store_path_out, char **receipt_path_out) {
     ChrStore s, old; char *store_path = NULL, *receipt_path = NULL; size_t size;
     uint8_t result_hash[32]; int same = 0;
-    if (!input_path || !store_path_out || !receipt_path_out) return 2;
+    if (!utf8_path_valid(input_path, CHR_STORE_PATH_MAX - (sizeof(".chronicle") - 1u)) ||
+        !store_path_out || !receipt_path_out) return 2;
     memset(&s, 0, sizeof(s)); memset(&old, 0, sizeof(old));
     s.version = 2u;
     store_path = path_suffix(input_path, ".chronicle");
@@ -801,7 +810,7 @@ int casper_chronicle_query(const char *store_path, const char *question,
     ChrStore s; char *json = NULL, *suffix = NULL, *receipt = NULL;
     uint8_t qh[32], rh[32]; char qhex[65];
     memset(&s, 0, sizeof(s));
-    if (!store_path || !question || !json_out || !receipt_path_out ||
+    if (!utf8_path_valid(store_path, CHR_STORE_PATH_MAX) || !question || !json_out || !receipt_path_out ||
         !utf8_valid((const uint8_t *)question, strlen(question))) return 2;
     if (store_load(store_path, &s) != 0 || reason_json(&s, question, &json) != 0) {
         store_free(&s); return 1;
@@ -821,7 +830,7 @@ int casper_chronicle_find(const char *store_path, const char *query,
     ChrStore s; char *json = NULL, *suffix = NULL, *receipt = NULL;
     uint8_t qh[32], rh[32]; char qhex[65];
     memset(&s, 0, sizeof(s));
-    if (!store_path || !query || !json_out || !receipt_path_out ||
+    if (!utf8_path_valid(store_path, CHR_STORE_PATH_MAX) || !query || !json_out || !receipt_path_out ||
         !utf8_valid((const uint8_t *)query, strlen(query))) return 2;
     if (store_load(store_path, &s) != 0 || find_json(&s, query, &json) != 0) {
         store_free(&s); return 1;
@@ -896,9 +905,10 @@ int casper_chronicle_verify(const char *receipt_path) {
     size_t store_n = 0u, question_n = 0u;
     ChrStore s; uint8_t actual[32]; char actual_hex[65]; char *json = NULL; int ok = 0, unsupported = 0;
     memset(&s, 0, sizeof(s));
-    if (!receipt_path || receipt_read(receipt_path, &receipt) != 0) return 1;
+    if (!utf8_path_valid(receipt_path, SIZE_MAX) || receipt_read(receipt_path, &receipt) != 0) return 1;
     store_bytes = decode_hex(receipt.store_hex, &store_n); question_bytes = decode_hex(receipt.question_hex, &question_n);
-    if (!store_bytes || !question_bytes || memchr(store_bytes, 0, store_n) ||
+    if (!store_bytes || !question_bytes || store_n == 0u || store_n > CHR_STORE_PATH_MAX ||
+        !utf8_valid(store_bytes, store_n) ||
         !utf8_valid(question_bytes, question_n))
         goto done;
     if (!niyah_sha256_file((const char *)store_bytes, actual)) goto done;
