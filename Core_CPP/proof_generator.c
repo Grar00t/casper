@@ -69,8 +69,15 @@ bool niyah_sha256_file(const char *path,uint8_t out[32]){
     f=niyah_fopen_utf8(path,"rb");
     if(!f)return false;
     sha256_init(&c);
-    while((n=fread(buf,1u,sizeof(buf),f))>0u)sha256_update(&c,buf,n);
-    if(ferror(f)){fclose(f);return false;}
+    for(;;){
+        n=fread(buf,1u,sizeof(buf),f);
+        if(n>0u)sha256_update(&c,buf,n);
+        if(ferror(f)){(void)fclose(f);return false;}
+        if(n<sizeof(buf)){
+            if(!feof(f)){(void)fclose(f);return false;}
+            break;
+        }
+    }
     if(fclose(f)!=0)return false;
     sha256_final(&c,out);
     return true;
@@ -146,8 +153,9 @@ bool niyah_proof_verify(const char *proof_path,const char *prompt,const char *ou
     if(!proof_path)return false;
     f=fopen(proof_path,"r");
     if(!f)return false;
-    if(fgets(header,sizeof(header),f))header[strcspn(header,"\r\n")]='\0';
-    while(fgets(line,sizeof(line),f)){
+    if(!fgets(header,sizeof(header),f)){(void)fclose(f);return false;}
+    header[strcspn(header,"\r\n")]='\0';
+    while(!feof(f)&&!ferror(f)&&fgets(line,sizeof(line),f)){
         char *value=NULL;char *dst=NULL;
         if(!strncmp(line,"hash: ",6)){value=line+6;dst=stored_hex;}
         else if(!strncmp(line,"prompt_hash: ",13)){value=line+13;dst=prompt_hex;}
@@ -155,7 +163,8 @@ bool niyah_proof_verify(const char *proof_path,const char *prompt,const char *ou
         else if(!strncmp(line,"rules_hash: ",12)){value=line+12;dst=rules_hex;}
         if(value&&dst){size_t l=strcspn(value,"\r\n");if(l==64u){memcpy(dst,value,64u);dst[64]='\0';}}
     }
-    fclose(f);
+    if(ferror(f)){(void)fclose(f);return false;}
+    if(fclose(f)!=0)return false;
     if(strcmp(header,"NIYAH-PROOF-V2")!=0)return false;
     if(!hex_to_hash(stored_hex,stored)||!hex_to_hash(prompt_hex,meta))return false;
     hash_text(prompt,actual_prompt);if(memcmp(meta,actual_prompt,32u)!=0)return false;
@@ -170,12 +179,14 @@ bool niyah_proof_verify(const char *proof_path,const char *prompt,const char *ou
 static char *read_line_alloc(FILE *f,size_t max_len){
     size_t cap=256u,len=0u;
     char *buf;
-    int ch;
+    int ch=EOF;
     if(!f||max_len==0u)return NULL;
     if(cap>max_len+1u)cap=max_len+1u;
     buf=(char*)malloc(cap);
     if(!buf)return NULL;
-    while((ch=fgetc(f))!=EOF){
+    while(!feof(f)&&!ferror(f)){
+        ch=fgetc(f);
+        if(ch==EOF)break;
         if(ch=='\n')break;
         if(ch=='\r')continue;
         if(len>=max_len){free(buf);return NULL;}
@@ -190,6 +201,7 @@ static char *read_line_alloc(FILE *f,size_t max_len){
         }
         buf[len++]=(char)ch;
     }
+    if(ferror(f)){free(buf);return NULL;}
     if(ch==EOF&&len==0u){free(buf);return NULL;}
     buf[len]='\0';
     return buf;
@@ -244,7 +256,8 @@ bool niyah_proof_verify_saved(const char *proof_path,const char *rule_file_path,
     if(!line){fclose(f);return false;}
     (void)snprintf(header,sizeof(header),"%s",line);
     free(line);
-    while((line=read_line_alloc(f,NIYAH_PROOF_MAX_LINE_BYTES))!=NULL){
+    while(!feof(f)&&!ferror(f)&&
+          (line=read_line_alloc(f,NIYAH_PROOF_MAX_LINE_BYTES))!=NULL){
         const char *value=NULL;
         if(!strncmp(line,"hash: ",6)){value=line+6;if(strlen(value)==64u)memcpy(stored_hex,value,65u);}
         else if(!strncmp(line,"prompt_hash: ",13)){value=line+13;if(strlen(value)==64u)memcpy(prompt_hash_hex,value,65u);}
@@ -254,8 +267,8 @@ bool niyah_proof_verify_saved(const char *proof_path,const char *rule_file_path,
         else if(!strncmp(line,"output_hex: ",12)){free(output_data_hex);output_data_hex=dup_text(line+12);}
         free(line);
     }
-    if(ferror(f)){fclose(f);goto done;}
-    fclose(f);
+    if(ferror(f)||!feof(f)){(void)fclose(f);goto done;}
+    if(fclose(f)!=0)goto done;
     if(strcmp(header,"NIYAH-PROOF-V2")!=0)goto done;
     if(!prompt_data_hex||!output_data_hex)goto done;
     if(strlen(prompt_data_hex)>NIYAH_PROOF_MAX_HEX_BYTES||strlen(output_data_hex)>NIYAH_PROOF_MAX_HEX_BYTES)goto done;
