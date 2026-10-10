@@ -141,8 +141,13 @@ the unpublished local V1 literal format, and recovery without overwriting.
 The receipt is an integrity checksum, not a signature, provenance guarantee,
 truth certificate, legal conclusion, or authenticity proof.
 Receipt fields are unique and bounded; unknown, duplicate, oversized, missing
-or unterminated fields are rejected. Paths and questions are limited to 2047
-UTF-8 bytes. Existing stores or receipts are never overwritten: identical valid
+or unterminated fields are rejected. Serialized event fields must contain valid
+UTF-8 without embedded NUL bytes, including trailing NUL padding. Store paths
+and questions in receipts are limited to 2047 UTF-8 bytes. Ingestion reserves
+10 bytes for `.chronicle`, so the supplied source path is limited to 2037 bytes
+and is checked before creating a store. Generated receipt filenames may exceed
+2047 bytes; they must still be valid UTF-8 and supported by the filesystem.
+Existing stores or receipts are never overwritten: identical valid
 content is reused; differing bytes cause failure. Use a new input filename to
 import a revised document. An I/O or receipt collision can leave a newly created
 store for inspection; ingestion is not a multi-file transaction.

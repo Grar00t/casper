@@ -1,0 +1,3197 @@
+{
+  "initial_head": "9706ec58dcbecf89e53b5692fa15a0ed4c71a3d5",
+  "scope": "Chronicle bounded V2 contract hardening; no format or public API change",
+  "gates": [
+    {
+      "name": "verified-gcc",
+      "summary_sha256": "0d7cba4a1ea3183873a7608d9b5cc3525cb5b3e401b6a74be0277fedf65b6670",
+      "status": "PASS",
+      "compiler": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+      "platform": "linux",
+      "native_windows": false,
+      "sanitizers_executed": true,
+      "heap_wrapping_executed": true,
+      "deterministic_result_hashes": {
+        "reasoner": "6d4a89f94247a9334689a6a5f2ca9a94e580b1d78a1e8d54dc02600328ca106b",
+        "literal": "e93b547c9df30d62385a5d6bf250dbf0bbb17d6d264c6b1e39dd16552b5f2327",
+        "resources": "4962d279fe29b137f08179aa89700647f9e1083479ea54662c67ad8e1c0a754b",
+        "arabic": "92914a9c043b134cf9fc9e1c6927cb2bc8ff1924b2a5eb5874168d1c21464d00",
+        "questions": "8855617191dfb8efe7c145e642559030bac4167d7ae56e8ca1f28aa09b6906b2",
+        "utf8_hardening": "098232130bf59aeb3794ff0cfe65feaf790e2135f71c432209968829fa031698"
+      },
+      "checks": [
+        {
+          "check": "compiler-version",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "--version"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "compiler-version.txt",
+          "sha256": "6e876a25bb7fdb71ab2914e8f1eeaa00cc61d20a36a6c2981ab7d4d7ceab42f8"
+        },
+        {
+          "check": "build-o2",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/Core_CPP/casper_chronicle_main.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "build-pool-o2",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/tests/test_chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-pool-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-pool-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "pool-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-pool-o2"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "pool-o2.txt",
+          "sha256": "aa8470de1117018cf4cbe67975512989b81623ecea5e26f628ab767233854dce"
+        },
+        {
+          "check": "build-api-o2",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/tests/test_chronicle_api.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-api-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-api-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "api-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-api-o2"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "api-o2.txt",
+          "sha256": "b9bdf2893fcc6168242f09e783d54ad4d350494c164796337208b097082af48e"
+        },
+        {
+          "check": "build-stream-o2",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/tests/test_chronicle_stream.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=fread",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-stream-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-stream-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "stream-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-stream-o2"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "stream-o2.txt",
+          "sha256": "ce2c4262f1c2a62afa008bd71a8506c4980fd381b0740b54a174268efeeb05c3"
+        },
+        {
+          "check": "build-io-o2",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/tests/test_chronicle_io.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=fopen,--wrap=fread,--wrap=fgetc,--wrap=fclose",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-io-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-io-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "io-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-io-o2"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "io-o2.txt",
+          "sha256": "f6b64080e488ab9d2b011abdfe441a4994be6970afaa2a92acba1496ee31e38e"
+        },
+        {
+          "check": "build-alloc_fail-o2",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/tests/test_chronicle_alloc_fail.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=chr_malloc,--wrap=chr_calloc,--wrap=chr_realloc",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-alloc_fail-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-alloc_fail-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "alloc_fail-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-alloc_fail-o2"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "alloc_fail-o2.txt",
+          "sha256": "59db86f1bceafc03fddf41eca5e6c1ed733f29c82ec91f409c872778fb852b24"
+        },
+        {
+          "check": "self-check-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2",
+            "--self-check"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "self-check-o2.txt",
+          "sha256": "584c6b8bde1ba19a33b7223a039b152e181c0c93fbe92e0d4ecd63b147945aa6"
+        },
+        {
+          "check": "integrity-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_integrity.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "integrity-o2-1.txt",
+          "sha256": "a0159aba895015e427eecb68d5c885b7c2988cc6165dad690da438d059a0f451"
+        },
+        {
+          "check": "reasoner-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o2-1.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "reasoner-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o2-2.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "reasoner-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o2-3.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "literal-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o2-1.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "literal-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o2-2.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "literal-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o2-3.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "preservation-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_preservation.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "preservation-o2-1.txt",
+          "sha256": "a305b8715647660e5de6f50f6841e0522fdec067ad7316efba75735aa1071673"
+        },
+        {
+          "check": "resources-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_resources.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "resources-o2-1.txt",
+          "sha256": "d605e57559ad24a94221f041f1952bf67473e640a043e228469fb670af2e5d80"
+        },
+        {
+          "check": "arabic-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o2-1.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "arabic-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o2-2.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "arabic-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o2-3.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "compatibility-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_compatibility.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "compatibility-o2-1.txt",
+          "sha256": "5e0b1bd6acc63b51d6e8d393cdba5a23376e6857747e2a64d7dc17eb8aface9b"
+        },
+        {
+          "check": "questions-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o2-1.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "questions-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o2-2.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "questions-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o2-3.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "store_hardening-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_store_hardening.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "store_hardening-o2-1.txt",
+          "sha256": "78956bbd8fe37d4050447bae26d611ea14bcbdc2c58fe3c702d2dc69529dbbbc"
+        },
+        {
+          "check": "utf8_hardening-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_utf8_hardening.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "utf8_hardening-o2-1.txt",
+          "sha256": "2cfe89c50a143b016b7c7a3564b399208d47bdd413933eab1f0c5bc5f776c5f3"
+        },
+        {
+          "check": "local-bridge-o2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_local_bridge.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "local-bridge-o2.txt",
+          "sha256": "a3abcda294805a5fc87136a9ff971009844298402d3a43397f680813b5865342"
+        },
+        {
+          "check": "benchmark",
+          "exit_code": 0,
+          "command": [
+            "/usr/bin/time",
+            "-f",
+            "max_rss_kib=%M",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/benchmark-rss.txt",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-o2",
+            "--benchmark"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "benchmark.txt",
+          "sha256": "997b7d7956ec7b768ad141ec81d3495f2a9db542758b7a2987e35f2c3be7f692"
+        },
+        {
+          "check": "build-san",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/Core_CPP/casper_chronicle_main.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "build-pool-san",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/tests/test_chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-pool-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-pool-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "pool-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-pool-san"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "pool-san.txt",
+          "sha256": "aa8470de1117018cf4cbe67975512989b81623ecea5e26f628ab767233854dce"
+        },
+        {
+          "check": "build-api-san",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/tests/test_chronicle_api.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-api-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-api-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "api-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-api-san"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "api-san.txt",
+          "sha256": "b9bdf2893fcc6168242f09e783d54ad4d350494c164796337208b097082af48e"
+        },
+        {
+          "check": "build-stream-san",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/tests/test_chronicle_stream.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=fread",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-stream-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-stream-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "stream-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-stream-san"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "stream-san.txt",
+          "sha256": "ce2c4262f1c2a62afa008bd71a8506c4980fd381b0740b54a174268efeeb05c3"
+        },
+        {
+          "check": "build-io-san",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/tests/test_chronicle_io.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=fopen,--wrap=fread,--wrap=fgetc,--wrap=fclose",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-io-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-io-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "io-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-io-san"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "io-san.txt",
+          "sha256": "f6b64080e488ab9d2b011abdfe441a4994be6970afaa2a92acba1496ee31e38e"
+        },
+        {
+          "check": "build-alloc_fail-san",
+          "exit_code": 0,
+          "command": [
+            "gcc",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/tests/test_chronicle_alloc_fail.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=chr_malloc,--wrap=chr_calloc,--wrap=chr_realloc",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-alloc_fail-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-alloc_fail-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "alloc_fail-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/test-alloc_fail-san"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "alloc_fail-san.txt",
+          "sha256": "59db86f1bceafc03fddf41eca5e6c1ed733f29c82ec91f409c872778fb852b24"
+        },
+        {
+          "check": "self-check-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san",
+            "--self-check"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "self-check-san.txt",
+          "sha256": "584c6b8bde1ba19a33b7223a039b152e181c0c93fbe92e0d4ecd63b147945aa6"
+        },
+        {
+          "check": "integrity-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_integrity.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "integrity-san-1.txt",
+          "sha256": "a0159aba895015e427eecb68d5c885b7c2988cc6165dad690da438d059a0f451"
+        },
+        {
+          "check": "reasoner-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-san-1.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "reasoner-san-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-san-2.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "reasoner-san-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-san-3.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "literal-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-san-1.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "literal-san-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-san-2.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "literal-san-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-san-3.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "preservation-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_preservation.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "preservation-san-1.txt",
+          "sha256": "a305b8715647660e5de6f50f6841e0522fdec067ad7316efba75735aa1071673"
+        },
+        {
+          "check": "resources-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_resources.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "resources-san-1.txt",
+          "sha256": "d605e57559ad24a94221f041f1952bf67473e640a043e228469fb670af2e5d80"
+        },
+        {
+          "check": "arabic-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-san-1.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "arabic-san-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-san-2.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "arabic-san-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-san-3.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "compatibility-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_compatibility.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "compatibility-san-1.txt",
+          "sha256": "5e0b1bd6acc63b51d6e8d393cdba5a23376e6857747e2a64d7dc17eb8aface9b"
+        },
+        {
+          "check": "questions-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-san-1.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "questions-san-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-san-2.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "questions-san-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-san-3.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "store_hardening-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_store_hardening.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "store_hardening-san-1.txt",
+          "sha256": "78956bbd8fe37d4050447bae26d611ea14bcbdc2c58fe3c702d2dc69529dbbbc"
+        },
+        {
+          "check": "utf8_hardening-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_utf8_hardening.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "utf8_hardening-san-1.txt",
+          "sha256": "2cfe89c50a143b016b7c7a3564b399208d47bdd413933eab1f0c5bc5f776c5f3"
+        },
+        {
+          "check": "local-bridge-san",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_local_bridge.py",
+            "<WORKTREE>/build/hardening-20261009/verified-gcc/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "local-bridge-san.txt",
+          "sha256": "c785a6a554c0802e96b664d1dacc17a19ee6d64fdd92861853daf008b792576a"
+        }
+      ]
+    },
+    {
+      "name": "verified-clang",
+      "summary_sha256": "4d42b32d81cd725652ec9e010bca40d8ad5318810a1bb2c1482863f0286423b3",
+      "status": "PASS",
+      "compiler": "Ubuntu clang version 21.1.8 (6ubuntu1)",
+      "platform": "linux",
+      "native_windows": false,
+      "sanitizers_executed": true,
+      "heap_wrapping_executed": true,
+      "deterministic_result_hashes": {
+        "reasoner": "6d4a89f94247a9334689a6a5f2ca9a94e580b1d78a1e8d54dc02600328ca106b",
+        "literal": "e93b547c9df30d62385a5d6bf250dbf0bbb17d6d264c6b1e39dd16552b5f2327",
+        "resources": "4962d279fe29b137f08179aa89700647f9e1083479ea54662c67ad8e1c0a754b",
+        "arabic": "92914a9c043b134cf9fc9e1c6927cb2bc8ff1924b2a5eb5874168d1c21464d00",
+        "questions": "8855617191dfb8efe7c145e642559030bac4167d7ae56e8ca1f28aa09b6906b2",
+        "utf8_hardening": "098232130bf59aeb3794ff0cfe65feaf790e2135f71c432209968829fa031698"
+      },
+      "checks": [
+        {
+          "check": "compiler-version",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "--version"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "compiler-version.txt",
+          "sha256": "77467400b91c4cebb6c3e29d8a611af518a2f4078c22baf276b0a1373e996bf5"
+        },
+        {
+          "check": "build-o2",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/Core_CPP/casper_chronicle_main.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "build-pool-o2",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/tests/test_chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-pool-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-pool-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "pool-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-pool-o2"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "pool-o2.txt",
+          "sha256": "aa8470de1117018cf4cbe67975512989b81623ecea5e26f628ab767233854dce"
+        },
+        {
+          "check": "build-api-o2",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/tests/test_chronicle_api.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-api-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-api-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "api-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-api-o2"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "api-o2.txt",
+          "sha256": "b9bdf2893fcc6168242f09e783d54ad4d350494c164796337208b097082af48e"
+        },
+        {
+          "check": "build-stream-o2",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/tests/test_chronicle_stream.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=fread",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-stream-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-stream-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "stream-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-stream-o2"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "stream-o2.txt",
+          "sha256": "ce2c4262f1c2a62afa008bd71a8506c4980fd381b0740b54a174268efeeb05c3"
+        },
+        {
+          "check": "build-io-o2",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/tests/test_chronicle_io.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=fopen,--wrap=fread,--wrap=fgetc,--wrap=fclose",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-io-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-io-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "io-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-io-o2"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "io-o2.txt",
+          "sha256": "f6b64080e488ab9d2b011abdfe441a4994be6970afaa2a92acba1496ee31e38e"
+        },
+        {
+          "check": "build-alloc_fail-o2",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O2",
+            "<WORKTREE>/tests/test_chronicle_alloc_fail.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=chr_malloc,--wrap=chr_calloc,--wrap=chr_realloc",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-alloc_fail-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-alloc_fail-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "alloc_fail-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-alloc_fail-o2"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "alloc_fail-o2.txt",
+          "sha256": "59db86f1bceafc03fddf41eca5e6c1ed733f29c82ec91f409c872778fb852b24"
+        },
+        {
+          "check": "self-check-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2",
+            "--self-check"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "self-check-o2.txt",
+          "sha256": "584c6b8bde1ba19a33b7223a039b152e181c0c93fbe92e0d4ecd63b147945aa6"
+        },
+        {
+          "check": "integrity-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_integrity.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "integrity-o2-1.txt",
+          "sha256": "a0159aba895015e427eecb68d5c885b7c2988cc6165dad690da438d059a0f451"
+        },
+        {
+          "check": "reasoner-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o2-1.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "reasoner-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o2-2.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "reasoner-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o2-3.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "literal-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o2-1.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "literal-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o2-2.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "literal-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o2-3.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "preservation-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_preservation.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "preservation-o2-1.txt",
+          "sha256": "a305b8715647660e5de6f50f6841e0522fdec067ad7316efba75735aa1071673"
+        },
+        {
+          "check": "resources-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_resources.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "resources-o2-1.txt",
+          "sha256": "d605e57559ad24a94221f041f1952bf67473e640a043e228469fb670af2e5d80"
+        },
+        {
+          "check": "arabic-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o2-1.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "arabic-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o2-2.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "arabic-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o2-3.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "compatibility-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_compatibility.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "compatibility-o2-1.txt",
+          "sha256": "5e0b1bd6acc63b51d6e8d393cdba5a23376e6857747e2a64d7dc17eb8aface9b"
+        },
+        {
+          "check": "questions-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o2-1.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "questions-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o2-2.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "questions-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o2-3.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "store_hardening-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_store_hardening.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "store_hardening-o2-1.txt",
+          "sha256": "78956bbd8fe37d4050447bae26d611ea14bcbdc2c58fe3c702d2dc69529dbbbc"
+        },
+        {
+          "check": "utf8_hardening-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_utf8_hardening.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "utf8_hardening-o2-1.txt",
+          "sha256": "2cfe89c50a143b016b7c7a3564b399208d47bdd413933eab1f0c5bc5f776c5f3"
+        },
+        {
+          "check": "local-bridge-o2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_local_bridge.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "local-bridge-o2.txt",
+          "sha256": "b1c7ae1f1815abd3447388e07de294100e57d5dfdc7882797639ca811ae643ae"
+        },
+        {
+          "check": "benchmark",
+          "exit_code": 0,
+          "command": [
+            "/usr/bin/time",
+            "-f",
+            "max_rss_kib=%M",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/benchmark-rss.txt",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-o2",
+            "--benchmark"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "benchmark.txt",
+          "sha256": "1a97c6003a0b5c8f1321691bcd920e44c46a5dd06e7ae9176b50c961dc53e20b"
+        },
+        {
+          "check": "build-san",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/Core_CPP/casper_chronicle_main.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "build-pool-san",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/tests/test_chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-pool-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-pool-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "pool-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-pool-san"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "pool-san.txt",
+          "sha256": "aa8470de1117018cf4cbe67975512989b81623ecea5e26f628ab767233854dce"
+        },
+        {
+          "check": "build-api-san",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/tests/test_chronicle_api.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-api-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-api-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "api-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-api-san"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "api-san.txt",
+          "sha256": "b9bdf2893fcc6168242f09e783d54ad4d350494c164796337208b097082af48e"
+        },
+        {
+          "check": "build-stream-san",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/tests/test_chronicle_stream.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=fread",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-stream-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-stream-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "stream-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-stream-san"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "stream-san.txt",
+          "sha256": "ce2c4262f1c2a62afa008bd71a8506c4980fd381b0740b54a174268efeeb05c3"
+        },
+        {
+          "check": "build-io-san",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/tests/test_chronicle_io.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=fopen,--wrap=fread,--wrap=fgetc,--wrap=fclose",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-io-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-io-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "io-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-io-san"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "io-san.txt",
+          "sha256": "f6b64080e488ab9d2b011abdfe441a4994be6970afaa2a92acba1496ee31e38e"
+        },
+        {
+          "check": "build-alloc_fail-san",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>/Core_CPP",
+            "-O0",
+            "-g",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "<WORKTREE>/tests/test_chronicle_alloc_fail.c",
+            "<WORKTREE>/Core_CPP/casper_chronicle.c",
+            "<WORKTREE>/Core_CPP/chronicle_pool.c",
+            "<WORKTREE>/Core_CPP/proof_generator.c",
+            "-Wl,--wrap=chr_malloc,--wrap=chr_calloc,--wrap=chr_realloc",
+            "-o",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-alloc_fail-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-alloc_fail-san.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "alloc_fail-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/test-alloc_fail-san"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "alloc_fail-san.txt",
+          "sha256": "59db86f1bceafc03fddf41eca5e6c1ed733f29c82ec91f409c872778fb852b24"
+        },
+        {
+          "check": "self-check-san",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san",
+            "--self-check"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "self-check-san.txt",
+          "sha256": "584c6b8bde1ba19a33b7223a039b152e181c0c93fbe92e0d4ecd63b147945aa6"
+        },
+        {
+          "check": "integrity-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_integrity.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "integrity-san-1.txt",
+          "sha256": "a0159aba895015e427eecb68d5c885b7c2988cc6165dad690da438d059a0f451"
+        },
+        {
+          "check": "reasoner-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-san-1.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "reasoner-san-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-san-2.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "reasoner-san-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_reasoner.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-san-3.txt",
+          "sha256": "15ac68c6f55e1a9f686ce6be9ab8fc01b87b921cbbfc9ca58c5c881e97ee38ee"
+        },
+        {
+          "check": "literal-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-san-1.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "literal-san-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-san-2.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "literal-san-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_literal.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-san-3.txt",
+          "sha256": "b7c2ce4bcb04d9feb38d54e9fdd13f6c86f295516de27b40beb2b73db07b08f4"
+        },
+        {
+          "check": "preservation-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_preservation.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "preservation-san-1.txt",
+          "sha256": "a305b8715647660e5de6f50f6841e0522fdec067ad7316efba75735aa1071673"
+        },
+        {
+          "check": "resources-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_resources.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "resources-san-1.txt",
+          "sha256": "d605e57559ad24a94221f041f1952bf67473e640a043e228469fb670af2e5d80"
+        },
+        {
+          "check": "arabic-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-san-1.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "arabic-san-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-san-2.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "arabic-san-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_arabic.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-san-3.txt",
+          "sha256": "ba8bceaa9efc737efff5b2576837069b48d1e7e9991bbe2e638a4ed825cefe74"
+        },
+        {
+          "check": "compatibility-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_compatibility.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "compatibility-san-1.txt",
+          "sha256": "5e0b1bd6acc63b51d6e8d393cdba5a23376e6857747e2a64d7dc17eb8aface9b"
+        },
+        {
+          "check": "questions-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-san-1.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "questions-san-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-san-2.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "questions-san-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_questions.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-san-3.txt",
+          "sha256": "9e00514c178fd9cd79b9db39ff971b5a2183dd470bcd9ae60b1334c9ca3ed3b2"
+        },
+        {
+          "check": "store_hardening-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_store_hardening.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "store_hardening-san-1.txt",
+          "sha256": "78956bbd8fe37d4050447bae26d611ea14bcbdc2c58fe3c702d2dc69529dbbbc"
+        },
+        {
+          "check": "utf8_hardening-san-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_chronicle_utf8_hardening.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "utf8_hardening-san-1.txt",
+          "sha256": "2cfe89c50a143b016b7c7a3564b399208d47bdd413933eab1f0c5bc5f776c5f3"
+        },
+        {
+          "check": "local-bridge-san",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>/tests/test_local_bridge.py",
+            "<WORKTREE>/build/hardening-20261009/verified-clang/chronicle-san"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "local-bridge-san.txt",
+          "sha256": "15a04183cc9f16e12b07f7e02142c1448984bcd834184d81b1c78cc6f02eb966"
+        }
+      ]
+    },
+    {
+      "name": "final-windows",
+      "summary_sha256": "e553dfc65fbc86e40966cd06ddb8c46a2d4c58c86657d6933a7e172fe481c9a7",
+      "status": "PASS",
+      "compiler": "clang version 22.1.8 (https://github.com/llvm/llvm-project.git ca7933e47d3a3451d81e72ac174dcb5aa28b59d1)",
+      "platform": "win32",
+      "native_windows": true,
+      "sanitizers_executed": false,
+      "heap_wrapping_executed": false,
+      "deterministic_result_hashes": {
+        "reasoner": "6d4a89f94247a9334689a6a5f2ca9a94e580b1d78a1e8d54dc02600328ca106b",
+        "literal": "e93b547c9df30d62385a5d6bf250dbf0bbb17d6d264c6b1e39dd16552b5f2327",
+        "resources": "4962d279fe29b137f08179aa89700647f9e1083479ea54662c67ad8e1c0a754b",
+        "arabic": "92914a9c043b134cf9fc9e1c6927cb2bc8ff1924b2a5eb5874168d1c21464d00",
+        "questions": "8855617191dfb8efe7c145e642559030bac4167d7ae56e8ca1f28aa09b6906b2",
+        "utf8_hardening": "098232130bf59aeb3794ff0cfe65feaf790e2135f71c432209968829fa031698",
+        "windows": "13444c49ec5ad674fefe658d532d7492deda9212aea44952b99f078875182c70"
+      },
+      "checks": [
+        {
+          "check": "compiler-version",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "--version"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "compiler-version.txt",
+          "sha256": "dca4bb31e50f78fda97146cca06de8e5c83c43c41c7423c452315f7764d52043"
+        },
+        {
+          "check": "build-o2",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>\\Core_CPP",
+            "-O2",
+            "<WORKTREE>\\Core_CPP\\casper_chronicle_main.c",
+            "<WORKTREE>\\Core_CPP\\casper_chronicle.c",
+            "<WORKTREE>\\Core_CPP\\chronicle_pool.c",
+            "<WORKTREE>\\Core_CPP\\proof_generator.c",
+            "-municode",
+            "-o",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "build-pool-o2",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>\\Core_CPP",
+            "-O2",
+            "<WORKTREE>\\tests\\test_chronicle_pool.c",
+            "<WORKTREE>\\Core_CPP\\chronicle_pool.c",
+            "-o",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\test-pool-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-pool-o2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "pool-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\test-pool-o2.exe"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "pool-o2.txt",
+          "sha256": "542250f86758cf9ece8c5a773f36ba4890a98f8277dcea72bebea4a82363b81f"
+        },
+        {
+          "check": "self-check-o2",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe",
+            "--self-check"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "self-check-o2.txt",
+          "sha256": "6f3ab235c44bed1220db46f5539a8abe265f2f1fb6832e13b66bca90a1d51965"
+        },
+        {
+          "check": "integrity-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_integrity.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "integrity-o2-1.txt",
+          "sha256": "94e521dc5e65f7b617665d9c6656e01e3a55dbcf5617ce7eced31defc993ae08"
+        },
+        {
+          "check": "reasoner-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_reasoner.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o2-1.txt",
+          "sha256": "3590c6b8611ed25ee0014b7e62819d828dc67d3669b62e657ccfc17b0eeb73fd"
+        },
+        {
+          "check": "reasoner-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_reasoner.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o2-2.txt",
+          "sha256": "3590c6b8611ed25ee0014b7e62819d828dc67d3669b62e657ccfc17b0eeb73fd"
+        },
+        {
+          "check": "reasoner-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_reasoner.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o2-3.txt",
+          "sha256": "3590c6b8611ed25ee0014b7e62819d828dc67d3669b62e657ccfc17b0eeb73fd"
+        },
+        {
+          "check": "literal-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_literal.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o2-1.txt",
+          "sha256": "11076ef4b974684fbe0be0e365b9300b72b309e9a85d97c492f60c1aef3dce23"
+        },
+        {
+          "check": "literal-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_literal.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o2-2.txt",
+          "sha256": "11076ef4b974684fbe0be0e365b9300b72b309e9a85d97c492f60c1aef3dce23"
+        },
+        {
+          "check": "literal-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_literal.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o2-3.txt",
+          "sha256": "11076ef4b974684fbe0be0e365b9300b72b309e9a85d97c492f60c1aef3dce23"
+        },
+        {
+          "check": "preservation-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_preservation.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "preservation-o2-1.txt",
+          "sha256": "8cbb05ec4b821421844b58197befc3ac8258814aebe6811a74b11fa1a643477a"
+        },
+        {
+          "check": "resources-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_resources.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "resources-o2-1.txt",
+          "sha256": "91f30261c4ea716d5654d6cd3d017ccb7f2b28e0ed2d1ad5c7901a3555384738"
+        },
+        {
+          "check": "arabic-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_arabic.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o2-1.txt",
+          "sha256": "7834c0f6ead374fb56f6ee25ecc06c707c14b02dca53edd56d88346998942882"
+        },
+        {
+          "check": "arabic-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_arabic.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o2-2.txt",
+          "sha256": "7834c0f6ead374fb56f6ee25ecc06c707c14b02dca53edd56d88346998942882"
+        },
+        {
+          "check": "arabic-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_arabic.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o2-3.txt",
+          "sha256": "7834c0f6ead374fb56f6ee25ecc06c707c14b02dca53edd56d88346998942882"
+        },
+        {
+          "check": "compatibility-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_compatibility.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "compatibility-o2-1.txt",
+          "sha256": "3564ff8e9979ea2005bc4eb199952536956519f241fd2cb4eb2d75badc4f6728"
+        },
+        {
+          "check": "questions-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_questions.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o2-1.txt",
+          "sha256": "78547bfbbf4ab1ceff50422d7ee98acfdb823b95ae8a2052292eea15b6bb9b24"
+        },
+        {
+          "check": "questions-o2-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_questions.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o2-2.txt",
+          "sha256": "78547bfbbf4ab1ceff50422d7ee98acfdb823b95ae8a2052292eea15b6bb9b24"
+        },
+        {
+          "check": "questions-o2-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_questions.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o2-3.txt",
+          "sha256": "78547bfbbf4ab1ceff50422d7ee98acfdb823b95ae8a2052292eea15b6bb9b24"
+        },
+        {
+          "check": "store_hardening-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_store_hardening.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "store_hardening-o2-1.txt",
+          "sha256": "b0b547a44e1908f09c9701c9fb25c6ac586ca1e8828d657b998f7aa22701c450"
+        },
+        {
+          "check": "utf8_hardening-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_utf8_hardening.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "utf8_hardening-o2-1.txt",
+          "sha256": "0c7ac783b72a0672e6f047e673eba9ad38d2fd510825932ff55f3f6860954fa6"
+        },
+        {
+          "check": "windows-o2-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_windows.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "windows-o2-1.txt",
+          "sha256": "ea963f97f480746a5463970bc8670a844ad631ee49619fbb3d63034048dc7cdd"
+        },
+        {
+          "check": "local-bridge-o2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_local_bridge.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "local-bridge-o2.txt",
+          "sha256": "22425265daea8aeb00873d1d9c75bc273b17d85b04eb231a84df67b5b5a104c8"
+        },
+        {
+          "check": "benchmark",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o2.exe",
+            "--benchmark"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "benchmark.txt",
+          "sha256": "3bb5838770581cc698745babe3e27991eb7674b0029b480cd11d40d9091fdbff"
+        },
+        {
+          "check": "build-o0",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>\\Core_CPP",
+            "-O0",
+            "-g",
+            "<WORKTREE>\\Core_CPP\\casper_chronicle_main.c",
+            "<WORKTREE>\\Core_CPP\\casper_chronicle.c",
+            "<WORKTREE>\\Core_CPP\\chronicle_pool.c",
+            "<WORKTREE>\\Core_CPP\\proof_generator.c",
+            "-municode",
+            "-o",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-o0.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "build-pool-o0",
+          "exit_code": 0,
+          "command": [
+            "clang",
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
+            "-Wshadow",
+            "-Wconversion",
+            "-Werror",
+            "-Wstrict-prototypes",
+            "-Wmissing-prototypes",
+            "-I<WORKTREE>\\Core_CPP",
+            "-O0",
+            "-g",
+            "<WORKTREE>\\tests\\test_chronicle_pool.c",
+            "<WORKTREE>\\Core_CPP\\chronicle_pool.c",
+            "-o",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\test-pool-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "build-pool-o0.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "check": "pool-o0",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\test-pool-o0.exe"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "pool-o0.txt",
+          "sha256": "542250f86758cf9ece8c5a773f36ba4890a98f8277dcea72bebea4a82363b81f"
+        },
+        {
+          "check": "self-check-o0",
+          "exit_code": 0,
+          "command": [
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe",
+            "--self-check"
+          ],
+          "cwd": "<SCRATCH>",
+          "log": "self-check-o0.txt",
+          "sha256": "6f3ab235c44bed1220db46f5539a8abe265f2f1fb6832e13b66bca90a1d51965"
+        },
+        {
+          "check": "integrity-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_integrity.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "integrity-o0-1.txt",
+          "sha256": "94e521dc5e65f7b617665d9c6656e01e3a55dbcf5617ce7eced31defc993ae08"
+        },
+        {
+          "check": "reasoner-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_reasoner.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o0-1.txt",
+          "sha256": "3590c6b8611ed25ee0014b7e62819d828dc67d3669b62e657ccfc17b0eeb73fd"
+        },
+        {
+          "check": "reasoner-o0-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_reasoner.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o0-2.txt",
+          "sha256": "3590c6b8611ed25ee0014b7e62819d828dc67d3669b62e657ccfc17b0eeb73fd"
+        },
+        {
+          "check": "reasoner-o0-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_reasoner.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "reasoner-o0-3.txt",
+          "sha256": "3590c6b8611ed25ee0014b7e62819d828dc67d3669b62e657ccfc17b0eeb73fd"
+        },
+        {
+          "check": "literal-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_literal.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o0-1.txt",
+          "sha256": "11076ef4b974684fbe0be0e365b9300b72b309e9a85d97c492f60c1aef3dce23"
+        },
+        {
+          "check": "literal-o0-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_literal.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o0-2.txt",
+          "sha256": "11076ef4b974684fbe0be0e365b9300b72b309e9a85d97c492f60c1aef3dce23"
+        },
+        {
+          "check": "literal-o0-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_literal.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "literal-o0-3.txt",
+          "sha256": "11076ef4b974684fbe0be0e365b9300b72b309e9a85d97c492f60c1aef3dce23"
+        },
+        {
+          "check": "preservation-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_preservation.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "preservation-o0-1.txt",
+          "sha256": "8cbb05ec4b821421844b58197befc3ac8258814aebe6811a74b11fa1a643477a"
+        },
+        {
+          "check": "resources-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_resources.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "resources-o0-1.txt",
+          "sha256": "91f30261c4ea716d5654d6cd3d017ccb7f2b28e0ed2d1ad5c7901a3555384738"
+        },
+        {
+          "check": "arabic-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_arabic.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o0-1.txt",
+          "sha256": "7834c0f6ead374fb56f6ee25ecc06c707c14b02dca53edd56d88346998942882"
+        },
+        {
+          "check": "arabic-o0-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_arabic.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o0-2.txt",
+          "sha256": "7834c0f6ead374fb56f6ee25ecc06c707c14b02dca53edd56d88346998942882"
+        },
+        {
+          "check": "arabic-o0-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_arabic.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "arabic-o0-3.txt",
+          "sha256": "7834c0f6ead374fb56f6ee25ecc06c707c14b02dca53edd56d88346998942882"
+        },
+        {
+          "check": "compatibility-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_compatibility.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "compatibility-o0-1.txt",
+          "sha256": "3564ff8e9979ea2005bc4eb199952536956519f241fd2cb4eb2d75badc4f6728"
+        },
+        {
+          "check": "questions-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_questions.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o0-1.txt",
+          "sha256": "78547bfbbf4ab1ceff50422d7ee98acfdb823b95ae8a2052292eea15b6bb9b24"
+        },
+        {
+          "check": "questions-o0-2",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_questions.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o0-2.txt",
+          "sha256": "78547bfbbf4ab1ceff50422d7ee98acfdb823b95ae8a2052292eea15b6bb9b24"
+        },
+        {
+          "check": "questions-o0-3",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_questions.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "questions-o0-3.txt",
+          "sha256": "78547bfbbf4ab1ceff50422d7ee98acfdb823b95ae8a2052292eea15b6bb9b24"
+        },
+        {
+          "check": "store_hardening-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_store_hardening.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "store_hardening-o0-1.txt",
+          "sha256": "b0b547a44e1908f09c9701c9fb25c6ac586ca1e8828d657b998f7aa22701c450"
+        },
+        {
+          "check": "utf8_hardening-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_utf8_hardening.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "utf8_hardening-o0-1.txt",
+          "sha256": "0c7ac783b72a0672e6f047e673eba9ad38d2fd510825932ff55f3f6860954fa6"
+        },
+        {
+          "check": "windows-o0-1",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_chronicle_windows.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "windows-o0-1.txt",
+          "sha256": "ea963f97f480746a5463970bc8670a844ad631ee49619fbb3d63034048dc7cdd"
+        },
+        {
+          "check": "local-bridge-o0",
+          "exit_code": 0,
+          "command": [
+            "<PYTHON>",
+            "<WORKTREE>\\tests\\test_local_bridge.py",
+            "<WORKTREE>\\build\\hardening-20261009\\final-windows\\chronicle-o0.exe"
+          ],
+          "cwd": "<WORKTREE>",
+          "log": "local-bridge-o0.txt",
+          "sha256": "083ff8338a01b29cd5d91ff8a1e04213e6a49b1723ea63c11eee1302300542ec"
+        }
+      ]
+    }
+  ],
+  "smoke_commands": [
+    {
+      "command": [
+        "bash",
+        "scripts/build.sh",
+        "--compiler",
+        "clang",
+        "--debug",
+        "--arch",
+        "generic",
+        "--smoke"
+      ],
+      "started_at_utc": "2026-10-09T11:24:39.136104+00:00",
+      "elapsed_seconds": 33.29603893999956,
+      "exit_code": 0,
+      "log": "smoke-clang-debug-0.log",
+      "sha256": "bdc9ef24a9ae7aa98678a71a3fd7a2e0986bae50e55c429baccebe860447d9a5"
+    },
+    {
+      "command": [
+        "./build/casper",
+        "--self-check"
+      ],
+      "started_at_utc": "2026-10-09T11:25:12.497256+00:00",
+      "elapsed_seconds": 0.020042999999532185,
+      "exit_code": 0,
+      "log": "smoke-clang-debug-1.log",
+      "sha256": "cef0409a4c82f3197318b213504aaa81b1b01af4ff511dfa5c5e64d43b46ce47"
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/build.sh",
+        "--compiler",
+        "clang",
+        "--release",
+        "--arch",
+        "generic",
+        "--smoke"
+      ],
+      "started_at_utc": "2026-10-09T11:24:22.220086+00:00",
+      "elapsed_seconds": 16.74556210999981,
+      "exit_code": 0,
+      "log": "smoke-clang-release-0.log",
+      "sha256": "4480b0ae14769b74fffcb89de3fcb8aad27cb30a2506bc54e7c4db9d44061fce"
+    },
+    {
+      "command": [
+        "./build/casper",
+        "--self-check"
+      ],
+      "started_at_utc": "2026-10-09T11:24:39.038199+00:00",
+      "elapsed_seconds": 0.00662700000066252,
+      "exit_code": 0,
+      "log": "smoke-clang-release-1.log",
+      "sha256": "cef0409a4c82f3197318b213504aaa81b1b01af4ff511dfa5c5e64d43b46ce47"
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/build.sh",
+        "--compiler",
+        "gcc",
+        "--debug",
+        "--arch",
+        "generic",
+        "--smoke"
+      ],
+      "started_at_utc": "2026-10-09T11:24:44.461204+00:00",
+      "elapsed_seconds": 13.747411499000009,
+      "exit_code": 0,
+      "log": "smoke-gcc-debug-0.log",
+      "sha256": "92a5f5de4303f802120aa91ede9009da38564b07aed7f62d46742b157640be1c"
+    },
+    {
+      "command": [
+        "./build/casper",
+        "--self-check"
+      ],
+      "started_at_utc": "2026-10-09T11:24:58.286567+00:00",
+      "elapsed_seconds": 0.018554799999947136,
+      "exit_code": 0,
+      "log": "smoke-gcc-debug-1.log",
+      "sha256": "cef0409a4c82f3197318b213504aaa81b1b01af4ff511dfa5c5e64d43b46ce47"
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/build.sh",
+        "--compiler",
+        "gcc",
+        "--release",
+        "--arch",
+        "generic",
+        "--smoke"
+      ],
+      "started_at_utc": "2026-10-09T11:24:24.041992+00:00",
+      "elapsed_seconds": 20.250919359999898,
+      "exit_code": 0,
+      "log": "smoke-gcc-release-0.log",
+      "sha256": "c5677f2d9e3aec9b90a744966e6c0124b6ee00108b92da62583dae0f3b2b7a4b"
+    },
+    {
+      "command": [
+        "./build/casper",
+        "--self-check"
+      ],
+      "started_at_utc": "2026-10-09T11:24:44.379057+00:00",
+      "elapsed_seconds": 0.007090899999639078,
+      "exit_code": 0,
+      "log": "smoke-gcc-release-1.log",
+      "sha256": "cef0409a4c82f3197318b213504aaa81b1b01af4ff511dfa5c5e64d43b46ce47"
+    }
+  ],
+  "regressions": [
+    {
+      "log": "audit-store/baseline-store-hardening.txt",
+      "sha256": "bd3b83d9d4ab20487883693dd25cd6ae19c7d0c67bd46b9b3b1066b23049861e",
+      "output": "FAIL query rejects subject with 1 trailing NUL bytes\nFAIL receipt rejects subject with 1 trailing NUL bytes\nFAIL query rejects subject with 2 trailing NUL bytes\nFAIL receipt rejects subject with 2 trailing NUL bytes\nFAIL query rejects predicate with 1 trailing NUL bytes\nFAIL receipt rejects predicate with 1 trailing NUL bytes\nFAIL query rejects predicate with 2 trailing NUL bytes\nFAIL receipt rejects predicate with 2 trailing NUL bytes\nFAIL query rejects object with 1 trailing NUL bytes\nFAIL receipt rejects object with 1 trailing NUL bytes\nFAIL query rejects object with 2 trailing NUL bytes\nFAIL receipt rejects object with 2 trailing NUL bytes\nFAIL query rejects currency with 1 trailing NUL bytes\nFAIL receipt rejects currency with 1 trailing NUL bytes\nFAIL query rejects currency with 2 trailing NUL bytes\nFAIL receipt rejects currency with 2 trailing NUL bytes\nFAIL query rejects time with 1 trailing NUL bytes\nFAIL receipt rejects time with 1 trailing NUL bytes\nFAIL query rejects time with 2 trailing NUL bytes\nFAIL receipt rejects time with 2 trailing NUL bytes\nFAIL query rejects modality with 1 trailing NUL bytes\nFAIL receipt rejects modality with 1 trailing NUL bytes\nFAIL query rejects modality with 2 trailing NUL bytes\nFAIL receipt rejects modality with 2 trailing NUL bytes\nFAIL query rejects polarity with 1 trailing NUL bytes\nFAIL receipt rejects polarity with 1 trailing NUL bytes\nFAIL query rejects polarity with 2 trailing NUL bytes\nFAIL receipt rejects polarity with 2 trailing NUL bytes\nFAIL query rejects status with 1 trailing NUL bytes\nFAIL receipt rejects status with 1 trailing NUL bytes\nFAIL query rejects status with 2 trailing NUL bytes\nFAIL receipt rejects status with 2 trailing NUL bytes\nchronicle_store_hardening_checks=474 failures=32\n"
+    },
+    {
+      "log": "audit-utf8/baseline-expanded.txt",
+      "sha256": "34d59ff59589a6882b913455c09c78b4fb40e9f6ca91abb511084b8efcf3298f",
+      "output": "PASS embedded_nul_end\nPASS embedded_nul_middle\nPASS continuation_80_end\nPASS continuation_80_middle\nPASS continuation_bf_end\nPASS continuation_bf_middle\nPASS overlong_nul_end\nPASS overlong_nul_middle\nPASS overlong_ascii_end\nPASS overlong_ascii_middle\nPASS overlong_three_end\nPASS overlong_three_middle\nPASS overlong_four_end\nPASS overlong_four_middle\nPASS surrogate_first_end\nPASS surrogate_first_middle\nPASS surrogate_last_end\nPASS surrogate_last_middle\nPASS above_unicode_end\nPASS above_unicode_middle\nPASS invalid_f5_end\nPASS invalid_f5_middle\nPASS invalid_ff_end\nPASS invalid_ff_middle\nPASS truncated_two_end\nPASS truncated_two_middle\nPASS truncated_three_one_end\nPASS truncated_three_one_middle\nPASS truncated_three_two_end\nPASS truncated_three_two_middle\nPASS truncated_four_one_end\nPASS truncated_four_one_middle\nPASS truncated_four_two_end\nPASS truncated_four_two_middle\nPASS truncated_four_three_end\nPASS truncated_four_three_middle\nPASS bad_continuation_end\nPASS bad_continuation_middle\nPASS split_by_lf_end\nPASS split_by_lf_middle\nPASS scalar_000080\nPASS scalar_0007ff\nPASS scalar_000800\nPASS scalar_00d7ff\nPASS scalar_00e000\nPASS scalar_00ffff\nPASS scalar_010000\nPASS scalar_10ffff\nPASS combining_identity\nPASS precomposed_identity\nPASS supplementary_identity\nPASS punctuation_002e\nPASS punctuation_002c\nPASS punctuation_003b\nPASS punctuation_003a\nPASS punctuation_0021\nPASS punctuation_003f\nPASS punctuation_0040\nPASS punctuation_060c\nPASS punctuation_061b\nPASS punctuation_061f\nPASS punctuation_2024\nPASS punctuation_2025\nPASS punctuation_2026\nPASS punctuation_2027\nPASS punctuation_2028\nPASS punctuation_2029\nPASS punctuation_3002\nPASS punctuation_ff0e\nPASS punctuation_ff01\nPASS punctuation_ff1f\nFAIL invalid_utf8_ingest_path: unexpected exit=0: b''\nFAIL invalid_utf8_query_path: unexpected exit=0: b''\nFAIL invalid_utf8_find_path: unexpected exit=0: b''\nFAIL invalid_utf8_receipt_filename: unexpected exit=0: b''\nFAIL invalid_utf8_receipt_store_path: unexpected exit=0: b''\nPASS invalid_query_overlong_ascii\nPASS invalid_find_overlong_ascii\nPASS invalid_query_surrogate_first\nPASS invalid_find_surrogate_first\nPASS invalid_query_above_unicode\nPASS invalid_find_above_unicode\nPASS invalid_query_truncated_four_three\nPASS invalid_find_truncated_four_three\nPASS maximum_serialized_store_path\nFAIL oversized_serialized_store_path: unrepresentable receipt path created a store\nutf8_hardening_cases=86 failures=6 result_sha256=098232130bf59aeb3794ff0cfe65feaf790e2135f71c432209968829fa031698\n"
+    },
+    {
+      "log": "io-baseline.log",
+      "sha256": "610091657b48354ac8109853ed50e1566db3591ee92597ea8a2c168c40eb7f70",
+      "output": "io_fault=1 exit=1 reads_after_failure=1 outputs_null=1\nio_fault=2 exit=1 reads_after_failure=1 outputs_null=1\nchronicle_io_cases=3 failures=2 arena_live_bytes=0\n"
+    },
+    {
+      "log": "io-repaired.log",
+      "sha256": "f6b64080e488ab9d2b011abdfe441a4994be6970afaa2a92acba1496ee31e38e",
+      "output": "io_fault=1 exit=1 reads_after_failure=0 outputs_null=1\nio_fault=2 exit=1 reads_after_failure=0 outputs_null=1\nchronicle_io_cases=3 failures=0 arena_live_bytes=0\n"
+    }
+  ],
+  "sources": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "bytes": 5480,
+      "sha256": "819c87e57ef73cd0e447363a440f52c467634658cb3f611ff91fff5005609ace",
+      "git_lf_sha256": "819c87e57ef73cd0e447363a440f52c467634658cb3f611ff91fff5005609ace"
+    },
+    {
+      "path": "Core_CPP/bench_niyah.c",
+      "bytes": 9366,
+      "sha256": "186e7c11779d7c5f09ea49acf1a60a80157b5a6094478ad6262068b49f7c5056",
+      "git_lf_sha256": "186e7c11779d7c5f09ea49acf1a60a80157b5a6094478ad6262068b49f7c5056"
+    },
+    {
+      "path": "Core_CPP/casper_chronicle.c",
+      "bytes": 58018,
+      "sha256": "cf6d58c89856042f84db6e6c1f2fb0b94b768540aa74b6146f3cfb3a343d5a15",
+      "git_lf_sha256": "cf6d58c89856042f84db6e6c1f2fb0b94b768540aa74b6146f3cfb3a343d5a15"
+    },
+    {
+      "path": "Core_CPP/casper_chronicle.h",
+      "bytes": 1330,
+      "sha256": "23f0546be3ff71ce025ec0d8e958af9ed89697823d268d362c180a92d94c6b19",
+      "git_lf_sha256": "23f0546be3ff71ce025ec0d8e958af9ed89697823d268d362c180a92d94c6b19"
+    },
+    {
+      "path": "Core_CPP/casper_chronicle_main.c",
+      "bytes": 3569,
+      "sha256": "605e7b2f668765ae92d28e41c4972446060bf06237152f72dc5208668a6698e6",
+      "git_lf_sha256": "605e7b2f668765ae92d28e41c4972446060bf06237152f72dc5208668a6698e6"
+    },
+    {
+      "path": "Core_CPP/casper_cli.c",
+      "bytes": 13329,
+      "sha256": "75680cbcf6763ad160f862adba78671507986dea9d52bd089fb0e90d8b0a51f3",
+      "git_lf_sha256": "75680cbcf6763ad160f862adba78671507986dea9d52bd089fb0e90d8b0a51f3"
+    },
+    {
+      "path": "Core_CPP/casper_rag.c",
+      "bytes": 25304,
+      "sha256": "84ae40972ac0c9bcdc787ce8529c0f7f402dfec3b57277f2c57092c1e25c4f9a",
+      "git_lf_sha256": "84ae40972ac0c9bcdc787ce8529c0f7f402dfec3b57277f2c57092c1e25c4f9a"
+    },
+    {
+      "path": "Core_CPP/casper_rag.h",
+      "bytes": 1651,
+      "sha256": "4ae32259eb664e1698227e55ae2a2f50c3828d2c340c1f31e0e8b3728cbca736",
+      "git_lf_sha256": "4ae32259eb664e1698227e55ae2a2f50c3828d2c340c1f31e0e8b3728cbca736"
+    },
+    {
+      "path": "Core_CPP/chronicle_arabic_parse.inc",
+      "bytes": 8469,
+      "sha256": "bd559c6f684fa9b8a36d9890f2ee852275aa1cce44c6bdf90ec6526ef926a5ee",
+      "git_lf_sha256": "bd559c6f684fa9b8a36d9890f2ee852275aa1cce44c6bdf90ec6526ef926a5ee"
+    },
+    {
+      "path": "Core_CPP/chronicle_literal_parse.inc",
+      "bytes": 2639,
+      "sha256": "18cd00f70443d66344acef2a57c97e9e36de984957a8f521328fc2b97cff4375",
+      "git_lf_sha256": "18cd00f70443d66344acef2a57c97e9e36de984957a8f521328fc2b97cff4375"
+    },
+    {
+      "path": "Core_CPP/chronicle_literal_query.inc",
+      "bytes": 3196,
+      "sha256": "f26fb66bcc4a040c9fd292f4f2ca52a5b0218aa009846dd1f54a6a912ffb9c5e",
+      "git_lf_sha256": "f26fb66bcc4a040c9fd292f4f2ca52a5b0218aa009846dd1f54a6a912ffb9c5e"
+    },
+    {
+      "path": "Core_CPP/chronicle_pool.c",
+      "bytes": 3067,
+      "sha256": "542728de23c034c12df0aa0a0a14672e86b9f9461d246547aca6f028b59032d2",
+      "git_lf_sha256": "542728de23c034c12df0aa0a0a14672e86b9f9461d246547aca6f028b59032d2"
+    },
+    {
+      "path": "Core_CPP/chronicle_pool.h",
+      "bytes": 447,
+      "sha256": "bb495f532bbd7ee79a66abaebfc5e4b379ab3fe74cee017e012321b4c38e4977",
+      "git_lf_sha256": "bb495f532bbd7ee79a66abaebfc5e4b379ab3fe74cee017e012321b4c38e4977"
+    },
+    {
+      "path": "Core_CPP/chronicle_question.inc",
+      "bytes": 2842,
+      "sha256": "658c82cbdc586185259925a175626a69c7e953a3dd2f0121ce59718cf8dcba43",
+      "git_lf_sha256": "658c82cbdc586185259925a175626a69c7e953a3dd2f0121ce59718cf8dcba43"
+    },
+    {
+      "path": "Core_CPP/constraint_solver.c",
+      "bytes": 19300,
+      "sha256": "9f9ec70b3330c5fbca472946d89ca34c1425fa93643867e0677620c5ed61ea47",
+      "git_lf_sha256": "9f9ec70b3330c5fbca472946d89ca34c1425fa93643867e0677620c5ed61ea47"
+    },
+    {
+      "path": "Core_CPP/constraint_solver.h",
+      "bytes": 3899,
+      "sha256": "dfac37de7f9dec3061cf71e5ea488969fde54928d2bed5c79ad36ecff7612171",
+      "git_lf_sha256": "dfac37de7f9dec3061cf71e5ea488969fde54928d2bed5c79ad36ecff7612171"
+    },
+    {
+      "path": "Core_CPP/hybrid_reasoner.c",
+      "bytes": 29022,
+      "sha256": "f5bbecd4abd2afb706e8e7d86be08b24303799685ecae617453d77ec14e5bb1d",
+      "git_lf_sha256": "f5bbecd4abd2afb706e8e7d86be08b24303799685ecae617453d77ec14e5bb1d"
+    },
+    {
+      "path": "Core_CPP/hybrid_reasoner.h",
+      "bytes": 7429,
+      "sha256": "de749c0b0ea180948b3496f0556358c9d8d4705e88c4dcfda40f065787da1e67",
+      "git_lf_sha256": "de749c0b0ea180948b3496f0556358c9d8d4705e88c4dcfda40f065787da1e67"
+    },
+    {
+      "path": "Core_CPP/khz_q_ising.c",
+      "bytes": 5025,
+      "sha256": "26fafba6901983766aa20ec9c361ec3113c4e1a7c1e43446beef17d58a69928c",
+      "git_lf_sha256": "26fafba6901983766aa20ec9c361ec3113c4e1a7c1e43446beef17d58a69928c"
+    },
+    {
+      "path": "Core_CPP/khz_q_ising.h",
+      "bytes": 1234,
+      "sha256": "6ae14d5d9e58eae02c73625aa829396c0887a6bd408e8eb18f1f4268b1d350ae",
+      "git_lf_sha256": "6ae14d5d9e58eae02c73625aa829396c0887a6bd408e8eb18f1f4268b1d350ae"
+    },
+    {
+      "path": "Core_CPP/khz_q_svd.c",
+      "bytes": 7893,
+      "sha256": "49f15d241bf558d6db8aa54ab2c835e5e81e7b95e3da5c2ec4d623235cc8971c",
+      "git_lf_sha256": "49f15d241bf558d6db8aa54ab2c835e5e81e7b95e3da5c2ec4d623235cc8971c"
+    },
+    {
+      "path": "Core_CPP/khz_q_svd.h",
+      "bytes": 2195,
+      "sha256": "7bd2bdc0c952b1e3a103c5e4d63c8d3903348196b5b907e86b7e7b23fbddc4e7",
+      "git_lf_sha256": "7bd2bdc0c952b1e3a103c5e4d63c8d3903348196b5b907e86b7e7b23fbddc4e7"
+    },
+    {
+      "path": "Core_CPP/niyah_core.c",
+      "bytes": 15116,
+      "sha256": "cc7f8a460925235649a0daee94db21f3acb23beb3eceefb84612c9d18941b96f",
+      "git_lf_sha256": "cc7f8a460925235649a0daee94db21f3acb23beb3eceefb84612c9d18941b96f"
+    },
+    {
+      "path": "Core_CPP/niyah_core.h",
+      "bytes": 4661,
+      "sha256": "3ecb5a67323ef919828d1e155d5ce3b30c4b612d937519468bbe43f957d497e1",
+      "git_lf_sha256": "3ecb5a67323ef919828d1e155d5ce3b30c4b612d937519468bbe43f957d497e1"
+    },
+    {
+      "path": "Core_CPP/niyah_hybrid_main.c",
+      "bytes": 20524,
+      "sha256": "3196ce6abe3745e3853f51e7a030779ef36282d32d1bc11bb3a49f81776c0383",
+      "git_lf_sha256": "3196ce6abe3745e3853f51e7a030779ef36282d32d1bc11bb3a49f81776c0383"
+    },
+    {
+      "path": "Core_CPP/niyah_main.c",
+      "bytes": 9559,
+      "sha256": "d00c3500f367a3afc832fa18fdcf11f45f95a9e7040bc10e965d5f0a1c8cae8d",
+      "git_lf_sha256": "d00c3500f367a3afc832fa18fdcf11f45f95a9e7040bc10e965d5f0a1c8cae8d"
+    },
+    {
+      "path": "Core_CPP/niyah_train.c",
+      "bytes": 7358,
+      "sha256": "d7d260850feee593e7fe3a09fc63186c15ccf1d845968e6e767c55ebecd0eacf",
+      "git_lf_sha256": "d7d260850feee593e7fe3a09fc63186c15ccf1d845968e6e767c55ebecd0eacf"
+    },
+    {
+      "path": "Core_CPP/niyah_train_full.c",
+      "bytes": 21661,
+      "sha256": "df1d44d09b5840f09b2204b73d567b2d4ba501f7df9e275aecc87f33fe8657bc",
+      "git_lf_sha256": "df1d44d09b5840f09b2204b73d567b2d4ba501f7df9e275aecc87f33fe8657bc"
+    },
+    {
+      "path": "Core_CPP/niyah_train_full.h",
+      "bytes": 1231,
+      "sha256": "ef2089b9ca30d3da6f4393831fbafa033ec3692f35457e89858fe6fb8207fdbd",
+      "git_lf_sha256": "ef2089b9ca30d3da6f4393831fbafa033ec3692f35457e89858fe6fb8207fdbd"
+    },
+    {
+      "path": "Core_CPP/proof_generator.c",
+      "bytes": 14948,
+      "sha256": "ba641a34ee5d175cd343ed24d9ed2e6ff68ac725b837126e1c9c62187577bb76",
+      "git_lf_sha256": "ba641a34ee5d175cd343ed24d9ed2e6ff68ac725b837126e1c9c62187577bb76"
+    },
+    {
+      "path": "Core_CPP/proof_generator.h",
+      "bytes": 3190,
+      "sha256": "257f19efeb4b71605c49b967711236a8625eae334f86982bb3ff24188a95be45",
+      "git_lf_sha256": "257f19efeb4b71605c49b967711236a8625eae334f86982bb3ff24188a95be45"
+    },
+    {
+      "path": "Core_CPP/rule_parser.c",
+      "bytes": 20707,
+      "sha256": "70ceca35f3ccb7c8175ab1b74261f6f7de006ef4b70b5f07687ebf8fc2bcb12b",
+      "git_lf_sha256": "70ceca35f3ccb7c8175ab1b74261f6f7de006ef4b70b5f07687ebf8fc2bcb12b"
+    },
+    {
+      "path": "Core_CPP/rule_parser.h",
+      "bytes": 4801,
+      "sha256": "4203533c619071fc44da3c03852c3f1bb4bf8cd9c98a3f3b73be57c4c98be574",
+      "git_lf_sha256": "4203533c619071fc44da3c03852c3f1bb4bf8cd9c98a3f3b73be57c4c98be574"
+    },
+    {
+      "path": "Core_CPP/rule_source_guard.c",
+      "bytes": 2173,
+      "sha256": "c38c0f72627e4c314bcd73a4adfe412a6547731f639855365083cdfc3af6d670",
+      "git_lf_sha256": "c38c0f72627e4c314bcd73a4adfe412a6547731f639855365083cdfc3af6d670"
+    },
+    {
+      "path": "Core_CPP/rule_source_guard.h",
+      "bytes": 721,
+      "sha256": "3b86d25b9f1e4dac4409c274a0f584cae15d96c6f93de61066109cbcc92d8419",
+      "git_lf_sha256": "3b86d25b9f1e4dac4409c274a0f584cae15d96c6f93de61066109cbcc92d8419"
+    },
+    {
+      "path": "Core_CPP/utf8_file.h",
+      "bytes": 1490,
+      "sha256": "5d07170dbf996de2cc38f815b7018e8615d247c6914e34b764578bfff37b13e4",
+      "git_lf_sha256": "5d07170dbf996de2cc38f815b7018e8615d247c6914e34b764578bfff37b13e4"
+    },
+    {
+      "path": "Data_Training/safety.nrule",
+      "bytes": 1252,
+      "sha256": "88dcfe6cf1540e16820314edf00e9e2ff4cc697d98b0ce7260c8e5bd149ccebe",
+      "git_lf_sha256": "88dcfe6cf1540e16820314edf00e9e2ff4cc697d98b0ce7260c8e5bd149ccebe"
+    },
+    {
+      "path": "include/casper_ffi.h",
+      "bytes": 2231,
+      "sha256": "949eb2bc851a7e74d2478cf791a3903c3421d34df1114122251340c53e91e69e",
+      "git_lf_sha256": "949eb2bc851a7e74d2478cf791a3903c3421d34df1114122251340c53e91e69e"
+    },
+    {
+      "path": "include/tokenizer.h",
+      "bytes": 1441,
+      "sha256": "2568d41712187e2a04c8a849f11fab4d6dd66def006f2a5e5f7e224d4a82339c",
+      "git_lf_sha256": "2568d41712187e2a04c8a849f11fab4d6dd66def006f2a5e5f7e224d4a82339c"
+    },
+    {
+      "path": "scripts/build.sh",
+      "bytes": 7132,
+      "sha256": "82d097ba9a6867c232bc8e0e800a65f5235b4b99726e374deb1937697955cdf0",
+      "git_lf_sha256": "82d097ba9a6867c232bc8e0e800a65f5235b4b99726e374deb1937697955cdf0"
+    },
+    {
+      "path": "scripts/test_chronicle.py",
+      "bytes": 6756,
+      "sha256": "446fb4ba10d7eebcf2e1a86c072ac781f19895f5cfa3a4e39478107c0ef5836b",
+      "git_lf_sha256": "446fb4ba10d7eebcf2e1a86c072ac781f19895f5cfa3a4e39478107c0ef5836b"
+    },
+    {
+      "path": "tests/fixtures/chronicle_ahmed_ar.txt",
+      "bytes": 558,
+      "sha256": "efccb4aafcb453c84e91529ebf611e800df3ad049e1e75945635203ba21a5ad1",
+      "git_lf_sha256": "efccb4aafcb453c84e91529ebf611e800df3ad049e1e75945635203ba21a5ad1"
+    },
+    {
+      "path": "tests/fixtures/chronicle_ahmed_prose_ar.txt",
+      "bytes": 926,
+      "sha256": "5755af8bbd9e68ed6a03c59484f57a58895191f6bedf2c08a3cd9c0a1dcc3632",
+      "git_lf_sha256": "5755af8bbd9e68ed6a03c59484f57a58895191f6bedf2c08a3cd9c0a1dcc3632"
+    },
+    {
+      "path": "tests/test_chronicle_alloc_fail.c",
+      "bytes": 4322,
+      "sha256": "b5342a714581d198bfa3bcf1de6bf718bd6368ce3ab7fc7ba85875755ab5350e",
+      "git_lf_sha256": "b5342a714581d198bfa3bcf1de6bf718bd6368ce3ab7fc7ba85875755ab5350e"
+    },
+    {
+      "path": "tests/test_chronicle_api.c",
+      "bytes": 3290,
+      "sha256": "821ed364a80d0c1e6bbbcc0432c842690cf722bbcb8aa26080b8b2c80b820eaf",
+      "git_lf_sha256": "821ed364a80d0c1e6bbbcc0432c842690cf722bbcb8aa26080b8b2c80b820eaf"
+    },
+    {
+      "path": "tests/test_chronicle_arabic.py",
+      "bytes": 8414,
+      "sha256": "e24477271d77addadd9779c8c369f9b308489eb85915de8ba406fbfd4a09a66f",
+      "git_lf_sha256": "e24477271d77addadd9779c8c369f9b308489eb85915de8ba406fbfd4a09a66f"
+    },
+    {
+      "path": "tests/test_chronicle_compatibility.py",
+      "bytes": 14854,
+      "sha256": "ea66904606a78241a0c72ea68fd01bbec480a9aa324dc00c53087d2dc6a14fec",
+      "git_lf_sha256": "ea66904606a78241a0c72ea68fd01bbec480a9aa324dc00c53087d2dc6a14fec"
+    },
+    {
+      "path": "tests/test_chronicle_integrity.py",
+      "bytes": 9000,
+      "sha256": "0ed42a678a37cefe66b1ae87dab61b08bf091ff9ebd0e5be3ee98fe4be9cbfe7",
+      "git_lf_sha256": "0ed42a678a37cefe66b1ae87dab61b08bf091ff9ebd0e5be3ee98fe4be9cbfe7"
+    },
+    {
+      "path": "tests/test_chronicle_io.c",
+      "bytes": 3048,
+      "sha256": "aad2fac012993c18e0e823f0027c7d7ea8c03f8d2aace1006c17d3995ed71ed4",
+      "git_lf_sha256": "aad2fac012993c18e0e823f0027c7d7ea8c03f8d2aace1006c17d3995ed71ed4"
+    },
+    {
+      "path": "tests/test_chronicle_literal.py",
+      "bytes": 7119,
+      "sha256": "c3eac66b0330528725957030407ea8004aec91018890318a210d748da49ccca6",
+      "git_lf_sha256": "c3eac66b0330528725957030407ea8004aec91018890318a210d748da49ccca6"
+    },
+    {
+      "path": "tests/test_chronicle_pool.c",
+      "bytes": 1268,
+      "sha256": "bcdcae51483d37f45b2e5f3c8f6e4211db86fbab4b5464004a15e26d8efe98a3",
+      "git_lf_sha256": "bcdcae51483d37f45b2e5f3c8f6e4211db86fbab4b5464004a15e26d8efe98a3"
+    },
+    {
+      "path": "tests/test_chronicle_preservation.py",
+      "bytes": 5769,
+      "sha256": "46bd71b65f64ecaf216d7fd1c50fac6d47c60b79f2853b6fbace6df45fbcdfe0",
+      "git_lf_sha256": "46bd71b65f64ecaf216d7fd1c50fac6d47c60b79f2853b6fbace6df45fbcdfe0"
+    },
+    {
+      "path": "tests/test_chronicle_questions.py",
+      "bytes": 7707,
+      "sha256": "0c8def6ce4721112bc5db08e7eb8fce737d1af69c15d5d267d5ba2256d5d98ba",
+      "git_lf_sha256": "0c8def6ce4721112bc5db08e7eb8fce737d1af69c15d5d267d5ba2256d5d98ba"
+    },
+    {
+      "path": "tests/test_chronicle_reasoner.py",
+      "bytes": 6295,
+      "sha256": "02432c9c160c8c23b5d3a3cffaef4a89b3d1d1e210e2394fc5cc507fdce4b9f9",
+      "git_lf_sha256": "02432c9c160c8c23b5d3a3cffaef4a89b3d1d1e210e2394fc5cc507fdce4b9f9"
+    },
+    {
+      "path": "tests/test_chronicle_resources.py",
+      "bytes": 7919,
+      "sha256": "97cd861a7d469f1b0014e6736c9e582ca620d4e26c52a93f0c8d3b2726f6914f",
+      "git_lf_sha256": "97cd861a7d469f1b0014e6736c9e582ca620d4e26c52a93f0c8d3b2726f6914f"
+    },
+    {
+      "path": "tests/test_chronicle_store_hardening.py",
+      "bytes": 4850,
+      "sha256": "a5a18ac4392791c23d897344335c8515d2f259016de51b42ff8b2e37a9279f43",
+      "git_lf_sha256": "a5a18ac4392791c23d897344335c8515d2f259016de51b42ff8b2e37a9279f43"
+    },
+    {
+      "path": "tests/test_chronicle_stream.c",
+      "bytes": 1389,
+      "sha256": "650f53596f0ef9dfe7cedcdbd9493a3e95e55e1ad4ccfbfe13654fe959d47067",
+      "git_lf_sha256": "650f53596f0ef9dfe7cedcdbd9493a3e95e55e1ad4ccfbfe13654fe959d47067"
+    },
+    {
+      "path": "tests/test_chronicle_utf8_hardening.py",
+      "bytes": 10433,
+      "sha256": "29dae7f593feae41d0a785bebc9d949ab57802fe924962986ccf8b5ddb95ba36",
+      "git_lf_sha256": "29dae7f593feae41d0a785bebc9d949ab57802fe924962986ccf8b5ddb95ba36"
+    },
+    {
+      "path": "tests/test_chronicle_windows.py",
+      "bytes": 5359,
+      "sha256": "cbc46009e94ea8d3c8b321e14469d696d2215537d562a5d2dd58cf05a592dd2d",
+      "git_lf_sha256": "cbc46009e94ea8d3c8b321e14469d696d2215537d562a5d2dd58cf05a592dd2d"
+    },
+    {
+      "path": "tests/test_local_bridge.py",
+      "bytes": 8891,
+      "sha256": "02ec4242da8a204f2bfdf4d67865f53d3d02c392c86bb00b7a80402ac4347cef",
+      "git_lf_sha256": "02ec4242da8a204f2bfdf4d67865f53d3d02c392c86bb00b7a80402ac4347cef"
+    },
+    {
+      "path": "tokenizer.c",
+      "bytes": 15007,
+      "sha256": "473f4796e927bf6c3484dbbaa58d77e6989f56cbb0329db63b505bafe0408982",
+      "git_lf_sha256": "473f4796e927bf6c3484dbbaa58d77e6989f56cbb0329db63b505bafe0408982"
+    },
+    {
+      "path": "tools/casper_local_app.py",
+      "bytes": 8384,
+      "sha256": "0f521ced72eb347ae2ae87ad05300cf00ef07476d93159301ee021590e1ccf55",
+      "git_lf_sha256": "0f521ced72eb347ae2ae87ad05300cf00ef07476d93159301ee021590e1ccf55"
+    },
+    {
+      "path": "tools/casper_local_bridge.py",
+      "bytes": 5262,
+      "sha256": "6796d659f5bf6d9ffc4684318b1a7ccacdbd03c2979b41704b57e08fb7a50b53",
+      "git_lf_sha256": "6796d659f5bf6d9ffc4684318b1a7ccacdbd03c2979b41704b57e08fb7a50b53"
+    }
+  ],
+  "static_analysis": {
+    "command": [
+      "clang",
+      "--analyze",
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-ICore_CPP",
+      "-Xanalyzer",
+      "-analyzer-output=text",
+      "Core_CPP/casper_chronicle.c",
+      "Core_CPP/chronicle_pool.c",
+      "Core_CPP/proof_generator.c"
+    ],
+    "exit_code": 0,
+    "log_sha256": "88bb3288373727ddfa05165a52e9764b8c3b32ce13292432c2a0b7d5409ab664",
+    "warnings": [
+      "Core_CPP/proof_generator.c:72:14: warning: File position of the stream might be 'indeterminate' after a failed operation. Can cause undefined behavior [unix.Stream]",
+      "Core_CPP/proof_generator.c:72:14: warning: Read function called when stream is in EOF state. Function has no effect [unix.Stream]",
+      "Core_CPP/proof_generator.c:150:11: warning: File position of the stream might be 'indeterminate' after a failed operation. Can cause undefined behavior [unix.Stream]",
+      "Core_CPP/proof_generator.c:150:11: warning: Read function called when stream is in EOF state. Function has no effect [unix.Stream]",
+      "Core_CPP/proof_generator.c:178:15: warning: File position of the stream might be 'indeterminate' after a failed operation. Can cause undefined behavior [unix.Stream]",
+      "Core_CPP/proof_generator.c:178:15: warning: Read function called when stream is in EOF state. Function has no effect [unix.Stream]"
+    ],
+    "interpretation": "Six pre-existing unix.Stream diagnostics in unchanged proof_generator.c; not runtime failures or proof of exploitable defects. Zero diagnostics in Chronicle and its allocator."
+  },
+  "source_manifest_sha256": "309155a3cb0f67ff0da59fb155688ada2a3f91912d9053559db97638cab8a320",
+  "preserved_local_ledgers": [
+    {
+      "path": "useful-demo-20261009T030315Z.txt",
+      "bytes": 256,
+      "sha256": "2a98a5b66d06c911affb11c9f36bbacf4653387c0eb8370cd8698cff50dafabc"
+    },
+    {
+      "path": "useful-demo-20261009T030315Z.txt.chronicle",
+      "bytes": 723,
+      "sha256": "71cd74041f43d8599138720071e7a056013ea5a20aec42e13edb449278c69231"
+    },
+    {
+      "path": "useful-demo-20261009T030315Z.txt.chronicle.query-2b1e625137622224.receipt",
+      "bytes": 601,
+      "sha256": "68792368e0ac8dc067f0138c1f36ccbecf0a83dbe1a1ffb30bc1f53352056ad2"
+    },
+    {
+      "path": "useful-demo-20261009T030315Z.txt.chronicle.receipt",
+      "bytes": 526,
+      "sha256": "464e8ca6d4c68ace3792de81f1dfa8698108e11a3077c548355f17335c6b1610"
+    }
+  ],
+  "limitations": [
+    "Bounded grammar, 8 MiB source, 4096 events, shared serial 16 MiB arena.",
+    "No native Windows sanitizer or allocation/read wrapper execution.",
+    "No ARM/macOS execution in this run; no concurrent mutation snapshot or crash-durability guarantee.",
+    "Six unchanged shared proof-module static stream diagnostics remain unconfirmed.",
+    "Import time is metadata; fresh store hashes can differ with timestamps. Same source event IDs/results remain deterministic.",
+    "No model training, weights, or unrestricted language understanding evaluated."
+  ]
+}
