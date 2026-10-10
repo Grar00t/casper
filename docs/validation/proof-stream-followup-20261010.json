@@ -1,0 +1,87 @@
+{
+  "schema": "casper-proof-stream-followup-v1",
+  "date": "2026-10-10",
+  "repository": "Grar00t/casper",
+  "tested_patch_commit": "5245887903777fa5a3f46b4e71b45080eb4171d3",
+  "validated_merge_commit": "0b5d85092268f279e25d5fb95359e78fb374e62e",
+  "source_tree_oid": "f8b3d02e577e77d8150bd41e683d43f125b8828e",
+  "historical_receipt": {
+    "path": "docs/validation/chronicle-hardening-20261009.json",
+    "sha256": "ea0ab3b90344727a97ec8f9e0fd20049641dd572b49a5bdefedff3f65cd10dc2",
+    "sources_checked": 63,
+    "expected_source_differences": [
+      "Core_CPP/proof_generator.c",
+      "scripts/test_chronicle.py"
+    ]
+  },
+  "changed_file_sha256": {
+    "Core_CPP/proof_generator.c": "a8fb4c096455e001d35a3f7e180cca651aa1f4b7b05cee108192696ccb25cf9d",
+    "scripts/test_chronicle.py": "94286df79fbd6aca6fe5d469c08c6dbfe5143796472064fc1c769503b110e9e2",
+    "tests/test_chronicle_proof_stream_errors.c": "55eb0678cf5af0f290a75deca6280a4d688719089ab3a055258cbb579dd4b1ca"
+  },
+  "local_chronicle_gates": {
+    "gcc": {
+      "status": "PASS",
+      "completed_commands": 68,
+      "summary_sha256": "e97c046d351ca460fcd6e35d919ce97f0b2447831125679832892311989ab69f",
+      "deterministic_result_hashes": {
+        "reasoner": "6d4a89f94247a9334689a6a5f2ca9a94e580b1d78a1e8d54dc02600328ca106b",
+        "literal": "e93b547c9df30d62385a5d6bf250dbf0bbb17d6d264c6b1e39dd16552b5f2327",
+        "resources": "4962d279fe29b137f08179aa89700647f9e1083479ea54662c67ad8e1c0a754b",
+        "arabic": "92914a9c043b134cf9fc9e1c6927cb2bc8ff1924b2a5eb5874168d1c21464d00",
+        "questions": "8855617191dfb8efe7c145e642559030bac4167d7ae56e8ca1f28aa09b6906b2",
+        "utf8_hardening": "098232130bf59aeb3794ff0cfe65feaf790e2135f71c432209968829fa031698"
+      }
+    },
+    "clang": {
+      "status": "PASS",
+      "completed_commands": 68,
+      "summary_sha256": "86c1e0e4a7201a06aadb1d090c399f226934b9cc7ef23a09249c0af3e2a7ecbe",
+      "deterministic_result_hashes": {
+        "reasoner": "6d4a89f94247a9334689a6a5f2ca9a94e580b1d78a1e8d54dc02600328ca106b",
+        "literal": "e93b547c9df30d62385a5d6bf250dbf0bbb17d6d264c6b1e39dd16552b5f2327",
+        "resources": "4962d279fe29b137f08179aa89700647f9e1083479ea54662c67ad8e1c0a754b",
+        "arabic": "92914a9c043b134cf9fc9e1c6927cb2bc8ff1924b2a5eb5874168d1c21464d00",
+        "questions": "8855617191dfb8efe7c145e642559030bac4167d7ae56e8ca1f28aa09b6906b2",
+        "utf8_hardening": "098232130bf59aeb3794ff0cfe65feaf790e2135f71c432209968829fa031698"
+      }
+    }
+  },
+  "github_actions": {
+    "run_id": 38039549730,
+    "head_sha": "0b5d85092268f279e25d5fb95359e78fb374e62e",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "windows-ui",
+        "conclusion": "success"
+      },
+      {
+        "name": "python-training-syntax",
+        "conclusion": "success"
+      },
+      {
+        "name": "chronicle-windows",
+        "conclusion": "success"
+      },
+      {
+        "name": "c-core (clang)",
+        "conclusion": "success"
+      },
+      {
+        "name": "c-core (gcc)",
+        "conclusion": "success"
+      },
+      {
+        "name": "node-runtime",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "limitations": [
+    "Original October 9 receipt is preserved as historical evidence.",
+    "Linux fault-injection tests do not execute on native Windows.",
+    "Passing checks do not establish unrestricted production safety.",
+    "Local summary files are identified by hashes, not embedded."
+  ]
+}
