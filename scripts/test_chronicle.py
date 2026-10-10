@@ -62,9 +62,9 @@ def main():
             binary = output / f"chronicle-{mode}{suffix}"
             run(f"build-{mode}", [args.compiler, *flags, *extra,
                                     CORE / "casper_chronicle_main.c", *common, *link, "-o", binary])
-            for name in (("pool",) if args.native_windows else ("pool", "api", "stream", "io", "alloc_fail")):
+            for name in (("pool",) if args.native_windows else ("pool", "api", "stream", "io", "alloc_fail", "proof_stream_errors")):
                 test = output / f"test-{name}-{mode}{suffix}"
-                sources = [CORE / "chronicle_pool.c"] if name == "pool" else common
+                sources = [CORE / "chronicle_pool.c"] if name == "pool" else ([CORE / "proof_generator.c"] if name == "proof_stream_errors" else common)
                 wrap = [] if name == "pool" else ["-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free"]
                 if name == "stream":
                     wrap = ["-Wl,--wrap=fread"]
@@ -72,6 +72,8 @@ def main():
                     wrap = ["-Wl,--wrap=fopen,--wrap=fread,--wrap=fgetc,--wrap=fclose"]
                 if name == "alloc_fail":
                     wrap = ["-Wl,--wrap=chr_malloc,--wrap=chr_calloc,--wrap=chr_realloc"]
+                if name == "proof_stream_errors":
+                    wrap = ["-Wl,--wrap=fopen,--wrap=malloc"]
                 run(f"build-{name}-{mode}", [args.compiler, *flags, *extra,
                     ROOT / "tests" / f"test_chronicle_{name}.c", *sources, *wrap, "-o", test])
                 with tempfile.TemporaryDirectory(prefix="chronicle-test-") as scratch:
