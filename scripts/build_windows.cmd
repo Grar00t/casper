@@ -27,6 +27,11 @@ if /i "%~1"=="--smoke" (
   if errorlevel 1 exit /b 1
   "%BINARY%" --verify-proof "build\fixture.proof"
   if errorlevel 1 exit /b 1
+  rem Guard source attribution against reordered fields and nested JSON.
+  cl /nologo /std:c11 /W4 /WX /wd4996 /O2 /I"Core_CPP" /Fe:"build\test_rag_json.exe" tests\test_rag_json.c Core_CPP\proof_generator.c /link winhttp.lib
+  if errorlevel 1 exit /b 1
+  "build\test_rag_json.exe"
+  if errorlevel 1 exit /b 1
 )
 if /i "%~1"=="--asan" (
   "%BINARY%" --smoke
