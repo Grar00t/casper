@@ -1,0 +1,25 @@
+@echo off
+setlocal EnableExtensions DisableDelayedExpansion
+set "ROOT=%~dp0.."
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+set "VSROOT="
+if not exist "%VSWHERE%" (
+  echo ERROR: vswhere not installed
+  exit /b 2
+)
+for /f "usebackq delims=" %%I in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSROOT=%%I"
+if not defined VSROOT (
+  echo ERROR: No MSVC C compiler installation found
+  exit /b 2
+)
+call "%VSROOT%\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64 >nul
+if errorlevel 1 exit /b 2
+cd /d "%ROOT%"
+if not exist "build\release" mkdir "build\release"
+cl /nologo /std:c11 /W4 /WX /wd4996 /MT /O2 /I"include" /I"Core_CPP" /Fe:"build\release\casper_engine.exe" Core_CPP\niyah_hybrid_main.c Core_CPP\niyah_core.c Core_CPP\hybrid_reasoner.c Core_CPP\constraint_solver.c Core_CPP\rule_parser.c Core_CPP\rule_source_guard.c Core_CPP\proof_generator.c Core_CPP\khz_q_svd.c Core_CPP\casper_rag.c src\niyah_gguf_map.c tokenizer.c /link winhttp.lib
+if errorlevel 1 exit /b 1
+if /i "%~1"=="--smoke" (
+  "build\release\casper_engine.exe" --smoke
+  if errorlevel 1 exit /b 1
+)
+exit /b 0

@@ -3,6 +3,7 @@
  */
 
 #include "niyah_core.h"
+#include "niyah_gguf_map.h"
 #include "rule_parser.h"
 #include "rule_source_guard.h"
 #include "proof_generator.h"
@@ -327,7 +328,9 @@ static uint32_t generate_tokens(NiyahModel *m, const uint32_t *prompt_tokens,
             if (!tokenizer_token_allowed_for_generation(id)) logits[id] = -FLT_MAX;
         }
 
-        const uint32_t tok = niyah_sample(logits, m->cfg.vocab_size, sampler);
+        const uint32_t tok = niyah_sample_with_workspace(logits, m->cfg.vocab_size,
+                                                         sampler, m->_sampler_workspace,
+                                                         m->_sampler_workspace_bytes);
         if (tok >= m->cfg.vocab_size) return 0u;
         if (tok == TOK_EOS) break;
 
@@ -470,6 +473,7 @@ static int run_all_smoke(void) {
     total_fail += niyah_csp_smoke();
     total_fail += niyah_rule_smoke();
     total_fail += niyah_proof_smoke();
+    total_fail += niyah_gguf_map_smoke();
     {
         int pass = 0, fail = 0;
 #define KHZQ_PASS(cond, label) do { if (cond) { ++pass; } else { ++fail; (void)fprintf(stderr, "[FAIL] %s\n", label); } } while (0)
@@ -493,6 +497,24 @@ static int run_all_smoke(void) {
         NiyahModel *m = niyah_alloc(&cfg);
         if (!m) ++total_fail;
         else {
+            {
+                const float probe[5] = {3.0f, 1.0f, -1.0f, 0.25f, 0.0f};
+                NiyahSampler original = {.temperature=0.8f,.top_p=0.9f,.seed=42};
+                NiyahSampler pooled = original;
+                const uintptr_t start = (uintptr_t)m->_pool;
+                const uintptr_t end = start + m->_pool_bytes;
+                const uintptr_t ws = (uintptr_t)m->_sampler_workspace;
+                if (ws < start || ws > end ||
+                    m->_sampler_workspace_bytes > end - ws ||
+                    m->_sampler_workspace_bytes < niyah_sample_workspace_bytes(m->cfg.vocab_size))
+                    ++total_fail;
+                for (unsigned j = 0u; j < 64u; ++j) {
+                    const uint32_t a = niyah_sample(probe, 5u, &original);
+                    const uint32_t b = niyah_sample_with_workspace(probe, 5u, &pooled,
+                                            m->_sampler_workspace, m->_sampler_workspace_bytes);
+                    if (a != b || original.seed != pooled.seed) { ++total_fail; break; }
+                }
+            }
             float *wp = (float *)m->_pool;
             size_t nw = niyah_param_count(m);
             for (size_t i=0;i<nw;++i) wp[i]=((float)(i%37)-18.f)*0.005f;
@@ -524,39 +546,104 @@ static void rag_loop(RagBackend backend, NiyahRuleKB *rules) {
     }
 }
 
-static void interactive_loop(NiyahModel *m, NiyahRuleKB *rules) {
+/*
+ * Each emitted response receives a self-contained V2 integrity receipt.
+ * Filenames are allocated monotonically without intentionally overwriting
+ * an earlier session's receipts. Nothing is printed as a response if the
+ * receipt cannot be saved and read back successfully.
+ */
+static int save_response_proof(const char *prompt, const char *response, char path[64]) {
+    static unsigned sequence=0u;
+    uint8_t proof[32];
+    bool rules_bound=false, rules_verified=false;
+    for(unsigned i=0u;i<1000000u;i++){
+        FILE *existing;
+        ++sequence;
+        if(sequence>999999u)sequence=1u;
+        if(snprintf(path,64u,"casper-response-%06u.proof",sequence)<0)return -1;
+        existing=fopen(path,"rb");
+        if(existing){(void)fclose(existing);continue;}
+        niyah_proof_generate(prompt,response,NULL,proof);
+        if(niyah_proof_save(path,proof,prompt,response,NULL)!=0)return -1;
+        if(!niyah_proof_verify_saved(path,NULL,&rules_bound,&rules_verified)||
+           rules_bound||!rules_verified){(void)remove(path);return -1;}
+        return 0;
+    }
+    return -1;
+}
+
+static int interactive_loop(NiyahModel *m, NiyahRuleKB *rules) {
     NiyahSampler sampler={.temperature=0.8f,.top_p=0.9f,.seed=12345};
     NiyahHybridOpts opts={.rules=rules,.max_retries=3,.generate_proof=false};
     char line[4096];
+    if(rules){(void)fprintf(stderr,"[niyah] rule material unavailable: refusing unbound receipts\n");return 2;}
     while(1){
+        char proof_path[64];
         (void)printf("> "); (void)fflush(stdout);
         if(!fgets(line,sizeof(line),stdin))break;
         size_t len=strlen(line); while(len&&(line[len-1]=='\n'||line[len-1]=='\r'))line[--len]='\0';
         if(!len) continue;
         if(!strcmp(line,"quit")||!strcmp(line,"exit")) break;
         char *response=niyah_hybrid_generate(m,line,&opts,&sampler,NULL);
-        if(response){(void)printf("%s\n",response);free(response);} else (void)printf("[no response]\n");
+        if(!response){(void)fprintf(stderr,"[niyah] generation failed\n");return 1;}
+        if(save_response_proof(line,response,proof_path)!=0){
+            (void)fprintf(stderr,"[niyah] receipt write/verification failed; response withheld\n");
+            free(response);return 2;
+        }
+        (void)printf("%s\n[proof: %s]\n",response,proof_path);
+        free(response);
         sampler.seed+=7919u;
     }
+    return 0;
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) { (void)fprintf(stderr,"usage: %s --smoke | --audit-stdin | --rag | --model <file> | --interactive\n",argv[0]); return 3; }
-    if (!strcmp(argv[1],"--smoke")) return run_all_smoke();
-    if (!strcmp(argv[1],"--audit-stdin")) return audit_stdin();
-    if (!strcmp(argv[1],"--rag")) { rag_loop(RAG_BACKEND_DDG,NULL); return 0; }
-    if (!strcmp(argv[1],"--model")) {
-        if (argc < 3) return 3;
-        NiyahModel *m=NULL;
-        int rc=niyah_load(&m,argv[2]);
-        if(rc!=0 || !m) return 1;
-        interactive_loop(m,NULL);
-        niyah_free(m); return 0;
+    if(argc<2){
+        (void)fprintf(stderr,"usage: %s --smoke | --audit-stdin | --verify-proof <proof> [rules-file] | --inspect-gguf <file> | --rag | --interactive <model.bin> | --model <model.bin>\n",argv[0]);
+        return 3;
     }
-    if (!strcmp(argv[1],"--interactive")) {
-        NiyahConfig cfg={.magic=NIYAH_MAGIC,.version=NIYAH_VER,.embed_dim=128,.n_heads=8,.n_kv_heads=8,.n_layers=4,.ffn_mult=4,.vocab_size=8192,.ctx_len=64,.rope_theta=10000.f,.rms_eps=1e-5f};
-        NiyahModel *m=niyah_alloc(&cfg); if(!m)return 1;
-        interactive_loop(m,NULL); niyah_free(m); return 0;
+    if(!strcmp(argv[1],"--smoke"))return run_all_smoke();
+    if(!strcmp(argv[1],"--audit-stdin"))return audit_stdin();
+    if(!strcmp(argv[1],"--inspect-gguf")){
+        NiyahGGUFMap mapped={0};
+        int rc;
+        if(argc!=3)return 3;
+        rc=niyah_gguf_map_open(&mapped,argv[2]);
+        if(rc!=0){
+            (void)fprintf(stderr,"[gguf] mapping/header rejected (%d)\n",rc);
+            return 2;
+        }
+        (void)printf("GGUF version=%u tensors=%llu metadata=%llu bytes=%llu mode=inspect-only\n",
+                     mapped.version,(unsigned long long)mapped.tensor_count,
+                     (unsigned long long)mapped.metadata_count,
+                     (unsigned long long)mapped.file_size);
+        niyah_gguf_map_close(&mapped);
+        return 0;
+    }
+    if(!strcmp(argv[1],"--verify-proof")){
+        bool bound=false, verified=false;
+        if(argc<3||argc>4)return 3;
+        if(!niyah_proof_verify_saved(argv[2],argc==4?argv[3]:NULL,&bound,&verified)){
+            (void)fprintf(stderr,"[proof] receipt invalid\n");
+            return 2;
+        }
+        if(!verified){
+            (void)fprintf(stderr,"[proof] rules hash not verified: supply the original rule file\n");
+            return 2;
+        }
+        (void)printf("receipt_integrity=verified rules_bound=%s factual_truth_verified=false\n",bound?"true":"false");
+        return 0;
+    }
+    if(!strcmp(argv[1],"--rag")){rag_loop(RAG_BACKEND_SEARXNG,NULL);return 0;}
+    if(!strcmp(argv[1],"--model")||!strcmp(argv[1],"--interactive")){
+        NiyahModel *m=NULL;
+        int rc;
+        if(argc!=3){(void)fprintf(stderr,"[niyah] an actual native .bin model path is required\n");return 3;}
+        rc=niyah_load(&m,argv[2]);
+        if(rc!=0||!m){(void)fprintf(stderr,"[niyah] model load failed (code %d)\n",rc);return 1;}
+        rc=interactive_loop(m,NULL);
+        niyah_free(m);
+        return rc;
     }
     return 3;
 }

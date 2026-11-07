@@ -73,6 +73,8 @@ UI_CSharp/obj/
 # ---- Runtime state ------------------------------------------------------
 sessions/
 memory/
+# Proof receipts embed prompt and response bytes; keep them local.
+casper-response-*.proof
 *.log
 *.tmp
 *.bak

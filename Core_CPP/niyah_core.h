@@ -67,6 +67,8 @@ typedef struct {
     float *kv_v;
     float *scratch;
     float *_logits;
+    void  *_sampler_workspace;  /* preallocated nucleus-sampling scratch */
+    size_t _sampler_workspace_bytes;
     void  *_pool;
     size_t _pool_bytes;
     uint32_t head_dim;
@@ -99,6 +101,11 @@ int  niyah_load(NiyahModel **out,    const char *path);
 float *niyah_forward(NiyahModel *m, uint32_t token, uint32_t pos);
 uint32_t niyah_sample(const float *logits, uint32_t vocab_size,
                       NiyahSampler *s);
+/* Hot path: no allocations; memory must be suitably aligned. */
+size_t niyah_sample_workspace_bytes(uint32_t vocab_size);
+uint32_t niyah_sample_with_workspace(const float *logits, uint32_t vocab_size,
+                                    NiyahSampler *s, void *workspace,
+                                    size_t workspace_bytes);
 float niyah_train_step(NiyahModel *m, NiyahAdam *opt,
                        const uint32_t *tokens, uint32_t n);
 NiyahAdam *niyah_adam_alloc(const NiyahModel *m);

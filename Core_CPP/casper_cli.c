@@ -68,13 +68,12 @@ static char *read_text_file(const char *path, size_t max_bytes) {
 }
 
 static RagBackend pick_backend(void) {
-    const char *name = getenv("CASPER_BACKEND");
-    if (!name || !name[0]) return RAG_BACKEND_DDG;
-    if (!strcmp(name, "searxng")) return RAG_BACKEND_SEARXNG;
-    if (!strcmp(name, "bing"))    return RAG_BACKEND_BING;
-    if (!strcmp(name, "ddg"))     return RAG_BACKEND_DDG;
-    fprintf(stderr, "[casper] unknown CASPER_BACKEND=%s (ddg|bing|searxng), using ddg\n", name);
-    return RAG_BACKEND_DDG;
+    const char *name=getenv("CASPER_BACKEND");
+    if(!name||!name[0]||!strcmp(name,"searxng"))return RAG_BACKEND_SEARXNG;
+    if(!strcmp(name,"bing"))return RAG_BACKEND_BING; /* explicitly disabled by RAG policy */
+    if(!strcmp(name,"ddg"))return RAG_BACKEND_DDG;   /* explicitly disabled by RAG policy */
+    (void)fprintf(stderr,"[casper] unknown backend: public fallback disabled; using local SearXNG only\n");
+    return RAG_BACKEND_SEARXNG;
 }
 
 static int hexval(char c) {

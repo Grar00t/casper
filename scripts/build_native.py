@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
     'niyah': ['niyah_core.c', 'niyah_train_full.c', 'niyah_main.c'],
     'trainer': ['niyah_train.c', 'niyah_train_full.c', 'niyah_core.c', '../tokenizer.c'],
-    'niyah_hybrid': ['niyah_hybrid_main.c', 'niyah_core.c', 'hybrid_reasoner.c', 'constraint_solver.c', 'rule_parser.c', 'rule_source_guard.c', 'proof_generator.c', 'khz_q_svd.c', 'casper_rag.c', '../tokenizer.c'],
+    'niyah_hybrid': ['niyah_hybrid_main.c', 'niyah_core.c', 'hybrid_reasoner.c', 'constraint_solver.c', 'rule_parser.c', 'rule_source_guard.c', 'proof_generator.c', 'khz_q_svd.c', 'casper_rag.c', '../src/niyah_gguf_map.c', '../tokenizer.c'],
     'casper': ['casper_cli.c', 'casper_rag.c', 'rule_parser.c', 'rule_source_guard.c', 'proof_generator.c', 'khz_q_svd.c'],
     'casper-chronicle': ['casper_chronicle_main.c', 'casper_chronicle.c', 'chronicle_pool.c', 'proof_generator.c'],
     'bench_niyah': ['bench_niyah.c', 'niyah_core.c'],

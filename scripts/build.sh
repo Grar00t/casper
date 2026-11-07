@@ -162,7 +162,7 @@ build_target niyah_hybrid \
     "$CORE/hybrid_reasoner.c" "$CORE/constraint_solver.c" \
     "$CORE/rule_parser.c" "$CORE/rule_source_guard.c" \
     "$CORE/proof_generator.c" "$CORE/khz_q_svd.c" \
-    "$CORE/casper_rag.c" "$ROOT/tokenizer.c"
+    "$CORE/casper_rag.c" "$ROOT/src/niyah_gguf_map.c" "$ROOT/tokenizer.c"
 
 build_target casper \
     "$CORE/casper_cli.c" "$CORE/casper_rag.c" "$CORE/rule_parser.c" \

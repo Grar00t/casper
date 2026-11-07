@@ -127,53 +127,68 @@ static void url_enc(const char *in, char *out, size_t max) {
 }
 
 /*
- * Hosts reach a command line on POSIX, so restrict them to the characters a
- * hostname and port can legitimately contain. url_enc already guarantees the
- * path side carries nothing but [A-Za-z0-9-_.~%] and the fixed query keys.
+ * Local-first network boundary: a numeric loopback address and an explicit
+ * TCP port. No DNS, proxy resolution, redirects, or public backend fallback.
+ * For remote search, configure a separate local authenticated SearXNG proxy.
  */
-static int host_is_safe(const char *host) {
-    const unsigned char *p;
-    if (!host || !host[0] || strlen(host) > 255u) return 0;
-    for (p = (const unsigned char *)host; *p; ++p) {
-        if (!(isalnum(*p) || *p == '.' || *p == '-' || *p == ':')) return 0;
+static unsigned short local_endpoint_port(const char *host) {
+    const char *p;
+    unsigned long n=0u;
+    if(!host || strncmp(host,"127.0.0.1:",10)!=0)return 0u;
+    p=host+10;
+    if(!*p || strlen(p)>5u)return 0u;
+    for(;*p;++p){
+        if(*p<'0'||*p>'9')return 0u;
+        n=n*10u+(unsigned long)(*p-'0');
     }
-    return 1;
+    return (n>0u&&n<=65535u)?(unsigned short)n:0u;
 }
 
-/*
- * SearXNG endpoint, host[:port] with no scheme, e.g. 127.0.0.1:8888.
- * A self-hosted instance is the only backend here that cannot rate-limit
- * you. The instance must list json under search.formats in settings.yml;
- * upstream ships that disabled.
- */
+static int host_is_safe(const char *host) {
+    return local_endpoint_port(host)!=0u;
+}
+
+/* Explicit opt-in: SEARXNG_HOST=127.0.0.1:<port> */
 static const char *searxng_host(void) {
-    const char *h = getenv("SEARXNG_HOST");
-    return (h && host_is_safe(h)) ? h : NULL;
+    const char *h=getenv("SEARXNG_HOST");
+    return (h&&host_is_safe(h))?h:NULL;
 }
 
 #ifdef _WIN32
 static HBuf *http_get(const char *host, const char *path, unsigned *status_out) {
-    HBuf *out = hbuf_new(); if (!out) return NULL;
-    if (status_out) *status_out = 0u;
-    int host_wlen = MultiByteToWideChar(CP_UTF8, 0, host, -1, NULL, 0);
-    int path_wlen = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
-    if (host_wlen <= 0 || path_wlen <= 0) { hbuf_free(out); return NULL; }
-    wchar_t *whost = (wchar_t *)calloc((size_t)host_wlen, sizeof(wchar_t));
-    wchar_t *wpath = (wchar_t *)calloc((size_t)path_wlen, sizeof(wchar_t));
-    if (!whost || !wpath) { free(whost); free(wpath); hbuf_free(out); return NULL; }
-    if (!MultiByteToWideChar(CP_UTF8, 0, host, -1, whost, host_wlen) || !MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, path_wlen)) {
-        free(whost); free(wpath); hbuf_free(out); return NULL;
+    const unsigned short port=local_endpoint_port(host);
+    HBuf *out=hbuf_new();
+    if(!out)return NULL;
+    if(status_out)*status_out=0u;
+    if(!port){hbuf_free(out);return NULL;}
+    int path_wlen=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path,-1,NULL,0);
+    if(path_wlen<=0){hbuf_free(out);return NULL;}
+    wchar_t *wpath=(wchar_t *)calloc((size_t)path_wlen,sizeof(wchar_t));
+    if(!wpath){hbuf_free(out);return NULL;}
+    if(!MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path,-1,wpath,path_wlen)){
+        free(wpath);hbuf_free(out);return NULL;
     }
-    /* Browser UA here too: WinHttpOpen's agent string is what goes on the
-       wire when no explicit header overrides it. */
-    HINTERNET session = WinHttpOpen(L"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                                   WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-    if (!session) { free(whost); free(wpath); hbuf_free(out); return NULL; }
-    HINTERNET connection = WinHttpConnect(session, whost, INTERNET_DEFAULT_HTTPS_PORT, 0);
-    if (!connection) { WinHttpCloseHandle(session); free(whost); free(wpath); hbuf_free(out); return NULL; }
-    HINTERNET request = WinHttpOpenRequest(connection, L"GET", wpath, NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
-    free(whost); free(wpath);
+    HINTERNET session=WinHttpOpen(L"CasperLocal/1.0",WINHTTP_ACCESS_TYPE_NO_PROXY,
+                                  WINHTTP_NO_PROXY_NAME,WINHTTP_NO_PROXY_BYPASS,0);
+    if(!session){free(wpath);hbuf_free(out);return NULL;}
+    HINTERNET connection=WinHttpConnect(session,L"127.0.0.1",(INTERNET_PORT)port,0);
+    if(!connection){WinHttpCloseHandle(session);free(wpath);hbuf_free(out);return NULL;}
+    HINTERNET request=WinHttpOpenRequest(connection,L"GET",wpath,NULL,WINHTTP_NO_REFERER,
+                                        WINHTTP_DEFAULT_ACCEPT_TYPES,0);
+    free(wpath);
     if (!request) { WinHttpCloseHandle(connection); WinHttpCloseHandle(session); hbuf_free(out); return NULL; }
+    {
+        /* Do not let a loopback search endpoint redirect us to a public host. */
+        DWORD disabled = WINHTTP_DISABLE_REDIRECTS;
+        if (!WinHttpSetOption(request, WINHTTP_OPTION_DISABLE_FEATURE,
+                              &disabled, sizeof(disabled))) {
+            WinHttpCloseHandle(request);
+            WinHttpCloseHandle(connection);
+            WinHttpCloseHandle(session);
+            hbuf_free(out);
+            return NULL;
+        }
+    }
     WinHttpAddRequestHeaders(request,
         L"Accept: text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8\r\n"
         L"Accept-Language: en-US,en;q=0.9,ar;q=0.8\r\n",
@@ -219,15 +234,15 @@ static HBuf *http_get(const char *host, const char *path, unsigned *status_out) 
     char  *marker;
 
     if (status_out) *status_out = 0u;
-    if (!host_is_safe(host) || !path) return NULL;
+    if (!host_is_safe(host) || !path || strncmp(path,"/search?",8)!=0) return NULL;
 
     if (snprintf(cmd, sizeof(cmd),
-                 "curl -sS -L --max-time %u --compressed "
+                 "curl -sS --noproxy '*' --max-redirs 0 --proto '=http' --max-time %u "
                  "-A '%s' "
                  "-H 'Accept: text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8' "
                  "-H 'Accept-Language: en-US,en;q=0.9,ar;q=0.8' "
                  "-w '\\n__STATUS__%%{http_code}' "
-                 "'https://%s%s' 2>/dev/null",
+                 "'http://%s%s' 2>/dev/null",
                  (unsigned)(RAG_TIMEOUT_MS / 1000u), rag_user_agent, host, path)
         >= (int)sizeof(cmd)) {
         return NULL;
@@ -386,19 +401,87 @@ static int json_field(const char **cursor, const char *key, char *out, size_t ma
 }
 
 /* SearXNG /search?format=json: {"results":[{"url":..,"title":..,"content":..}]} */
+/* Bound each result to its own JSON object, independent of field order. */
+static const char *json_object_end(const char *begin) {
+    const char *p;
+    unsigned depth = 0u;
+    bool quoted = false, escaped = false;
+    for (p = begin; *p; ++p) {
+        if (quoted) {
+            if (escaped) escaped = false;
+            else if (*p == '\\') escaped = true;
+            else if (*p == '"') quoted = false;
+        } else if (*p == '"') quoted = true;
+        else if (*p == '{') ++depth;
+        else if (*p == '}') {
+            if (depth == 0u) return NULL;
+            if (--depth == 0u) return p + 1;
+        }
+    }
+    return NULL;
+}
+
+/* Find only immediate fields, not keys from nested objects or later results. */
+static int json_result_field(const char *begin, const char *end,
+                             const char *key, char *out, size_t cap) {
+    const char *p = begin;
+    const size_t key_len = strlen(key);
+    unsigned obj_depth = 0u, arr_depth = 0u;
+    if (!out || cap == 0u) return 0;
+    out[0] = '\0';
+    while (p < end) {
+        if (*p == '{') { ++obj_depth; ++p; continue; }
+        if (*p == '}') { if (!obj_depth) return 0; --obj_depth; ++p; continue; }
+        if (*p == '[') { ++arr_depth; ++p; continue; }
+        if (*p == ']') { if (!arr_depth) return 0; --arr_depth; ++p; continue; }
+        if (*p == '"') {
+            const char *quote = p;
+            const char *start = ++p;
+            while (p < end && *p != '"') {
+                if (*p == '\\' && p + 1 < end) p += 2;
+                else ++p;
+            }
+            if (p >= end) return 0;
+            if (obj_depth == 1u && arr_depth == 0u &&
+                (size_t)(p - start) == key_len &&
+                memcmp(start, key, key_len) == 0) {
+                const char *after = p + 1;
+                while (after < end && isspace((unsigned char)*after)) ++after;
+                if (after < end && *after == ':') {
+                    const char *probe = quote;
+                    return json_field(&probe, key, out, cap) && probe <= end;
+                }
+            }
+            ++p;
+            continue;
+        }
+        ++p;
+    }
+    return 0;
+}
+
 static int parse_searxng(const char *json, RagResult *res, int max) {
     const char *cursor = json ? strstr(json, "\"results\"") : NULL;
-    int         n      = 0;
-
+    int n = 0;
+    if (!cursor || max <= 0) return 0;
+    cursor = strchr(cursor, '[');
     if (!cursor) return 0;
-
+    ++cursor;
     while (n < max) {
-        const char *probe = cursor;
-        if (!json_field(&probe, "url", res[n].url, sizeof(res[n].url))) break;
-        cursor = probe;
-        (void)json_field(&cursor, "title",   res[n].title,   sizeof(res[n].title));
-        (void)json_field(&cursor, "content", res[n].snippet, sizeof(res[n].snippet));
-        if (!strncmp(res[n].url, "http://", 7) || !strncmp(res[n].url, "https://", 8)) ++n;
+        const char *end;
+        while (*cursor == ',' || isspace((unsigned char)*cursor)) ++cursor;
+        if (*cursor == ']' || !*cursor) break;
+        if (*cursor != '{') break;
+        end = json_object_end(cursor);
+        if (!end) break;
+        memset(&res[n], 0, sizeof(res[n]));
+        if (json_result_field(cursor, end, "url", res[n].url, sizeof(res[n].url))) {
+            (void)json_result_field(cursor, end, "title", res[n].title, sizeof(res[n].title));
+            (void)json_result_field(cursor, end, "content", res[n].snippet, sizeof(res[n].snippet));
+            if (!strncmp(res[n].url, "http://", 7) ||
+                !strncmp(res[n].url, "https://", 8)) ++n;
+        }
+        cursor = end;
     }
     return n;
 }
@@ -492,15 +575,9 @@ static HBuf *http_get_retry(const char *host, const char *path, RagCtx *ctx, uin
     return NULL;
 }
 
-bool casper_rag_online(RagBackend backend){
-    if(backend==RAG_BACKEND_SEARXNG) return searxng_host()!=NULL;
-#ifdef _WIN32
-    if(backend!=RAG_BACKEND_DDG&&backend!=RAG_BACKEND_BING)return false;
-    const wchar_t*host=backend==RAG_BACKEND_BING?L"www.bing.com":L"html.duckduckgo.com";HINTERNET session=WinHttpOpen(L"Mozilla/5.0",WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,WINHTTP_NO_PROXY_NAME,WINHTTP_NO_PROXY_BYPASS,0);if(!session)return false;HINTERNET connection=WinHttpConnect(session,host,INTERNET_DEFAULT_HTTPS_PORT,0);bool ok=connection!=NULL;if(connection)WinHttpCloseHandle(connection);WinHttpCloseHandle(session);return ok;
-#else
-    /* Reachability is decided by the transport, which now exists on POSIX. */
-    return backend==RAG_BACKEND_DDG||backend==RAG_BACKEND_BING;
-#endif
+/* Reports explicit configuration, not actual service reachability. */
+bool casper_rag_online(RagBackend backend) {
+    return backend==RAG_BACKEND_SEARXNG && searxng_host()!=NULL;
 }
 
 RagCtx *casper_rag_query(const char *q, RagBackend backend, const char *rules_path) {
@@ -535,13 +612,10 @@ RagCtx *casper_rag_query(const char *q, RagBackend backend, const char *rules_pa
             fmt = "/search?q=%s&format=json&language=en&safesearch=0";
             break;
         case RAG_BACKEND_BING:
-            host = "www.bing.com";
-            fmt  = "/search?q=%s&setlang=en";
-            break;
         case RAG_BACKEND_DDG:
-            host = "html.duckduckgo.com";
-            fmt  = "/html/?q=%s";
-            break;
+            tr_add(ctx,TRACE_WARN,0.0f,t0,"public search backends disabled by local-first policy");
+            ctx->elapsed_ms=ms_now()-t0;
+            return ctx;
         default:
             tr_add(ctx, TRACE_WARN, 0.0f, t0, "unsupported backend");
             ctx->elapsed_ms = ms_now() - t0;
@@ -554,7 +628,7 @@ RagCtx *casper_rag_query(const char *q, RagBackend backend, const char *rules_pa
         ctx->elapsed_ms = ms_now() - t0;
         return ctx;
     }
-    tr_add(ctx, TRACE_SEARCH, 0.0f, t0, "GET https://%s%s", host, path);
+    tr_add(ctx, TRACE_SEARCH, 0.0f, t0, "GET http://%s%s", host, path);
 
     resp = http_get_retry(host, path, ctx, t0);
     if (!resp || resp->len == 0u) {

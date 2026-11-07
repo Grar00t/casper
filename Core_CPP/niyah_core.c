@@ -22,6 +22,11 @@
 
 typedef char _cfg_size_check[(sizeof(NiyahConfig) == 64) ? 1 : -1];
 
+typedef struct {
+    double weight;
+    uint32_t token_id;
+} NiyahSampleCandidate;
+
 static void *xmalloc(size_t n) {
     void *p = malloc(n);
     if (!p) { fprintf(stderr, "[niyah] OOM: %zu bytes\n", n); abort(); }
@@ -109,9 +114,14 @@ static size_t scratch_count(const NiyahConfig*c){size_t d=c->embed_dim,f=checked
 
 size_t niyah_param_count(const NiyahModel*m){return m?weight_count(&m->cfg):0u;}
 
+size_t niyah_sample_workspace_bytes(uint32_t vocab_size) {
+    if (vocab_size == 0u || (size_t)vocab_size > SIZE_MAX / sizeof(NiyahSampleCandidate)) return 0u;
+    return (size_t)vocab_size * sizeof(NiyahSampleCandidate);
+}
+
 NiyahModel*niyah_alloc(const NiyahConfig*cfg){
     if(!cfg||cfg->embed_dim==0u||cfg->n_heads==0u||cfg->n_layers==0u||cfg->n_kv_heads==0u||cfg->n_kv_heads>cfg->n_heads||cfg->vocab_size==0u||cfg->ctx_len==0u||cfg->ffn_mult==0u||cfg->embed_dim%cfg->n_heads!=0u||cfg->ctx_len>NIYAH_MAX_CTX||cfg->vocab_size>NIYAH_MAX_VOCAB) return NULL;
-    NiyahModel*m=xcalloc(1u,sizeof(*m));m->cfg=*cfg;m->head_dim=cfg->embed_dim/cfg->n_heads;m->kv_dim=cfg->n_kv_heads*m->head_dim;m->ffn_dim=cfg->embed_dim*cfg->ffn_mult;size_t nw=weight_count(cfg),nkv=kv_count(cfg),nsc=scratch_count(cfg),nl=cfg->n_layers;size_t float_count=checked_add(checked_add(nw,nkv),nsc);size_t float_bytes=checked_mul(float_count,sizeof(float));size_t align_pad=(float_bytes%_Alignof(NiyahLayer))?(_Alignof(NiyahLayer)-(float_bytes%_Alignof(NiyahLayer))):0u;m->_pool_bytes=checked_add(float_bytes,checked_add(align_pad,checked_mul(nl,sizeof(NiyahLayer))));m->_pool=xcalloc(1u,m->_pool_bytes);float*fp=(float*)m->_pool;const uintptr_t layer_addr=(uintptr_t)m->_pool+float_bytes+align_pad;assert(layer_addr%_Alignof(NiyahLayer)==0u);NiyahLayer*lp=(NiyahLayer*)layer_addr;m->layers=lp;size_t d=cfg->embed_dim,kd=m->kv_dim,f=m->ffn_dim;float*p=fp;for(uint32_t l=0;l<nl;l++){m->layers[l].wq=p;p+=checked_mul(d,d);m->layers[l].wk=p;p+=checked_mul(kd,d);m->layers[l].wv=p;p+=checked_mul(kd,d);m->layers[l].wo=p;p+=checked_mul(d,d);m->layers[l].w_gate=p;p+=checked_mul(f,d);m->layers[l].w_up=p;p+=checked_mul(f,d);m->layers[l].w_down=p;p+=checked_mul(d,f);m->layers[l].rms_att=p;p+=d;m->layers[l].rms_ffn=p;p+=d;}m->token_embed=p;p+=checked_mul(cfg->vocab_size,d);m->rms_final=p;p+=d;m->lm_head=p;p+=checked_mul(cfg->vocab_size,d);m->kv_k=p;p+=nkv/2u;m->kv_v=p;p+=nkv/2u;m->scratch=p;m->_logits=p+3u*d+2u*f+3u*d+(size_t)cfg->n_heads*cfg->ctx_len;assert((size_t)(p-fp)==nw+nkv);return m;}
+    NiyahModel*m=xcalloc(1u,sizeof(*m));m->cfg=*cfg;m->head_dim=cfg->embed_dim/cfg->n_heads;m->kv_dim=cfg->n_kv_heads*m->head_dim;m->ffn_dim=cfg->embed_dim*cfg->ffn_mult;size_t nw=weight_count(cfg),nkv=kv_count(cfg),nsc=scratch_count(cfg),nl=cfg->n_layers;size_t float_count=checked_add(checked_add(nw,nkv),nsc);size_t float_bytes=checked_mul(float_count,sizeof(float));size_t align_pad=(float_bytes%_Alignof(NiyahLayer))?(_Alignof(NiyahLayer)-(float_bytes%_Alignof(NiyahLayer))):0u;size_t sampler_bytes=niyah_sample_workspace_bytes(cfg->vocab_size);m->_pool_bytes=checked_add(float_bytes,checked_add(align_pad,checked_add(checked_mul(nl,sizeof(NiyahLayer)),sampler_bytes)));m->_pool=xcalloc(1u,m->_pool_bytes);float*fp=(float*)m->_pool;const uintptr_t layer_addr=(uintptr_t)m->_pool+float_bytes+align_pad;assert(layer_addr%_Alignof(NiyahLayer)==0u);NiyahLayer*lp=(NiyahLayer*)layer_addr;m->layers=lp;m->_sampler_workspace=(void*)(lp+nl);m->_sampler_workspace_bytes=sampler_bytes;size_t d=cfg->embed_dim,kd=m->kv_dim,f=m->ffn_dim;float*p=fp;for(uint32_t l=0;l<nl;l++){m->layers[l].wq=p;p+=checked_mul(d,d);m->layers[l].wk=p;p+=checked_mul(kd,d);m->layers[l].wv=p;p+=checked_mul(kd,d);m->layers[l].wo=p;p+=checked_mul(d,d);m->layers[l].w_gate=p;p+=checked_mul(f,d);m->layers[l].w_up=p;p+=checked_mul(f,d);m->layers[l].w_down=p;p+=checked_mul(d,f);m->layers[l].rms_att=p;p+=d;m->layers[l].rms_ffn=p;p+=d;}m->token_embed=p;p+=checked_mul(cfg->vocab_size,d);m->rms_final=p;p+=d;m->lm_head=p;p+=checked_mul(cfg->vocab_size,d);m->kv_k=p;p+=nkv/2u;m->kv_v=p;p+=nkv/2u;m->scratch=p;m->_logits=p+3u*d+2u*f+3u*d+(size_t)cfg->n_heads*cfg->ctx_len;assert((size_t)(p-fp)==nw+nkv);return m;}
 
 void niyah_free(NiyahModel*m){if(!m)return;free(m->_pool);free(m);}
 
@@ -132,11 +142,6 @@ int niyah_load(NiyahModel**out,const char*path){if(!out||!path)return -1;*out=NU
 float*niyah_forward(NiyahModel*m,uint32_t token,uint32_t pos){if(!m||!m->_pool||token>=m->cfg.vocab_size||pos>=m->cfg.ctx_len)return NULL;const NiyahConfig*c=&m->cfg;uint32_t d=c->embed_dim,hd=m->head_dim,nh=c->n_heads,nkv=c->n_kv_heads,xctx=c->ctx_len;float*x=SCR_X(m),*xb=SCR_XB(m),*xb2=SCR_XB2(m),*hb=SCR_HB(m),*hb2=SCR_HB2(m),*q=SCR_Q(m),*k=SCR_K(m),*v=SCR_V(m),*att=SCR_ATT(m);memcpy(x,m->token_embed+(size_t)token*d,d*sizeof(float));for(uint32_t l=0;l<c->n_layers;l++){const NiyahLayer*lw=&m->layers[l];rmsnorm(xb,x,lw->rms_att,d,c->rms_eps);matvec(q,lw->wq,xb,d,d);matvec(k,lw->wk,xb,m->kv_dim,d);matvec(v,lw->wv,xb,m->kv_dim,d);for(uint32_t h=0;h<nh;h++)rope(q+h*hd,pos,hd,c->rope_theta);for(uint32_t h=0;h<nkv;h++)rope(k+h*hd,pos,hd,c->rope_theta);size_t L=(size_t)nkv*xctx*hd;float*kc=m->kv_k+(size_t)l*L,*vc=m->kv_v+(size_t)l*L;for(uint32_t h=0;h<nkv;h++){float*dk=kc+(size_t)h*xctx*hd+(size_t)pos*hd;float*dv=vc+(size_t)h*xctx*hd+(size_t)pos*hd;memcpy(dk,k+h*hd,hd*sizeof(float));memcpy(dv,v+h*hd,hd*sizeof(float));}memset(att,0,(size_t)nh*xctx*sizeof(float));for(uint32_t h=0;h<nh;h++){uint32_t kvh=(h*nkv)/nh;float*ah=att+(size_t)h*xctx;for(uint32_t t=0;t<=pos;t++){float score=dot_f32(q+h*hd,kc+(size_t)kvh*xctx*hd+(size_t)t*hd,hd)/(sqrtf((float)hd));if(score>80.f)score=80.f;if(score<-80.f)score=-80.f;ah[t]=score;}float maxs=ah[0];for(uint32_t t=1;t<=pos;t++)if(ah[t]>maxs)maxs=ah[t];float den=0.f;for(uint32_t t=0;t<=pos;t++){ah[t]=expf(ah[t]-maxs);den+=ah[t];}den=den>0.f?den:1.f;for(uint32_t t=0;t<=pos;t++)ah[t]/=den;memset(xb2+h*hd,0,hd*sizeof(float));for(uint32_t t=0;t<=pos;t++){const float*vv=vc+(size_t)kvh*xctx*hd+(size_t)t*hd;axpy_f32(xb2+h*hd,vv,ah[t],hd);}}matvec(xb,lw->wo,xb2,d,d);for(uint32_t i=0;i<d;i++)x[i]+=xb[i];rmsnorm(xb,x,lw->rms_ffn,d,c->rms_eps);matvec(hb,lw->w_gate,xb,m->ffn_dim,d);matvec(hb2,lw->w_up,xb,m->ffn_dim,d);for(uint32_t i=0;i<m->ffn_dim;i++)hb[i]=silu(hb[i])*hb2[i];matvec(xb,lw->w_down,hb,d,m->ffn_dim);for(uint32_t i=0;i<d;i++)x[i]+=xb[i];}rmsnorm(xb,x,m->rms_final,d,c->rms_eps);matvec(m->_logits,m->lm_head,xb,c->vocab_size,d);return m->_logits;}
 
 /* Stable descending probability order; equal scores use vocabulary ID as tiebreak. */
-typedef struct {
-    double weight;
-    uint32_t token_id;
-} NiyahSampleCandidate;
-
 static int niyah_sample_candidate_compare(const void *lhs, const void *rhs)
 {
     const NiyahSampleCandidate *a = (const NiyahSampleCandidate *)lhs;
@@ -151,7 +156,9 @@ static int niyah_sample_candidate_compare(const void *lhs, const void *rhs)
 /* Nucleus sampling: sort probabilities, choose the smallest prefix whose
  * cumulative mass reaches top_p, then sample from that prefix's mass.
  * This is O(vocab log vocab), with O(vocab) temporary memory. */
-uint32_t niyah_sample(const float *logits, uint32_t vocab_size, NiyahSampler *s)
+uint32_t niyah_sample_with_workspace(const float *logits, uint32_t vocab_size,
+                                    NiyahSampler *s, void *workspace,
+                                    size_t workspace_bytes)
 {
     uint32_t best = 0u;
     float max_logit;
@@ -176,9 +183,9 @@ uint32_t niyah_sample(const float *logits, uint32_t vocab_size, NiyahSampler *s)
     }
     if (s->temperature == 0.0f) return best;
 
-    if ((uint64_t)vocab_size * sizeof(*candidates) > (uint64_t)SIZE_MAX) return 0u;
-    candidates = (NiyahSampleCandidate *)malloc((size_t)vocab_size * sizeof(*candidates));
-    if (!candidates) return 0u;
+    if (!workspace || workspace_bytes < niyah_sample_workspace_bytes(vocab_size) ||
+        ((uintptr_t)workspace % _Alignof(NiyahSampleCandidate)) != 0u) return 0u;
+    candidates = (NiyahSampleCandidate *)workspace;
 
     for (uint32_t i = 0u; i < vocab_size; ++i) {
         const double z = ((double)logits[i] - (double)max_logit) /
@@ -188,10 +195,7 @@ uint32_t niyah_sample(const float *logits, uint32_t vocab_size, NiyahSampler *s)
         candidates[i].token_id = i;
         total += weight;
     }
-    if (!(total > 0.0) || !isfinite(total)) {
-        free(candidates);
-        return 0u;
-    }
+    if (!(total > 0.0) || !isfinite(total)) return 0u;
 
     qsort(candidates, (size_t)vocab_size, sizeof(*candidates),
           niyah_sample_candidate_compare);
@@ -216,8 +220,25 @@ uint32_t niyah_sample(const float *logits, uint32_t vocab_size, NiyahSampler *s)
             break;
         }
     }
-    free(candidates);
     return chosen;
+}
+
+/* Compatibility wrapper: callers using the old API still work.
+ * The generation hot path calls niyah_sample_with_workspace instead. */
+uint32_t niyah_sample(const float *logits, uint32_t vocab_size, NiyahSampler *s) {
+    uint32_t result;
+    size_t needed;
+    void *memory;
+    if (!logits || !s || vocab_size == 0u) return 0u;
+    if (s->temperature == 0.0f)
+        return niyah_sample_with_workspace(logits, vocab_size, s, NULL, 0u);
+    needed = niyah_sample_workspace_bytes(vocab_size);
+    if (needed == 0u) return 0u;
+    memory = malloc(needed);
+    if (!memory) return 0u;
+    result = niyah_sample_with_workspace(logits, vocab_size, s, memory, needed);
+    free(memory);
+    return result;
 }
 
 NiyahAdam*niyah_adam_alloc(const NiyahModel*m){if(!m)return NULL;NiyahAdam*opt=xcalloc(1u,sizeof(*opt));opt->n_weights=weight_count(&m->cfg);opt->m=xcalloc(opt->n_weights,sizeof(float));opt->v=xcalloc(opt->n_weights,sizeof(float));opt->lr=3e-4f;opt->beta1=.9f;opt->beta2=.999f;opt->eps=1e-8f;opt->wd=.01f;return opt;}
