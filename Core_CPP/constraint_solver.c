@@ -45,14 +45,10 @@ NiyahCspRat niyah_csp_rat(int64_t num, int64_t den) {
 }
 
 /*
- * Overflow-safe helpers for signed 64-bit arithmetic.
- *
- * Cross-reduce a/b op c/d before multiplying to keep products in range.
- * For add/sub we additionally pre-reduce the common denominator.
- *
- * For rat_cmp we use __int128 where the target has it to avoid the product
- * overflowing; elsewhere we fall back to double comparison, which is exact
- * only while both products fit in a 53-bit mantissa.
+ * Cross-reduction reduces intermediate sizes in the arithmetic operators,
+ * but does NOT make every int64 addition/multiplication overflow-safe.
+ * Comparison below uses an exact, portable integer-only Euclidean algorithm.
+ * A checked-arithmetic API is still needed for unrepresentable results.
  */
 
 NiyahCspRat niyah_csp_rat_add(NiyahCspRat a, NiyahCspRat b) {
@@ -92,39 +88,41 @@ NiyahCspRat niyah_csp_rat_neg(NiyahCspRat a) {
     return (NiyahCspRat){-a.num, a.den};
 }
 
+/* Unsigned magnitude without signed overflow, including INT64_MIN. */
+static uint64_t rat_uabs(int64_t n) {
+    return n < 0 ? (uint64_t)(-(n + 1)) + UINT64_C(1) : (uint64_t)n;
+}
+
+/* Exact continued-fraction comparison: no cross-products or floating point.
+ * Every inversion reverses ordering; Euclidean remainders strictly decrease.
+ * Inputs are nonnegative numerators and strictly positive denominators. */
+static int rat_cmp_magnitude(uint64_t an, uint64_t ad,
+                             uint64_t bn, uint64_t bd) {
+    int direction = 1;
+    for (;;) {
+        uint64_t aq = an / ad, bq = bn / bd;
+        uint64_t ar, br;
+        if (aq != bq) return direction * (aq < bq ? -1 : 1);
+        ar = an % ad;
+        br = bn % bd;
+        if (ar == 0u || br == 0u) {
+            if (ar == br) return 0;
+            return direction * (ar == 0u ? -1 : 1);
+        }
+        an = ad; ad = ar;
+        bn = bd; bd = br;
+        direction = -direction;
+    }
+}
+
 int niyah_csp_rat_cmp(NiyahCspRat a, NiyahCspRat b) {
-    /*
-     * Compare a.num/a.den vs b.num/b.den without overflow.
-     * Cross-multiply:  a.num * b.den  vs  b.num * a.den
-     *
-     * __int128 is a GNU/Clang extension, not ISO C, so -Wpedantic rejects it
-     * and this tree builds with -Werror. Exactness is the entire purpose of
-     * this function, so the extension stays and the diagnostic is silenced
-     * for these two declarations only. __SIZEOF_INT128__ is the feature test;
-     * __GNUC__ is not, because 32-bit and clang-cl targets define the vendor
-     * macro without providing a 128-bit integer.
-     */
-#if defined(__SIZEOF_INT128__)
-#  if defined(__GNUC__)
-#    pragma GCC diagnostic push
-#    pragma GCC diagnostic ignored "-Wpedantic"
-#  endif
-    __int128 lhs = (__int128)a.num * b.den;
-    __int128 rhs = (__int128)b.num * a.den;
-    if (lhs < rhs) return -1;
-    if (lhs > rhs) return  1;
-    return 0;
-#  if defined(__GNUC__)
-#    pragma GCC diagnostic pop
-#  endif
-#else
-    /* No 128-bit integer: use double; exact only within a 53-bit mantissa */
-    double lhsd = (double)a.num * (double)b.den;
-    double rhsd = (double)b.num * (double)a.den;
-    if (lhsd < rhsd) return -1;
-    if (lhsd > rhsd) return  1;
-    return 0;
-#endif
+    int order;
+    /* The public rational invariant requires denominators greater than zero. */
+    assert(a.den > 0 && b.den > 0);
+    if ((a.num < 0) != (b.num < 0)) return a.num < 0 ? -1 : 1;
+    order = rat_cmp_magnitude(rat_uabs(a.num), (uint64_t)a.den,
+                              rat_uabs(b.num), (uint64_t)b.den);
+    return a.num < 0 ? -order : order;
 }
 
 bool niyah_csp_rat_eq(NiyahCspRat a, NiyahCspRat b) {
@@ -426,6 +424,29 @@ int niyah_csp_smoke(void) {
         CSP_PASS(niyah_csp_rat_cmp(a, b) < 0, "1/3 < 1/2");
         CSP_PASS(niyah_csp_rat_cmp(b, a) > 0, "1/2 > 1/3");
         CSP_PASS(niyah_csp_rat_cmp(a, a) == 0, "1/3 == 1/3");
+
+        /* Regression: MSVC previously rounded both cross-products to equal
+         * doubles, even though these neighbouring fractions differ. */
+        {
+            const int64_t m = INT64_MAX;
+            const NiyahCspRat near_one = {m - 1, m};
+            const NiyahCspRat smaller = {m - 2, m - 1};
+            const NiyahCspRat neg_near_one = {-(m - 1), m};
+            const NiyahCspRat neg_smaller = {-(m - 2), m - 1};
+            const NiyahCspRat min_num = {INT64_MIN, m};
+            const NiyahCspRat minus_one = {-1, 1};
+            CSP_PASS(niyah_csp_rat_cmp(near_one, smaller) > 0,
+                     "int64 adjacent fractions ordered exactly");
+            CSP_PASS(niyah_csp_rat_cmp(smaller, near_one) < 0,
+                     "int64 comparator antisymmetry");
+            CSP_PASS(niyah_csp_rat_cmp(neg_near_one, neg_smaller) < 0,
+                     "negative adjacent fractions ordered exactly");
+            CSP_PASS(niyah_csp_rat_cmp(min_num, minus_one) < 0,
+                     "INT64_MIN numerator comparison");
+            CSP_PASS(niyah_csp_rat_cmp((NiyahCspRat){2, 4},
+                                       (NiyahCspRat){1, 2}) == 0,
+                     "equivalent fractions compare equal");
+        }
     }
 
     /* §4.4 — Simple bounds: 0 <= x <= 10 */
