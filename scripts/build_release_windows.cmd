@@ -21,5 +21,16 @@ if errorlevel 1 exit /b 1
 if /i "%~1"=="--smoke" (
   "build\release\casper_engine.exe" --smoke
   if errorlevel 1 exit /b 1
+  rem Verify the proof receipt and RAG JSON parser in the release pipeline.
+  cl /nologo /std:c11 /W4 /WX /wd4996 /MT /O2 /I"Core_CPP" /Fe:"build\release\make_proof_fixture.exe" tests\make_proof_fixture.c Core_CPP\proof_generator.c
+  if errorlevel 1 exit /b 1
+  "build\release\make_proof_fixture.exe" "build\release\fixture.proof"
+  if errorlevel 1 exit /b 1
+  "build\release\casper_engine.exe" --verify-proof "build\release\fixture.proof"
+  if errorlevel 1 exit /b 1
+  cl /nologo /std:c11 /W4 /WX /wd4996 /MT /O2 /I"Core_CPP" /Fe:"build\release\test_rag_json.exe" tests\test_rag_json.c Core_CPP\proof_generator.c /link winhttp.lib
+  if errorlevel 1 exit /b 1
+  "build\release\test_rag_json.exe"
+  if errorlevel 1 exit /b 1
 )
 exit /b 0
