@@ -40,7 +40,7 @@ struct NiyahGGUFRunner {
     void *_pool;
     size_t _pool_bytes;
     float *cache_k, *cache_v;
-    float *x, *norm, *q, *k, *v, *att, *acc, *gate, *up, *scores, *logits;
+    float *x, *norm, *q, *k, *v, *att, *acc, *gate, *up, *scores, *logits, *quant_act;
 };
 
 typedef struct {
@@ -404,8 +404,210 @@ static void gg_rope_neox(float *v, uint32_t pos, uint32_t dim, float theta) {
         v[i + dim / 2u] = a * sn + b * cs;
     }
 }
-static void gg_mv(float *out, const GGWeight *w, const float *x) {
+/* CPU GGML quantized matmul first quantizes the input activations.
+ * Q4_0/Q4_1/Q5_0/Q8_0 use Q8_0 activations (FP16 scale, 32 values),
+ * K-quants and IQ4_XS use Q8_K (FP32 scale, 256 values).
+ * Staging is caller-owned _pool storage; no heap allocation in hot loops.
+ */
+static uint16_t gg_to_f16(float x) {
+    uint32_t u, sign, mant, rounded;
+    int exp;
+    memcpy(&u, &x, sizeof u);
+    sign = (u >> 16u) & 0x8000u;
+    mant = u & 0x007fffffu;
+    exp = (int)((u >> 23u) & 255u) - 112;
+    if (exp >= 31) return (uint16_t)(sign | 0x7c00u);
+    if (exp <= 0) {
+        uint32_t shift;
+        if (exp < -10) return (uint16_t)sign;
+        mant |= 0x00800000u;
+        shift = (uint32_t)(14 - exp);
+        rounded = mant + ((UINT32_C(1) << (shift - 1u)) - 1u) +
+                  ((mant >> shift) & 1u);
+        return (uint16_t)(sign | (rounded >> shift));
+    }
+    rounded = mant + 0x00000fffu + ((mant >> 13u) & 1u);
+    if (rounded & 0x00800000u) { rounded = 0u; ++exp; }
+    if (exp >= 31) return (uint16_t)(sign | 0x7c00u);
+    return (uint16_t)(sign | (uint32_t)(exp << 10u) | (rounded >> 13u));
+}
+static float gg_round_to_even(float x) {
+    int whole = (int)x;
+    const float fraction = fabsf(x - (float)whole);
+    if (fraction > 0.5f || (fraction == 0.5f && (whole & 1) != 0))
+        whole += x < 0.0f ? -1 : 1;
+    return (float)whole;
+}
+static void gg_quant_act(float *out, const float *in, size_t n, uint32_t weight_type) {
+    const size_t width = (weight_type == 2u || weight_type == 3u ||
+                          weight_type == 6u || weight_type == 8u) ? 32u : 256u;
+    for (size_t base = 0u; base < n; base += width) {
+        float max_abs = 0.0f, max_value = 0.0f, scale, inv;
+        for (size_t j = 0u; j < width; ++j) {
+            const float a = fabsf(in[base + j]);
+            if (a > max_abs) { max_abs = a; max_value = in[base + j]; }
+        }
+        if (width == 32u) {
+            scale = gg_f16(gg_to_f16(max_abs / 127.0f));
+            inv = max_abs > 0.0f ? 127.0f / max_abs : 0.0f;
+        } else {
+            inv = max_abs > 0.0f ? -127.0f / max_value : 0.0f;
+            scale = inv != 0.0f ? 1.0f / inv : 0.0f;
+        }
+        out[n + base / width] = scale;
+        for (size_t j = 0u; j < width; ++j) {
+            const float scaled = in[base + j] * inv;
+            float q = gg_round_to_even(scaled);
+            if (q > 127.0f) q = 127.0f;
+            if (q < -127.0f) q = -127.0f;
+            out[base + j] = scale * q;
+        }
+    }
+}
+static void gg_mv(float *out, const GGWeight *w, const float *x, float *scratch) {
     size_t rows = (size_t)w->dims[1], cols = (size_t)w->dims[0];
+    if (w->type != 0u && w->type != 1u) {
+        gg_quant_act(scratch, x, cols, w->type);
+        x = scratch;
+    }
+    if (w->type == 8u) {
+        for (size_t i = 0u; i < rows; ++i) {
+            const uint8_t *wr = w->bytes + i * w->row_bytes;
+            float lanes[8] = {0.0f, 0.0f, 0.0f, 0.0f,
+                              0.0f, 0.0f, 0.0f, 0.0f};
+            for (size_t b = 0u; b < cols / 32u; ++b) {
+                const uint8_t *p = wr + b * 34u;
+                const float act_scale = scratch[cols + b];
+                const float scale = gg_f16((uint16_t)(p[0] | ((uint16_t)p[1] << 8))) * act_scale;
+                int partial[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+                for (size_t j = 0u; j < 32u; ++j) {
+                    const int q = act_scale != 0.0f
+                                      ? (int)roundf(x[b * 32u + j] / act_scale)
+                                      : 0;
+                    partial[j / 4u] += (int)(int8_t)p[2u + j] * q;
+                }
+                for (size_t lane = 0u; lane < 8u; ++lane)
+                    lanes[lane] = fmaf(scale, (float)partial[lane], lanes[lane]);
+            }
+            {
+                const float a0 = lanes[0] + lanes[4];
+                const float a1 = lanes[1] + lanes[5];
+                const float a2 = lanes[2] + lanes[6];
+                const float a3 = lanes[3] + lanes[7];
+                out[i] = (a0 + a2) + (a1 + a3);
+            }
+        }
+        return;
+    }
+    if (w->type == 6u || w->type == 12u || w->type == 14u) {
+        const size_t block = (w->type == 6u) ? 32u : 256u;
+        const size_t block_bytes = (w->type == 6u) ? 22u : (w->type == 12u ? 144u : 210u);
+        for (size_t i = 0u; i < rows; ++i) {
+            const uint8_t *wr = w->bytes + i * w->row_bytes;
+            float sum = 0.0f;
+            float sum_min = 0.0f;
+            float lanes[8] = {0.0f, 0.0f, 0.0f, 0.0f,
+                              0.0f, 0.0f, 0.0f, 0.0f};
+            for (size_t b = 0u; b < cols / block; ++b) {
+                const uint8_t *p = wr + b * block_bytes;
+                const float sx = scratch[cols + b];
+                if (sx == 0.0f) continue;
+                if (w->type == 6u) {
+                    int partial[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+                    const uint32_t upper = gg_u32(p + 2u);
+                    for (size_t j = 0u; j < 32u; ++j) {
+                        unsigned q = ((unsigned)p[6u + j % 16u] >>
+                                      (j >= 16u ? 4u : 0u)) & 15u;
+                        q |= ((upper >> j) & 1u) << 4u;
+                        partial[j / 4u] +=
+                            ((int)q - 16) * (int)roundf(x[b * block + j] / sx);
+                    }
+                    const float dw = gg_f16((uint16_t)(p[0] | ((uint16_t)p[1] << 8)));
+                    const float scale = dw * sx;
+                    for (size_t lane = 0u; lane < 8u; ++lane)
+                        lanes[lane] = fmaf(scale, (float)partial[lane], lanes[lane]);
+                } else if (w->type == 12u) {
+                    int8_t q8[256];
+                    int32_t scaled = 0, mins = 0;
+                    int32_t sums32[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+                    for (size_t g = 0u; g < 8u; ++g) {
+                        int scale, minimum, dot = 0;
+                        gg_scale_k4(p + 4u, g, &scale, &minimum);
+                        for (size_t j = 0u; j < 32u; ++j) {
+                            const size_t local = g * 32u + j;
+                            q8[local] = (int8_t)roundf(x[b * block + local] / sx);
+                            sums32[g] += q8[local];
+                            const size_t idx = (local / 64u) * 32u + local % 32u;
+                            const int q = (int)((g & 1u) ? (p[16u + idx] >> 4u)
+                                                           : (p[16u + idx] & 15u));
+                            dot += q * q8[local];
+                        }
+                        scaled += scale * dot;
+                        mins += minimum * sums32[g];
+                    }
+                    {
+                        const float dw = gg_f16((uint16_t)(p[0] | ((uint16_t)p[1] << 8)));
+                        const float dmin = gg_f16((uint16_t)(p[2] | ((uint16_t)p[3] << 8)));
+                        const float d = dw * sx, dm = dmin * sx;
+                        sum = fmaf((float)scaled, d, sum);
+                        sum_min = fmaf((float)mins, dm, sum_min);
+                    }
+                } else {
+                    int8_t q8[256];
+                    int32_t partial[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+                    int32_t sums16[16] = {0};
+                    const int8_t *scales = (const int8_t *)(p + 192u);
+                    const float d = gg_f16((uint16_t)(p[208] | ((uint16_t)p[209] << 8)));
+                    for (size_t pair = 0u; pair < 8u; ++pair) {
+                        for (size_t g = pair * 2u; g < pair * 2u + 2u; ++g) {
+                            for (size_t j = 0u; j < 16u; ++j) {
+                                const size_t local = g * 16u + j;
+                                q8[local] = (int8_t)roundf(x[b * block + local] / sx);
+                                sums16[g] += q8[local];
+                            }
+                        }
+                        for (size_t lane = 0u; lane < 8u; ++lane) {
+                            const size_t g = pair * 2u + lane / 4u;
+                            for (size_t j = 0u; j < 4u; ++j) {
+                                const size_t local = g * 16u + (lane % 4u) * 4u + j;
+                                const size_t half = local / 128u;
+                                const size_t sub = (local % 128u) / 32u;
+                                const size_t k = local % 32u;
+                                const size_t lo = half * 64u, hi = half * 32u;
+                                unsigned q;
+                                if (sub == 0u) q = (p[lo + k] & 15u) |
+                                    ((p[128u + hi + k] & 3u) << 4u);
+                                else if (sub == 1u) q = (p[lo + 32u + k] & 15u) |
+                                    (((p[128u + hi + k] >> 2u) & 3u) << 4u);
+                                else if (sub == 2u) q = (p[lo + k] >> 4u) |
+                                    (((p[128u + hi + k] >> 4u) & 3u) << 4u);
+                                else q = (p[lo + 32u + k] >> 4u) |
+                                    (((p[128u + hi + k] >> 6u) & 3u) << 4u);
+                                partial[lane] += (int)scales[g] * (int)q * q8[local];
+                            }
+                        }
+                    }
+                    for (size_t lane = 0u; lane < 8u; ++lane)
+                        partial[lane] -= 32 * ((int)scales[2u * lane] * sums16[2u * lane] +
+                                               (int)scales[2u * lane + 1u] * sums16[2u * lane + 1u]);
+                    {
+                        const float scale = sx * d;
+                        for (size_t lane = 0u; lane < 8u; ++lane)
+                            lanes[lane] = fmaf(scale, (float)partial[lane], lanes[lane]);
+                    }
+                }
+            }
+            if (w->type == 6u || w->type == 14u) {
+                const float a0 = lanes[0] + lanes[4];
+                const float a1 = lanes[1] + lanes[5];
+                const float a2 = lanes[2] + lanes[6];
+                const float a3 = lanes[3] + lanes[7];
+                out[i] = (a0 + a2) + (a1 + a3);
+            } else if (w->type == 12u) out[i] = sum - sum_min;
+            else out[i] = sum;
+        }
+        return;
+    }
     for (size_t i = 0u; i < rows; ++i) {
         double acc = 0.0;
         for (size_t j = 0u; j < cols; ++j)
@@ -414,13 +616,19 @@ static void gg_mv(float *out, const GGWeight *w, const float *x) {
     }
 }
 static float gg_gelu(float x) {
-    return 0.5f * x * (1.0f + tanhf(0.7978845608028654f * x *
-                                   (1.0f + 0.044715f * x * x)));
+    if (x <= -10.0f) return 0.0f;
+    if (x >= 10.0f) return x;
+    x = gg_f16(gg_to_f16(x));
+    {
+        float y = 0.5f * x * (1.0f + tanhf(0.7978845608028654f * x *
+                                          (1.0f + 0.044715f * x * x)));
+        return gg_f16(gg_to_f16(y));
+    }
 }
 static void gg_norm(float *out, const float *x, const GGWeight *w,
                     uint32_t n, float eps) {
     double ss = 0.0;
-    for (uint32_t i = 0u; i < n; ++i) ss += (double)x[i] * (double)x[i];
+    for (uint32_t i = 0u; i < n; ++i) ss += (double)(x[i] * x[i]);
     {
         float scale = 1.0f / sqrtf((float)(ss / n) + eps);
         for (uint32_t i = 0u; i < n; ++i)
@@ -521,7 +729,7 @@ static void gg_rebase_all(NiyahGGUFRunner *m, const uint8_t *old_base,
     }
 }
 static int gg_allocate_runtime(NiyahGGUFRunner *m) {
-    size_t kv_per_layer, count = 0u, runtime, runtime_offset, pool_bytes;
+    size_t kv_per_layer, count = 0u, runtime, runtime_offset, pool_bytes, act_cap;
     const uint8_t *old_base;
     uint8_t *pool;
     float *p, *runtime_begin;
@@ -530,6 +738,9 @@ static int gg_allocate_runtime(NiyahGGUFRunner *m) {
     kv_per_layer = (size_t)m->nkv * m->ctx * m->hd;
     if (kv_per_layer > SIZE_MAX / m->n_layers) return 0;
     runtime = kv_per_layer * m->n_layers;
+    act_cap = m->d;
+    if (act_cap < m->qd) act_cap = m->qd;
+    if (act_cap < m->ff) act_cap = m->ff;
     if (runtime > SIZE_MAX / 2u || !gg_add(&count, 2u * runtime) ||
         !gg_add(&count, 3u * m->d) ||
         !gg_add(&count, m->qd) ||
@@ -537,6 +748,8 @@ static int gg_allocate_runtime(NiyahGGUFRunner *m) {
         !gg_add(&count, m->qd) ||
         !gg_add(&count, 2u * m->ff) ||
         !gg_add(&count, m->ctx) ||
+        !gg_add(&count, act_cap) ||
+        !gg_add(&count, act_cap / 32u + 1u) ||
         !gg_add(&count, m->vocab) ||
         count > SIZE_MAX / sizeof(float)) return 0;
     /* One contiguous allocation contains original GGUF bytes, KV cache,
@@ -569,6 +782,7 @@ static int gg_allocate_runtime(NiyahGGUFRunner *m) {
     m->gate = p; p += m->ff;
     m->up = p; p += m->ff;
     m->scores = p; p += m->ctx;
+    m->quant_act = p; p += act_cap + act_cap / 32u + 1u;
     m->logits = p; p += m->vocab;
     assert((size_t)(p - runtime_begin) == count);
     gg_rebase_all(m, old_base, pool);
@@ -678,9 +892,9 @@ float *niyah_gguf_runner_step(NiyahGGUFRunner *m, uint32_t token, uint32_t pos) 
         float *ck = m->cache_k + (size_t)l * stride;
         float *cv = m->cache_v + (size_t)l * stride;
         gg_norm(m->norm, m->x, &w->att_norm, m->d, m->eps);
-        gg_mv(m->q, &w->q, m->norm);
-        gg_mv(m->k, &w->k, m->norm);
-        gg_mv(m->v, &w->v, m->norm);
+        gg_mv(m->q, &w->q, m->norm, m->quant_act);
+        gg_mv(m->k, &w->k, m->norm, m->quant_act);
+        gg_mv(m->v, &w->v, m->norm, m->quant_act);
         if (w->q_norm.bytes) {
             for (uint32_t h = 0u; h < m->nh; ++h)
                 gg_norm(m->q + (size_t)h * m->hd,
@@ -710,7 +924,9 @@ float *niyah_gguf_runner_step(NiyahGGUFRunner *m, uint32_t token, uint32_t pos) 
         for (uint32_t h = 0u; h < m->nkv; ++h) {
             size_t at = (size_t)h * m->ctx * m->hd + (size_t)pos * m->hd;
             memcpy(ck + at, m->k + (size_t)h * m->hd, m->hd * sizeof(float));
-            memcpy(cv + at, m->v + (size_t)h * m->hd, m->hd * sizeof(float));
+            for (uint32_t j = 0u; j < m->hd; ++j) {
+                cv[at + j] = gg_f16(gg_to_f16(m->v[(size_t)h * m->hd + j]));
+            }
         }
         for (uint32_t h = 0u; h < m->nh; ++h) {
             uint32_t kh = h / (m->nh / m->nkv);
@@ -739,20 +955,20 @@ float *niyah_gguf_runner_step(NiyahGGUFRunner *m, uint32_t token, uint32_t pos) 
                 axpy_f32(y, value, m->scores[t] / sum, m->hd);
             }
         }
-        gg_mv(m->acc, &w->o, m->att);
+        gg_mv(m->acc, &w->o, m->att, m->quant_act);
         if (m->gemma3) gg_norm(m->acc, m->acc, &w->post_att_norm, m->d, m->eps);
         for (uint32_t i = 0u; i < m->d; ++i) m->x[i] += m->acc[i];
         gg_norm(m->norm, m->x, &w->ffn_norm, m->d, m->eps);
-        gg_mv(m->gate, &w->gate, m->norm);
-        gg_mv(m->up, &w->up, m->norm);
+        gg_mv(m->gate, &w->gate, m->norm, m->quant_act);
+        gg_mv(m->up, &w->up, m->norm, m->quant_act);
         for (uint32_t i = 0u; i < m->ff; ++i)
             m->gate[i] = (m->gemma3 ? gg_gelu(m->gate[i]) : silu(m->gate[i])) * m->up[i];
-        gg_mv(m->acc, &w->down, m->gate);
+        gg_mv(m->acc, &w->down, m->gate, m->quant_act);
         if (m->gemma3) gg_norm(m->acc, m->acc, &w->post_ff_norm, m->d, m->eps);
         for (uint32_t i = 0u; i < m->d; ++i) m->x[i] += m->acc[i];
     }
     gg_norm(m->norm, m->x, &m->final_norm, m->d, m->eps);
-    gg_mv(m->logits, &m->output, m->norm);
+    gg_mv(m->logits, &m->output, m->norm, m->quant_act);
     if (m->final_softcap > 0.0f)
         for (uint32_t i = 0u; i < m->vocab; ++i)
             m->logits[i] = m->final_softcap * tanhf(m->logits[i] / m->final_softcap);
