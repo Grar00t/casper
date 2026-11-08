@@ -170,8 +170,11 @@ static void normalize_results(RagCtx *ctx) {
 static int cmd_verify(const char *proof_path, const char *rules_path) {
     bool rules_bound = false;
     bool rules_verified = false;
-    bool receipt_valid = niyah_proof_verify_saved(proof_path, rules_path,
-                                                   &rules_bound, &rules_verified);
+    bool receipt_valid = niyah_proof_v1_verify_file(proof_path, rules_path,
+                                                      &rules_bound, &rules_verified);
+    if (!receipt_valid)
+        receipt_valid = niyah_proof_verify_saved(proof_path, rules_path,
+                                                  &rules_bound, &rules_verified);
     bool valid = receipt_valid && (!rules_bound || rules_verified);
     printf("{\"proof_path\":");
     json_str(stdout, proof_path);
@@ -287,12 +290,17 @@ int main(int argc,char **argv){
     }
 
     uint8_t proof_bytes[32];
-    niyah_proof_generate_hashed(query,answer,rules_hash_ptr,proof_bytes);
+    if (niyah_proof_generate_v1(query, answer, rules_path, proof_bytes) != 0) {
+        fprintf(stderr, "[casper] V1 digest could not bind rule-file bytes\n");
+        if(kb)niyah_rule_free(kb);
+        free(rules_text);casper_rag_free(ctx);return 3;
+    }
     char proof_hex[65];niyah_hash_to_hex(proof_bytes,proof_hex);
     char proof_path[256];
     int pn=snprintf(proof_path,sizeof(proof_path),"casper_%.8s.proof",proof_hex);
     if(pn<0 || (size_t)pn>=sizeof(proof_path)){if(kb)niyah_rule_free(kb);free(rules_text);casper_rag_free(ctx);return 3;}
-    if(niyah_proof_save_hashed(proof_path,proof_bytes,query,answer,rules_hash_ptr)!=0){
+    if(niyah_proof_save_v1(proof_path,proof_bytes,query,answer,rules_path)!=0 ||
+       !niyah_proof_verify_saved_v1(proof_path,rules_path,NULL,NULL)){
         fprintf(stderr,"[casper] proof write failed: %s\n",proof_path);
         if(kb)niyah_rule_free(kb);
         free(rules_text);
@@ -306,7 +314,7 @@ int main(int argc,char **argv){
         printf("  \"relevance_score\":%.3f,\n  \"confidence\":%.3f,\n  \"confidence_kind\":\"top_lexical_relevance\",\n  \"mean_relevance\":%.3f,\n  \"elapsed_ms\":%u,\n  \"violated\":%s,\n  \"rejected\":%s,\n",
                top_relevance,top_relevance,(double)ctx->confidence,ctx->elapsed_ms,violation?"true":"false",rejected?"true":"false");
     }
-    printf("  \"proof_kind\":\"NIYAH-PROOF-V2\",\n  \"rules_bound\":%s,\n  \"proof\":\"%s\",\n  \"proof_file\":",rules_hash_ptr?"true":"false",proof_hex);json_str(stdout,proof_path);printf(",\n  \"n_sources\":%d,\n  \"sources\":[\n",ctx->n_results);
+    printf("  \"proof_kind\":\"NIYAH-PROOF-V1\",\n  \"rules_bound\":%s,\n  \"proof\":\"%s\",\n  \"proof_file\":",rules_hash_ptr?"true":"false",proof_hex);json_str(stdout,proof_path);printf(",\n  \"n_sources\":%d,\n  \"sources\":[\n",ctx->n_results);
     for(int i=0;i<ctx->n_results;++i){
         const RagResult *r=&ctx->results[i];char src_hex[65];niyah_hash_to_hex(r->sha256,src_hex);
         printf("    {\"n\":%d,\"score\":%.3f,\"sha256\":\"%s\",\"title\":",i+1,(double)r->score,src_hex);json_str(stdout,r->title);printf(",\"url\":");json_str(stdout,r->url);printf(",\"snippet\":");json_str(stdout,r->snippet);printf("}%s\n",i+1<ctx->n_results?",":"");

@@ -28,14 +28,20 @@ Executables and test fixtures stay under `build/`.
 `--model` is an alias for `--interactive`. An actual native NIYAH .bin
 checkpoint is required; the CLI does not silently create an untrained model.
 Interactive generation must save and self-check a `casper-response-XXXXXX.proof`
-receipt before returning the response. Receipts currently use
-`NIYAH-PROOF-V2` and cryptographically bind prompt bytes, response bytes
-and the exact rule-file hash. This establishes integrity, not authenticity,
-legal validity, factual accuracy, or model correctness.
+receipt before returning the response. New receipts use `NIYAH-PROOF-V1`:
+`SHA-256(prompt bytes || output bytes || exact rule-file bytes)`.
+Legacy V2 verification remains available. Receipts establish integrity, not
+authenticity, legal validity, factual accuracy, or model correctness.
 
-`--inspect-gguf` only memory-maps a GGUF file read-only and checks a minimal
-v2/v3 header and file range. **It cannot load tensors, dequantize GGUF weights,
-or run GGUF inference.** Native `.bin` inference remains separate.
+`--inspect-gguf` checks the v2/v3 GGUF header without inference.
+`--gguf-forward <model.gguf> <token-id> [token-id...]` runs a native dense
+LLaMA/Qwen3-style forward pass and reports finite logits/argmax. Supported
+GGML tensor types are explicitly validated on load (including F32, F16 and
+selected Q4/Q5/Q6 variants); unsupported model layouts fail closed. GGUF
+weights and all forward workspace use a single allocated runtime `_pool`,
+with file mapping closed after loading. This is a bounded forward-test path,
+not tokenizer-driven chat generation or independent numerical parity proof.
+Native `.bin` inference remains separate.
 
 ## Retrieval policy
 
@@ -54,12 +60,13 @@ Its own outbound security is not proven by this engine.
 
 ## Limitations and verification scope
 
-The pool allocation covers weights, KV cache, forward scratch and
-the new generation sampler workspace. Auxiliary non-hot paths can allocate.
-A passing smoke/ASan test does not establish absence of all memory errors.
-The public `include/casper_ffi.h` contract predates these changes and
-is not evidence that a loadable FFI DLL is shipped here.
-The C native model format is not GGUF.
+The GGUF forward path allocates a single contiguous `_pool` for the
+validated tensor bytes, KV cache, forward scratch, and logits, and releases
+the read-only model mapping after loading. Auxiliary non-hot setup paths can
+allocate. The native `.bin` path retains its distinct format.
+The Windows Release build creates `casper.dll` and tests its exported FFI
+functions with `test_ffi_host.exe`. A passing smoke/ASan test does not
+establish absence of every memory error.
 Production release requires model checkpoints, end-to-end source/citation
 checks, concurrency and extended malformed-input testing, ABI compatibility
 verification and a complete supported toolchain/CI matrix.

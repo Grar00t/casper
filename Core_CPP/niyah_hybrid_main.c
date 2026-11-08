@@ -263,8 +263,12 @@ static int audit_stdin(void)
         khz_pass = khz.is_coherent;
         if (kb) violation = niyah_rule_check(kb, prompt, text);
         rules_pass = (violation == NULL);
-        niyah_proof_generate_hashed(prompt, text, rules_hash_ptr, proof);
-        receipt_created = true;
+        if(niyah_proof_generate_v1(prompt, text, rules_bound ? rules_path : NULL, proof) != 0) {
+            memset(proof, 0, sizeof proof);
+            error = "V1 digest generation failed";
+        } else {
+            receipt_created = true;
+        }
         if (!rules_hash_ptr) niyah_sha256((const uint8_t *)"", 0u, rules_hash);
         niyah_hash_to_hex(proof, proof_hex);
         niyah_hash_to_hex(rules_hash, rules_hex);
@@ -284,7 +288,7 @@ static int audit_stdin(void)
     printf(",\"verification_scope\":\"khz_q_heuristic+text_rules\"");
     printf(",\"factual_truth_verified\":false");
     printf(",\"chain_hash\":\"%s\"", proof_hex);
-    printf(",\"proof_kind\":\"NIYAH-PROOF-V2\"");
+    printf(",\"proof_kind\":\"NIYAH-PROOF-V1\"");
     printf(",\"rules_bound\":%s", rules_bound ? "true" : "false");
     printf(",\"rules_hash\":\"%s\"", rules_hex);
     printf(",\"confidence\":%.6f", local_gate_verified ? (double)khz.energy_preserved : 0.0);
@@ -458,8 +462,9 @@ char *niyah_hybrid_generate(NiyahModel *m, const char *prompt,
     }
 
     if (proof_out) memset(proof_out, 0, 32u);
-    if (proof_out && generate_proof && result && !rules)
-        niyah_proof_generate(prompt, result, NULL, proof_out);
+    if (proof_out && generate_proof && result && !rules &&
+        niyah_proof_generate_v1(prompt, result, NULL, proof_out) != 0)
+        memset(proof_out, 0, 32u);
 
     free(prompt_tokens);
     free(out_tokens);
@@ -474,6 +479,7 @@ static int run_all_smoke(void) {
     total_fail += niyah_rule_smoke();
     total_fail += niyah_proof_smoke();
     total_fail += niyah_gguf_map_smoke();
+    total_fail += niyah_gguf_quant_smoke();
     {
         int pass = 0, fail = 0;
 #define KHZQ_PASS(cond, label) do { if (cond) { ++pass; } else { ++fail; (void)fprintf(stderr, "[FAIL] %s\n", label); } } while (0)
@@ -547,7 +553,7 @@ static void rag_loop(RagBackend backend, NiyahRuleKB *rules) {
 }
 
 /*
- * Each emitted response receives a self-contained V2 integrity receipt.
+ * Each emitted response receives a self-contained V1 integrity receipt.
  * Filenames are allocated monotonically without intentionally overwriting
  * an earlier session's receipts. Nothing is printed as a response if the
  * receipt cannot be saved and read back successfully.
@@ -563,9 +569,9 @@ static int save_response_proof(const char *prompt, const char *response, char pa
         if(snprintf(path,64u,"casper-response-%06u.proof",sequence)<0)return -1;
         existing=fopen(path,"rb");
         if(existing){(void)fclose(existing);continue;}
-        niyah_proof_generate(prompt,response,NULL,proof);
-        if(niyah_proof_save(path,proof,prompt,response,NULL)!=0)return -1;
-        if(!niyah_proof_verify_saved(path,NULL,&rules_bound,&rules_verified)||
+        if(niyah_proof_generate_v1(prompt,response,NULL,proof)!=0)return -1;
+        if(niyah_proof_save_v1(path,proof,prompt,response,NULL)!=0)return -1;
+        if(!niyah_proof_verify_saved_v1(path,NULL,&rules_bound,&rules_verified)||
            rules_bound||!rules_verified){(void)remove(path);return -1;}
         return 0;
     }
@@ -599,7 +605,7 @@ static int interactive_loop(NiyahModel *m, NiyahRuleKB *rules) {
 
 int main(int argc, char **argv) {
     if(argc<2){
-        (void)fprintf(stderr,"usage: %s --smoke | --audit-stdin | --verify-proof <proof> [rules-file] | --inspect-gguf <file> | --rag | --interactive <model.bin> | --model <model.bin>\n",argv[0]);
+        (void)fprintf(stderr,"usage: %s --smoke | --audit-stdin | --verify-proof <proof> [rules-file] | --inspect-gguf <file> | --gguf-forward <file> <token> [token...] | --rag | --interactive <model.bin> | --model <model.bin>\n",argv[0]);
         return 3;
     }
     if(!strcmp(argv[1],"--smoke"))return run_all_smoke();
@@ -632,6 +638,42 @@ int main(int argc, char **argv) {
             return 2;
         }
         (void)printf("receipt_integrity=verified rules_bound=%s factual_truth_verified=false\n",bound?"true":"false");
+        return 0;
+    }
+    if(!strcmp(argv[1],"--gguf-forward")){
+        NiyahGGUFRunner *m = NULL;
+        float *logits = NULL;
+        uint32_t vocab, chosen = 0u;
+        int rc;
+        if (argc < 4 || argc - 3 > (int)NIYAH_MAX_CTX) return 3;
+        rc = niyah_gguf_runner_open(&m, argv[2], (uint32_t)(argc - 3));
+        if (rc != 0 || !m) {
+            (void)fprintf(stderr, "[gguf] unsupported or corrupt GGUF (%d)\n", rc);
+            return 2;
+        }
+        vocab = niyah_gguf_runner_vocab_size(m);
+        for (int j = 3; j < argc; ++j) {
+            char *end = NULL;
+            unsigned long long t = strtoull(argv[j], &end, 10);
+            if (!argv[j][0] || !end || *end != '\0' || t >= vocab) {
+                (void)fprintf(stderr, "[gguf] invalid token: %s\n", argv[j]);
+                niyah_gguf_runner_close(m);
+                return 3;
+            }
+            logits = niyah_gguf_runner_step(m, (uint32_t)t, (uint32_t)(j - 3));
+            if (!logits) {
+                (void)fprintf(stderr, "[gguf] forward pass failed at pos=%d\n", j-3);
+                niyah_gguf_runner_close(m);
+                return 2;
+            }
+        }
+        for (uint32_t j = 1u; j < vocab; ++j)
+            if (logits[j] > logits[chosen]) chosen = j;
+        (void)printf("gguf_forward=ok vocab=%u tokens=%d argmax=%u\n",
+                     vocab, argc - 3, chosen);
+        for (uint32_t j = 0u; j < vocab && j < 8u; ++j)
+            (void)printf("logit[%u]=%.9g\n", j, (double)logits[j]);
+        niyah_gguf_runner_close(m);
         return 0;
     }
     if(!strcmp(argv[1],"--rag")){rag_loop(RAG_BACKEND_SEARXNG,NULL);return 0;}

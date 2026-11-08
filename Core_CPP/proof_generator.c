@@ -239,6 +239,26 @@ static bool proof_file_size_ok(FILE *f){
     return fseek(f,0,SEEK_SET)==0;
 }
 
+#include "niyah_proof_v1.inc"
+
+/* Compatibility wrappers all use the canonical V1 serializer and verifier. */
+int niyah_proof_v1_generate_file(const char *prompt, const char *output,
+                                 const char *rules_path, uint8_t proof[32]) {
+    return niyah_proof_generate_v1(prompt, output, rules_path, proof);
+}
+int niyah_proof_v1_save_file(const char *path, const char *prompt,
+                             const char *output, const char *rules_path) {
+    uint8_t proof[32];
+    if (niyah_proof_generate_v1(prompt, output, rules_path, proof) != 0)
+        return -1;
+    return niyah_proof_save_v1(path, proof, prompt, output, rules_path);
+}
+bool niyah_proof_v1_verify_file(const char *path, const char *rules_path,
+                                bool *rules_bound, bool *rules_verified) {
+    return niyah_proof_verify_saved_v1(path, rules_path,
+                                       rules_bound, rules_verified);
+}
+
 bool niyah_proof_verify_saved(const char *proof_path,const char *rule_file_path,bool *rules_bound,bool *rules_verified){
     FILE *f;
     char *line;
@@ -249,6 +269,18 @@ bool niyah_proof_verify_saved(const char *proof_path,const char *rule_file_path,
     if(rules_bound)*rules_bound=false;
     if(rules_verified)*rules_verified=false;
     if(!proof_path)return false;
+    {
+        FILE *version_file = niyah_fopen_utf8(proof_path, "rb");
+        char signature[14];
+        size_t n;
+        int v1;
+        if (!version_file) return false;
+        n = fread(signature, 1u, sizeof(signature), version_file);
+        v1 = n == sizeof(signature) && memcmp(signature, "NIYAH-PROOF-V1", sizeof(signature)) == 0;
+        if (fclose(version_file) != 0) return false;
+        if (v1) return niyah_proof_verify_saved_v1(proof_path, rule_file_path,
+                                                    rules_bound, rules_verified);
+    }
     f=fopen(proof_path,"rb");
     if(!f)return false;
     if(!proof_file_size_ok(f)){fclose(f);return false;}

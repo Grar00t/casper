@@ -16,14 +16,20 @@
 #ifndef KSPIKE_CASPER_FFI_H
 #define KSPIKE_CASPER_FFI_H
 
+#if defined(_WIN32) && defined(CASPER_BUILD_DLL)
+# define CASPER_FFI_API __declspec(dllexport)
+#else
+# define CASPER_FFI_API
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Initialise the Casper Engine. `model_path` may point to a model directory,
- * a single weights file, or be NULL to use a built-in default. Returns 0 on
- * success, non-zero on failure. */
-int casper_init(const char *model_path);
+/* Initialise the deterministic policy-only FFI runtime. NULL or an empty
+ * model_path succeeds; non-empty paths fail because model inference is not
+ * implemented by this ABI. Returns 0 on success, non-zero on failure. */
+CASPER_FFI_API int casper_init(const char *model_path);
 
 /* Evaluate a judgement request.
  *
@@ -49,17 +55,15 @@ int casper_init(const char *model_path);
  * error. If `out_cap` is too small to hold the response plus its terminator,
  * the function returns -1 without writing past `out_cap`.
  */
-int casper_judge_evaluate(const char *req_json, char *out, int out_cap);
+CASPER_FFI_API int casper_judge_evaluate(const char *req_json, char *out, int out_cap);
 
 /* Release all resources. After calling this, no other casper_* function may
  * be called until casper_init() is called again. */
-void casper_shutdown(void);
+CASPER_FFI_API void casper_shutdown(void);
 
-/* Returns a static, NUL-terminated string identifying the Casper Engine
- * build. KSpike logs this on startup so the audit trail captures the model
- * provenance. The returned pointer is valid for the lifetime of the
- * library. */
-const char *casper_version(void);
+/* Returns a static, NUL-terminated build identifier. This identifies the
+ * policy-only FFI runtime, not a loaded model or its provenance. */
+CASPER_FFI_API const char *casper_version(void);
 
 #ifdef __cplusplus
 } /* extern "C" */

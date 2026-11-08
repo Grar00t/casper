@@ -28,6 +28,32 @@ bool niyah_sha256_file(const char *path, uint8_t out[32]);
 /* Convert 32-byte hash to 64-char hex string (null-terminated, needs 65 bytes). */
 void niyah_hash_to_hex(const uint8_t hash[32], char hex[65]);
 
+/* V1: SHA256(exact UTF-8 prompt bytes || output bytes || raw file bytes).
+ * rules_path == NULL or empty means zero rule bytes. A non-empty path must
+ * exist and be readable. These operations do not use rule digests as a
+ * substitute for the actual rule bytes. Return 0 on success, -1 on failure.
+ */
+int niyah_proof_generate_v1(const char *prompt, const char *output,
+                            const char *rules_path, uint8_t proof[32]);
+int niyah_proof_save_v1(const char *path, const uint8_t proof[32],
+                        const char *prompt, const char *output,
+                        const char *rules_path);
+/* V1 canonical on-disk receipt (eight LF-delimited lines):
+ * NIYAH-PROOF-V1, hash, prompt_hash, output_hash, rules_hash,
+ * rules_bytes, prompt_hex, output_hex. Verification re-reads the original
+ * rule file. No-rule receipts verify without a rule-file path.
+ */
+bool niyah_proof_verify_saved_v1(const char *path, const char *rules_path,
+                                 bool *rules_bound, bool *rules_verified);
+
+/* Stable V1 aliases: all emit and accept the single canonical rules_bytes schema. */
+int niyah_proof_v1_generate_file(const char *prompt, const char *output,
+                                 const char *rules_path, uint8_t proof[32]);
+int niyah_proof_v1_save_file(const char *path, const char *prompt,
+                             const char *output, const char *rules_path);
+bool niyah_proof_v1_verify_file(const char *path, const char *rules_path,
+                                bool *rules_bound, bool *rules_verified);
+
 /*
  * Generate a V2 receipt hash from prompt/output/rule material.
  * rule_material is the exact rule-file CONTENT, not a path. NULL is the empty

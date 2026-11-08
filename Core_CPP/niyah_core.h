@@ -94,6 +94,20 @@ typedef struct {
     uint64_t seed;
 } NiyahSampler;
 
+/* GGUF decoder: weights remain mapped read-only; all token-step workspace
+ * (KV cache, attention/FFN scratch, logits) lives in one allocated pool.
+ * Only dense llama/qwen3 tensor layouts and explicitly decoded types load.
+ * ctx_override=0 requests min(model context,512). Step positions are
+ * strictly consecutive from 0; reset starts a fresh sequence. */
+typedef struct NiyahGGUFRunner NiyahGGUFRunner;
+int niyah_gguf_runner_open(NiyahGGUFRunner **out, const char *path,
+                           uint32_t ctx_override);
+float *niyah_gguf_runner_step(NiyahGGUFRunner *model, uint32_t token, uint32_t pos);
+uint32_t niyah_gguf_runner_vocab_size(const NiyahGGUFRunner *model);
+void niyah_gguf_runner_reset(NiyahGGUFRunner *model);
+void niyah_gguf_runner_close(NiyahGGUFRunner *model);
+int niyah_gguf_quant_smoke(void);
+
 NiyahModel *niyah_alloc(const NiyahConfig *cfg);
 void        niyah_free (NiyahModel *m);
 int  niyah_save(const NiyahModel *m, const char *path);
